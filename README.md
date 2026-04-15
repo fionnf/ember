@@ -15,6 +15,7 @@ Long-press → both go dark.  Long-press again → both wake up.
 | `sk6812.py` | PIO-based SK6812 RGBW driver |
 | `touch.py` | Capacitive touch detection |
 | `colour.py` | Organic colour engine (palette, fades, breathing) |
+| `mqtt_smoke.py` | WiFi + MQTT smoke test for a single board |
 
 ---
 
@@ -106,6 +107,52 @@ If touches aren't detected (or there are false triggers):
    - Decrease if it misses real touches
 4. For very long wires to the pad, you may need a smaller pull-down
    resistor (e.g., 470 kΩ instead of 1 MΩ)
+
+---
+
+## Quick WiFi + MQTT smoke test
+
+If you only have one Pico right now, use `mqtt_smoke.py` to confirm the board
+can join WiFi and publish to the cloud broker.
+
+### What it does
+
+- connects to the WiFi settings in `config.py`
+- connects to the MQTT broker in `config.py`
+- publishes a **retained** JSON message to:
+
+```text
+<MQTT_TOPIC_PREFIX>/smoke
+```
+
+- sends a heartbeat every 15 seconds
+
+### How to use it
+
+1. Upload `mqtt_smoke.py` to the Pico.
+2. If you want it to auto-run on boot, temporarily rename it to `main.py`
+   on that board.
+3. Open a cloud MQTT viewer such as:
+   - HiveMQ WebSocket client
+   - MQTT Explorer
+   - `mosquitto_sub`
+4. Subscribe to:
+
+```text
+<MQTT_TOPIC_PREFIX>/smoke
+```
+
+You should see a retained `boot` message first, then periodic `heartbeat`
+messages.
+
+### Example subscribe command
+
+```bash
+mosquitto_sub -h broker.hivemq.com -p 1883 -t 'picolight_lf26/smoke' -v
+```
+
+If you change `MQTT_TOPIC_PREFIX` in `config.py`, use that value in the
+subscribe topic.
 
 ---
 
