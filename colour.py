@@ -10,7 +10,8 @@ from config import (
     FADE_STEPS, FADE_DELAY_MS,
     BREATHE_SPEED, BREATHE_DEPTH,
     IDLE_DRIFT_INTERVAL_S,
-    NUM_LEDS, LED_BRIGHTNESS, NUM_GROUPS,
+    NUM_LEDS, LED_BRIGHTNESS,
+    NUM_GROUPS, GROUP_MIN_LEDS, GROUP_MAX_LEDS,
 )
 try:
     from config import REVERSE_LEDS
@@ -27,6 +28,29 @@ def _lerp_colour(c1, c2, t):
 
 def _rand_float(lo, hi):
     return lo + (urandom.getrandbits(16) / 65535.0) * (hi - lo)
+
+def _random_partition(total, n, mn, mx):
+    """
+    Split `total` LEDs into `n` groups, each between mn and mx LEDs.
+    Returns a list of n integers that sum to total.
+    """
+    mn = max(1, mn)
+    mx = min(mx, total - (n - 1) * mn)  # ensure others can have at least mn
+    sizes = []
+    remaining = total
+    for i in range(n):
+        left = n - i
+        lo = max(mn, remaining - left * mx)
+        hi = min(mx, remaining - (left - 1) * mn)
+        if lo > hi:
+            lo = hi = remaining - (left - 1) * mn
+        size = int(_rand_float(lo, hi + 1))
+        size = max(mn, min(mx, size))
+        sizes.append(size)
+        remaining -= size
+    # Distribute any rounding remainder into the last group
+    sizes[-1] += remaining
+    return sizes
 
 def _palette_colour(position):
     n = len(TINT_PALETTE)
@@ -71,6 +95,8 @@ class ColourEngine:
         self._w_fading    = [False] * n
         # Breathing — stagger starting phases so groups pulse out of sync
         self._breathe_phase = [i * (6.28 / n) for i in range(n)]
+        # LED counts per group — re-randomised on every impulse
+        self._group_sizes   = _random_partition(NUM_LEDS, n, GROUP_MIN_LEDS, GROUP_MAX_LEDS)
 
         self._powered_on  = True
         self._power_level = 1.0
@@ -83,10 +109,11 @@ class ColourEngine:
     def impulse(self):
         if not self._powered_on:
             return
+        # Re-partition the strip into new random group sizes
+        self._group_sizes = _random_partition(NUM_LEDS, self._n, GROUP_MIN_LEDS, GROUP_MAX_LEDS)
         for i in range(self._n):
-            shift     = _rand_float(HUE_SHIFT_MIN, HUE_SHIFT_MAX)
-            direction = 1 if urandom.getrandbits(1) else -1
-            new_pos   = max(0.0, min(1.0, self._pos[i] + direction * shift))
+            # Jump to a fully random palette position — no sequential order
+            new_pos = _rand_float(0.0, 1.0)
             self._start_fade(i, new_pos)
             self._w_target[i] = _rand_float(0.6, 1.0)
             self._w_step[i]   = 0
@@ -99,10 +126,13 @@ class ColourEngine:
     def force_colour(self, palette_pos):
         if not self._powered_on:
             return
+        self._group_sizes = _random_partition(NUM_LEDS, self._n, GROUP_MIN_LEDS, GROUP_MAX_LEDS)
         for i in range(self._n):
-            jitter  = _rand_float(-0.08, 0.08)
-            new_pos = max(0.0, min(1.0, palette_pos + jitter))
+            new_pos = _rand_float(0.0, 1.0)
             self._start_fade(i, new_pos)
+            self._w_target[i] = _rand_float(0.6, 1.0)
+            self._w_step[i]   = 0
+            self._w_fading[i] = True
 
     def set_power(self, on):
         if on != self._powered_on:
@@ -136,14 +166,14 @@ class ColourEngine:
             self._last_drift = utime.time()
             self.impulse()
 
-        leds_per_group = NUM_LEDS // self._n
         strip.set_brightness(LED_BRIGHTNESS)
+        cursor = 0
 
         for i in range(self._n):
             # Hue fade
             if self._fading[i]:
                 t = self._fade_step[i] / FADE_STEPS
-                self._colour[i]   = _lerp_colour(self._colour[i], self._target_col[i], t)
+                self._colour[i]    = _lerp_colour(self._colour[i], self._target_col[i], t)
                 self._fade_step[i] += 1
                 if self._fade_step[i] >= FADE_STEPS:
                     self._fading[i]  = False
@@ -165,16 +195,16 @@ class ColourEngine:
 
             scale = breath * self._power_level
             r, g, b, w = self._colour[i]
-            r    = min(255, int(r * scale))
-            g    = min(255, int(g * scale))
-            b    = min(255, int(b * scale))
-            w    = min(255, int(w * self._w_level[i] * scale))
+            r = min(255, int(r * scale))
+            g = min(255, int(g * scale))
+            b = min(255, int(b * scale))
+            w = min(255, int(w * self._w_level[i] * scale))
 
-            start = i * leds_per_group
-            end   = NUM_LEDS if i == self._n - 1 else start + leds_per_group
-            for j in range(start, end):
+            group_end = cursor + self._group_sizes[i]
+            for j in range(cursor, group_end):
                 idx = (NUM_LEDS - 1 - j) if REVERSE_LEDS else j
                 strip.set(idx, r, g, b, w)
+            cursor = group_end
 
         strip.show()
 
