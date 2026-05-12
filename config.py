@@ -97,10 +97,10 @@ GROUP_MAX_LEDS = 8    # a group won't consume more than this many LEDs
 
 # ── Animation parameters ─────────────────────────────────────
 FADE_STEPS     = 60            # steps in a colour-change crossfade
-FADE_DELAY_MS  = 16            # ms between fade steps  (~60 fps)
+FADE_DELAY_MS  = 160            # ms between fade steps  (~60 fps)
 BREATHE_SPEED  = 0.0008        # how fast brightness "breathes" when idle
 BREATHE_DEPTH  = 0.1          # how much brightness oscillates (0 = none)
-IDLE_DRIFT_INTERVAL_S = 45     # seconds between autonomous gentle hue drifts
+IDLE_DRIFT_INTERVAL_S = 65     # seconds between autonomous gentle hue drifts
 
 # ── WebREPL ─────────────────────────────────────────────────
 # Allows wireless file editing and REPL access over WiFi.
