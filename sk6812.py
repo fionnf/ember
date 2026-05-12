@@ -89,7 +89,7 @@ class SK6812:
             # Pack as 32-bit: G(8) R(8) B(8) W(8)  — sent MSB first
             buf[i] = (gi << 24) | (ri << 16) | (bi << 8) | wi
         # Write 32 bits per LED; PIO autopulls on 32-bit threshold
-        self._sm.put(buf, 8)
+        self._sm.put(buf, 0)
 
     def off(self):
         """Turn all LEDs off immediately."""

@@ -11,13 +11,14 @@ from umqtt.simple import MQTTClient
 
 from config import (
     BOARD_ID,
-    WIFI_SSID, WIFI_PASSWORD,
+    WIFI_NETWORKS,
     MQTT_BROKER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD,
     MQTT_TOPIC_PREFIX,
     LED_PIN, NUM_LEDS, LED_BRIGHTNESS,
     TOUCH_PINS,
     FADE_DELAY_MS,
     RECONNECT_DELAY_MS,
+    WEBREPL_PASSWORD,
 )
 from sk6812 import SK6812
 from touch   import TouchManager
@@ -41,15 +42,36 @@ def connect_wifi():
     wlan.active(True)
     if wlan.isconnected():
         return wlan
-    print(f"[wifi] connecting to {WIFI_SSID}...")
-    wlan.connect(WIFI_SSID, WIFI_PASSWORD)
-    deadline = utime.ticks_add(utime.ticks_ms(), 20_000)
-    while not wlan.isconnected():
-        if utime.ticks_diff(deadline, utime.ticks_ms()) <= 0:
-            raise OSError("WiFi timeout")
-        utime.sleep_ms(200)
-    print(f"[wifi] connected — IP {wlan.ifconfig()[0]}")
-    return wlan
+
+    # Scan for visible SSIDs so we skip networks that aren't in range
+    print("[wifi] scanning...")
+    visible = set()
+    try:
+        for ap in wlan.scan():
+            visible.add(ap[0].decode("utf-8", "ignore"))
+    except Exception:
+        pass  # scan failed — just try all networks anyway
+    print(f"[wifi] visible networks: {visible}")
+
+    for ssid, password in WIFI_NETWORKS:
+        if visible and ssid not in visible:
+            print(f"[wifi] {ssid} not in range, skipping")
+            continue
+        print(f"[wifi] trying {ssid}...")
+        wlan.connect(ssid, password)
+        deadline = utime.ticks_add(utime.ticks_ms(), 12_000)
+        while not wlan.isconnected():
+            if utime.ticks_diff(deadline, utime.ticks_ms()) <= 0:
+                print(f"[wifi] {ssid} timed out")
+                wlan.disconnect()
+                utime.sleep_ms(500)
+                break
+            utime.sleep_ms(200)
+        if wlan.isconnected():
+            print(f"[wifi] connected to {ssid} — IP {wlan.ifconfig()[0]}")
+            return wlan
+
+    raise OSError("No known WiFi network found")
 
 
 # ── MQTT ─────────────────────────────────────────────────────
@@ -128,23 +150,28 @@ def main():
     # Initial LED feedback
     startup_animation()
 
-    # Connect WiFi (blocking, with retry)
-    while True:
-        try:
-            connect_wifi()
-            break
-        except OSError as e:
-            print(f"[wifi] failed: {e}, retrying...")
-            utime.sleep_ms(RECONNECT_DELAY_MS)
+    # Connect WiFi — best-effort, continue offline if it fails
+    wifi_ok = False
+    try:
+        connect_wifi()
+        wifi_ok = True
+    except OSError as e:
+        print(f"[wifi] failed: {e} — running offline")
 
-    # Connect MQTT (blocking, with retry)
-    while True:
+    # Start WebREPL if WiFi is up — allows wireless file editing
+    if wifi_ok:
         try:
-            client = connect_mqtt()
-            break
+            import webrepl
+            webrepl.start(password=WEBREPL_PASSWORD)
+            print(f"[webrepl] started — connect at ws://<board-ip>:8266")
         except Exception as e:
-            print(f"[mqtt] connect failed: {e}, retrying...")
-            utime.sleep_ms(RECONNECT_DELAY_MS)
+            print(f"[webrepl] failed to start: {e}")
+
+    # Connect MQTT — best-effort, continue without sync if it fails
+    try:
+        client = connect_mqtt()
+    except Exception as e:
+        print(f"[mqtt] connect failed: {e} — running standalone")
 
     # Calibrate touch baseline (nobody touching at boot)
     print("[touch] calibrating baseline...")
@@ -152,26 +179,26 @@ def main():
     print("[touch] ready")
 
     last_frame = utime.ticks_ms()
+    _reconnect_at = utime.ticks_add(utime.ticks_ms(), RECONNECT_DELAY_MS)
 
     while True:
         now = utime.ticks_ms()
 
-        # ── Reconnect MQTT if disconnected ──
-        if client is None:
+        # ── Reconnect MQTT in the background if disconnected ──
+        if client is None and utime.ticks_diff(now, _reconnect_at) >= 0:
             try:
                 client = connect_mqtt()
             except Exception as e:
                 print(f"[mqtt] reconnect failed: {e}")
-                utime.sleep_ms(RECONNECT_DELAY_MS)
-                continue
+            _reconnect_at = utime.ticks_add(now, RECONNECT_DELAY_MS)
 
         # ── Poll MQTT for incoming messages ──
-        try:
-            client.check_msg()    # non-blocking poll
-        except Exception as e:
-            print(f"[mqtt] check_msg error: {e}")
-            client = None
-            continue
+        if client is not None:
+            try:
+                client.check_msg()    # non-blocking poll
+            except Exception as e:
+                print(f"[mqtt] check_msg error: {e}")
+                client = None
 
         # ── Poll touch sensors ──
         event = touch.update()
@@ -191,7 +218,6 @@ def main():
             engine.tick(strip)
             last_frame = now
 
-        # Tiny yield to keep the MQTT stack healthy
         utime.sleep_ms(1)
 
 

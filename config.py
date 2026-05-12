@@ -6,8 +6,12 @@
 BOARD_ID = "board_a"          # Change to "board_b" on the second Pico
 
 # ── WiFi credentials ────────────────────────────────────────
-WIFI_SSID     = "your_wifi_name"
-WIFI_PASSWORD = "your_wifi_password"
+# List all known networks — the board will try each in order until one connects.
+WIFI_NETWORKS = [
+    ("eth-iot",       "-6uWFXWia3Vb"),
+    ("Gaydar",  "rainb0wLAN"),
+    # ("iPhone",      "hotspotpass"),
+]
 
 # ── MQTT broker ─────────────────────────────────────────────
 # Both boards must be able to reach this address.
@@ -22,46 +26,50 @@ MQTT_PASSWORD = ""             # Leave empty if not required
 MQTT_TOPIC_PREFIX = "picolight_lf26"   # ← change this to something personal
 
 # ── LED strip ───────────────────────────────────────────────
-LED_PIN        = 0             # GPIO pin connected to DIN of SK6812 strip
-NUM_LEDS       = 8             # Number of LEDs on the strip
+LED_PIN        = 5             # GPIO pin connected to DIN of SK6812 strip
+NUM_LEDS       = 10            # Number of LEDs on the strip
 LED_BRIGHTNESS = 0.6           # 0.0 – 1.0  global brightness cap
+# REVERSE_LEDS = True          # Uncomment on board_b if connected to the far end of the strip
 
 # ── Capacitive touch sensors ────────────────────────────────
 # List all GPIO pins that have a touch sensor attached.
 # You can attach as many as you like — any sensor can trigger events.
-TOUCH_PINS = [14]              # e.g. [14, 15]  for two sensors
+TOUCH_PINS = [12]              # e.g. [14, 15]  for two sensors
 
 # Touch detection threshold: lower = more sensitive.
 # Raw ADC on the Pico reads charge/discharge time via a resistor.
 # Typical resting value ~5–50; touch raises it significantly.
 # Tune this per your setup (see README for calibration tip).
-TOUCH_THRESHOLD   = 400        # counts above baseline = "touched"
+TOUCH_THRESHOLD   = 1        # counts above baseline = "touched"
 HOLD_TIME_MS      = 3000        # ms held before it counts as a "long press" (toggle off/on)
 
 # ── Colour palette ──────────────────────────────────────────
 # Base warm-white RGBW values  (R, G, B, W)  — 0-255 each
 # W channel carries most of the warmth; RGB adds tint.
-BASE_WARM_WHITE = (255, 160, 60, 220)
+BASE_WARM_WHITE = (0, 0, 0, 200)       # W channel only — pure warm white LED
 
 # How much each impulse can shift hue (0.0 – 1.0 of the full palette)
-HUE_SHIFT_MIN  = 0.02
-HUE_SHIFT_MAX  = 0.20
+HUE_SHIFT_MIN  = 0.20
+HUE_SHIFT_MAX  = 0.50
 
 # Palette of possible hue tints blended on top of warm white.
 # Each entry is (R, G, B) normalised 0-255.  Order matters — adjacent
 # entries will drift between each other smoothly.
 TINT_PALETTE = [
-    (255, 160,  60),   # 0  warm amber
-    (255, 200, 100),   # 1  golden
-    (255, 240, 200),   # 2  soft white
-    (200, 220, 255),   # 3  cool white / daylight
-    (160, 180, 255),   # 4  blue-white
-    (180, 140, 255),   # 5  lavender
-    (120, 100, 220),   # 6  purple
-    (100, 220, 180),   # 7  aqua-green
-    (140, 255, 160),   # 8  soft green
-    (255, 180, 120),   # 9  peach
+    (255, 180,   0),   # 0  warm amber
+    (255, 100,   0),   # 1  orange
+    (255,   0,   0),   # 2  red
+    (255,   0, 120),   # 3  hot pink
+    (180,   0, 255),   # 4  purple
+    (  0,   0, 255),   # 5  blue
+    (  0, 180, 255),   # 6  cyan
+    (  0, 255,  80),   # 7  green
+    (180, 255,   0),   # 8  lime
+    (255, 200,   0),   # 9  yellow
 ]
+
+# Number of independent colour groups the strip is divided into
+NUM_GROUPS = 3
 
 # ── Animation parameters ─────────────────────────────────────
 FADE_STEPS     = 60            # steps in a colour-change crossfade
@@ -69,6 +77,11 @@ FADE_DELAY_MS  = 16            # ms between fade steps  (~60 fps)
 BREATHE_SPEED  = 0.0008        # how fast brightness "breathes" when idle
 BREATHE_DEPTH  = 0.08          # how much brightness oscillates (0 = none)
 IDLE_DRIFT_INTERVAL_S = 45     # seconds between autonomous gentle hue drifts
+
+# ── WebREPL ─────────────────────────────────────────────────
+# Allows wireless file editing and REPL access over WiFi.
+# Connect at http://micropython.org/webrepl/ using the board's IP address.
+WEBREPL_PASSWORD = "linked1"   # 4–9 characters
 
 # ── Reconnect behaviour ─────────────────────────────────────
 RECONNECT_DELAY_MS = 5000      # ms to wait before retrying WiFi / MQTT

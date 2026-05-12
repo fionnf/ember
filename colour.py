@@ -1,10 +1,6 @@
 # ============================================================
 #  colour.py  —  Organic colour engine
 # ============================================================
-# All colours are warm white by default, with occasional tint
-# shifts driven by touch impulses or autonomous idle drift.
-# Everything is expressed as RGBW tuples (0-255 each).
-
 import math
 import urandom
 import utime
@@ -14,173 +10,184 @@ from config import (
     FADE_STEPS, FADE_DELAY_MS,
     BREATHE_SPEED, BREATHE_DEPTH,
     IDLE_DRIFT_INTERVAL_S,
-    NUM_LEDS, LED_BRIGHTNESS,
+    NUM_LEDS, LED_BRIGHTNESS, NUM_GROUPS,
 )
+try:
+    from config import REVERSE_LEDS
+except ImportError:
+    REVERSE_LEDS = False
 
 # ── Helpers ──────────────────────────────────────────────────
 
 def _lerp(a, b, t):
-    """Linear interpolate between two values."""
     return a + (b - a) * t
 
 def _lerp_colour(c1, c2, t):
-    """Interpolate between two (R,G,B,W) tuples."""
     return tuple(int(_lerp(a, b, t)) for a, b in zip(c1, c2))
 
-def _palette_colour(position: float) -> tuple:
-    """
-    Sample the TINT_PALETTE at a float position 0.0–1.0.
-    Returns an (R, G, B, W) tuple blended with BASE_WARM_WHITE.
-    position=0 → pure warm white; position=1 → fully saturated tint.
-    """
+def _rand_float(lo, hi):
+    return lo + (urandom.getrandbits(16) / 65535.0) * (hi - lo)
+
+def _palette_colour(position):
     n = len(TINT_PALETTE)
-    # Map position to palette index with smooth interpolation
-    scaled  = position * (n - 1)
-    idx     = int(scaled)
-    frac    = scaled - idx
+    scaled = position * (n - 1)
+    idx    = int(scaled)
+    frac   = scaled - idx
     if idx >= n - 1:
         tint_rgb = TINT_PALETTE[-1]
     else:
         c1, c2   = TINT_PALETTE[idx], TINT_PALETTE[idx + 1]
         tint_rgb = tuple(int(_lerp(a, b, frac)) for a, b in zip(c1, c2))
 
-    # Blend tint into warm-white base
-    # W channel decreases as colour saturation increases
-    saturation = position * 0.6        # max 60% tint saturation feels organic
-    r = int(_lerp(BASE_WARM_WHITE[0], tint_rgb[0], saturation))
-    g = int(_lerp(BASE_WARM_WHITE[1], tint_rgb[1], saturation))
-    b = int(_lerp(BASE_WARM_WHITE[2], tint_rgb[2], saturation))
-    w = int(BASE_WARM_WHITE[3] * (1.0 - saturation * 0.5))
+    sat = position
+    r = int(_lerp(BASE_WARM_WHITE[0], tint_rgb[0], sat))
+    g = int(_lerp(BASE_WARM_WHITE[1], tint_rgb[1], sat))
+    b = int(_lerp(BASE_WARM_WHITE[2], tint_rgb[2], sat))
+    w = int(BASE_WARM_WHITE[3] * (1.0 - sat))  # W fades out as colour takes over
     return (r, g, b, w)
 
 
-# ── ColourEngine class ───────────────────────────────────────
+# ── ColourEngine ─────────────────────────────────────────────
 
 class ColourEngine:
     """
-    Maintains current colour state and drives organic transitions.
-
-    Typical loop usage:
-        engine.tick(strip)    # call every ~16 ms
-        engine.impulse()      # call when a touch event fires
-        engine.toggle_power() # call on long-press
+    NUM_GROUPS independent colour groups across the strip.
+    Each group fades to its own palette position and warm-white level.
     """
 
     def __init__(self):
-        self._palette_pos  = 0.0         # 0.0 = warmest white, 1.0 = most tinted
-        self._target_pos   = 0.0
-        self._current_colour  = BASE_WARM_WHITE
-        self._target_colour   = BASE_WARM_WHITE
-        self._fade_step    = 0
-        self._fading       = False
-        self._powered_on   = True
-        self._breathe_phase = 0.0
-        self._last_drift   = utime.time()
-        self._time_ms      = utime.ticks_ms()
+        n = NUM_GROUPS
+        self._n           = n
+        self._pos         = [0.0] * n
+        self._target_pos  = [0.0] * n
+        self._colour      = [BASE_WARM_WHITE] * n
+        self._target_col  = [BASE_WARM_WHITE] * n
+        self._fade_step   = [0] * n
+        self._fading      = [False] * n
+        # Warm-white intensity per group (0.6–1.0)
+        self._w_level     = [1.0] * n
+        self._w_target    = [1.0] * n
+        self._w_step      = [0] * n
+        self._w_fading    = [False] * n
+        # Breathing — stagger starting phases so groups pulse out of sync
+        self._breathe_phase = [i * (6.28 / n) for i in range(n)]
+
+        self._powered_on  = True
+        self._power_level = 1.0
+        self._power_dir   = 0
+        self._last_drift  = utime.time()
+        self._time_ms     = utime.ticks_ms()
 
     # ── Public controls ─────────────────────────────────────
 
     def impulse(self):
-        """
-        Fired by a touch event.  Picks a new nearby colour and starts fading.
-        """
         if not self._powered_on:
             return
-        shift = _rand_float(HUE_SHIFT_MIN, HUE_SHIFT_MAX)
-        # Randomly go left or right along the palette
-        direction = 1 if urandom.getrandbits(1) else -1
-        new_pos   = self._palette_pos + direction * shift
-        new_pos   = max(0.0, min(1.0, new_pos))
-        self._start_fade(new_pos)
+        for i in range(self._n):
+            shift     = _rand_float(HUE_SHIFT_MIN, HUE_SHIFT_MAX)
+            direction = 1 if urandom.getrandbits(1) else -1
+            new_pos   = max(0.0, min(1.0, self._pos[i] + direction * shift))
+            self._start_fade(i, new_pos)
+            self._w_target[i] = _rand_float(0.6, 1.0)
+            self._w_step[i]   = 0
+            self._w_fading[i] = True
 
     def toggle_power(self):
-        """Long-press handler: turn off or turn on."""
         self._powered_on = not self._powered_on
-        if self._powered_on:
-            self._start_fade(self._palette_pos)
-        # Off state: strip cleared in tick()
+        self._power_dir  = 1 if self._powered_on else -1
 
-    def force_colour(self, palette_pos: float):
-        """
-        Externally set palette position (called when MQTT event arrives).
-        Mirrors what impulse() would have picked on the remote board.
-        """
+    def force_colour(self, palette_pos):
         if not self._powered_on:
             return
-        self._start_fade(palette_pos)
+        for i in range(self._n):
+            jitter  = _rand_float(-0.08, 0.08)
+            new_pos = max(0.0, min(1.0, palette_pos + jitter))
+            self._start_fade(i, new_pos)
 
-    def set_power(self, on: bool):
-        """Sync power state from remote board."""
+    def set_power(self, on):
         if on != self._powered_on:
             self.toggle_power()
 
     # ── Tick ─────────────────────────────────────────────────
 
     def tick(self, strip):
-        """
-        Must be called every frame (ideally every FADE_DELAY_MS ms).
-        Updates animations and pushes to the strip.
-        """
         now = utime.ticks_ms()
         dt  = utime.ticks_diff(now, self._time_ms)
         self._time_ms = now
 
-        if not self._powered_on:
+        # Power fade
+        if self._power_dir != 0:
+            self._power_level += self._power_dir * (dt / 800.0)
+            if self._power_level >= 1.0:
+                self._power_level = 1.0
+                self._power_dir   = 0
+            elif self._power_level <= 0.0:
+                self._power_level = 0.0
+                self._power_dir   = 0
+                strip.off()
+                return
+
+        if not self._powered_on and self._power_level == 0.0:
             strip.off()
             return
 
-        # ── Advance fade ──
-        if self._fading:
-            t = self._fade_step / FADE_STEPS
-            self._current_colour = _lerp_colour(
-                self._current_colour, self._target_colour, t
-            )
-            self._fade_step += 1
-            if self._fade_step >= FADE_STEPS:
-                self._fading         = False
-                self._current_colour = self._target_colour
-                self._palette_pos    = self._target_pos
-
-        # ── Breathing brightness ──
-        self._breathe_phase += BREATHE_SPEED * dt
-        breath = 1.0 + math.sin(self._breathe_phase) * BREATHE_DEPTH
-
-        # ── Autonomous idle drift ──
-        if utime.time() - self._last_drift > IDLE_DRIFT_INTERVAL_S:
+        # Idle drift
+        if self._powered_on and utime.time() - self._last_drift > IDLE_DRIFT_INTERVAL_S:
             self._last_drift = utime.time()
             self.impulse()
 
-        # ── Apply to strip ──
-        r, g, b, w = self._current_colour
-        r = min(255, int(r * breath))
-        g = min(255, int(g * breath))
-        b = min(255, int(b * breath))
-        w = min(255, int(w * breath))
+        leds_per_group = NUM_LEDS // self._n
         strip.set_brightness(LED_BRIGHTNESS)
-        strip.set_all(r, g, b, w)
+
+        for i in range(self._n):
+            # Hue fade
+            if self._fading[i]:
+                t = self._fade_step[i] / FADE_STEPS
+                self._colour[i]   = _lerp_colour(self._colour[i], self._target_col[i], t)
+                self._fade_step[i] += 1
+                if self._fade_step[i] >= FADE_STEPS:
+                    self._fading[i]  = False
+                    self._colour[i]  = self._target_col[i]
+                    self._pos[i]     = self._target_pos[i]
+
+            # W-level fade
+            if self._w_fading[i]:
+                t = self._w_step[i] / FADE_STEPS
+                self._w_level[i] = _lerp(self._w_level[i], self._w_target[i], t)
+                self._w_step[i] += 1
+                if self._w_step[i] >= FADE_STEPS:
+                    self._w_fading[i] = False
+                    self._w_level[i]  = self._w_target[i]
+
+            # Breathing
+            self._breathe_phase[i] += BREATHE_SPEED * dt
+            breath = 1.0 + math.sin(self._breathe_phase[i]) * BREATHE_DEPTH
+
+            scale = breath * self._power_level
+            r, g, b, w = self._colour[i]
+            r    = min(255, int(r * scale))
+            g    = min(255, int(g * scale))
+            b    = min(255, int(b * scale))
+            w    = min(255, int(w * self._w_level[i] * scale))
+
+            start = i * leds_per_group
+            end   = NUM_LEDS if i == self._n - 1 else start + leds_per_group
+            for j in range(start, end):
+                idx = (NUM_LEDS - 1 - j) if REVERSE_LEDS else j
+                strip.set(idx, r, g, b, w)
+
         strip.show()
 
-    # ── State export/import for MQTT ────────────────────────
+    # ── MQTT payload ────────────────────────────────────────
 
-    def get_event_payload(self) -> dict:
-        """Return a dict to publish over MQTT after a local impulse."""
-        return {
-            "pos": round(self._target_pos, 4),
-            "on":  self._powered_on,
-        }
+    def get_event_payload(self):
+        avg_pos = sum(self._pos) / self._n
+        return {"pos": round(avg_pos, 4), "on": self._powered_on}
 
     # ── Internal ─────────────────────────────────────────────
 
-    def _start_fade(self, new_pos: float):
-        self._target_pos    = new_pos
-        self._target_colour = _palette_colour(new_pos)
-        self._fade_step     = 0
-        self._fading        = True
-
-
-# ── Utility ──────────────────────────────────────────────────
-
-def _rand_float(lo: float, hi: float) -> float:
-    """Random float in [lo, hi]."""
-    r = urandom.getrandbits(16) / 65535.0
-    return lo + r * (hi - lo)
+    def _start_fade(self, group, new_pos):
+        self._target_pos[group] = new_pos
+        self._target_col[group] = _palette_colour(new_pos)
+        self._fade_step[group]  = 0
+        self._fading[group]     = True

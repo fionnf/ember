@@ -6,12 +6,59 @@
 #    2. Touch sensor — prints raw readings and fires events
 #
 #  Pins: LEDs on GPIO 5, touch sensor on GPIO 12
-#  Flash this as main.py (or run via REPL) to check wiring.
+#  Self-contained — flash this single file, no other project
+#  files needed on the Pico.
 # ============================================================
 
+import array
 import utime
 import machine
-from sk6812 import SK6812
+import rp2
+from machine import Pin
+
+
+# ── Inline SK6812 PIO driver ─────────────────────────────────
+
+@rp2.asm_pio(
+    sideset_init=rp2.PIO.OUT_LOW,
+    out_shiftdir=rp2.PIO.SHIFT_LEFT,
+    autopull=True,
+    pull_thresh=32,
+)
+def _sk6812_pio():
+    wrap_target()
+    label("bit_loop")
+    out(x, 1)               .side(0)  [2]
+    jmp(not_x, "zero")      .side(1)  [4]
+    jmp("bit_loop")         .side(1)  [3]
+    label("zero")
+    nop()                   .side(0)  [3]
+    wrap()
+
+
+class SK6812:
+    def __init__(self, pin: int, num_leds: int, brightness: float = 1.0):
+        self.num_leds  = num_leds
+        self.brightness = max(0.0, min(1.0, brightness))
+        self._pixels = [(0, 0, 0, 0)] * num_leds
+        self._sm = rp2.StateMachine(
+            0, _sk6812_pio, freq=10_000_000, sideset_base=Pin(pin)
+        )
+        self._sm.active(1)
+
+    def set_all(self, r=0, g=0, b=0, w=0):
+        self._pixels = [(r, g, b, w)] * self.num_leds
+
+    def show(self):
+        buf = array.array("I", [0] * self.num_leds)
+        br = self.brightness
+        for i, (r, g, bv, w) in enumerate(self._pixels):
+            buf[i] = (int(w*br) << 24) | (int(g*br) << 16) | (int(r*br) << 8) | int(bv*br)
+        self._sm.put(buf, 8)
+
+    def off(self):
+        self.set_all(0, 0, 0, 0)
+        self.show()
 
 # ── Config ───────────────────────────────────────────────────
 LED_PIN     = 5
@@ -20,7 +67,7 @@ NUM_LEDS    = 8
 BRIGHTNESS  = 0.5
 
 TOUCH_SAMPLES   = 10      # samples averaged per reading
-TOUCH_THRESHOLD = 400     # counts above baseline = "touched"
+TOUCH_THRESHOLD = 50      # counts above baseline = "touched"
 HOLD_TIME_MS    = 1000    # ms held → "hold" event
 
 # ── LED test ─────────────────────────────────────────────────

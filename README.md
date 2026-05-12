@@ -117,8 +117,7 @@ can join WiFi and publish to the cloud broker.
 
 ### What it does
 
-- connects to the WiFi settings in `config.py`
-- connects to the MQTT broker in `config.py`
+- uses the standalone settings defined directly in `mqtt_smoke.py`
 - publishes a **retained** JSON message to:
 
 ```text
@@ -129,10 +128,11 @@ can join WiFi and publish to the cloud broker.
 
 ### How to use it
 
-1. Upload `mqtt_smoke.py` to the Pico.
-2. If you want it to auto-run on boot, temporarily rename it to `main.py`
+1. Edit the WiFi and broker values at the top of `mqtt_smoke.py`.
+2. Upload `mqtt_smoke.py` to the Pico.
+3. If you want it to auto-run on boot, temporarily rename it to `main.py`
    on that board.
-3. Open a cloud MQTT viewer such as:
+4. Open a cloud MQTT viewer such as:
    - HiveMQ WebSocket client
    - MQTT Explorer
    - `mosquitto_sub`
@@ -151,8 +151,35 @@ messages.
 mosquitto_sub -h broker.hivemq.com -p 1883 -t 'picolight_lf26/smoke' -v
 ```
 
-If you change `MQTT_TOPIC_PREFIX` in `config.py`, use that value in the
+If you change `MQTT_TOPIC_PREFIX` in `mqtt_smoke.py`, use that value in the
 subscribe topic.
+
+### Verifying messages are posting
+
+You can confirm the smoke test is working in three ways:
+
+#### 1. Console output (simplest)
+When the script runs, look for lines like:
+```
+[mqtt] connected to broker.hivemq.com:1883
+[mqtt] published {"type": "boot", "board": "smoke_test_board", ...}
+[mqtt] published {"type": "heartbeat", "board": "smoke_test_board", ...}
+```
+
+#### 2. Use the standalone subscriber script
+A `mqtt_test_subscriber.py` is included to verify messages in real-time:
+```bash
+pip install paho-mqtt
+python mqtt_test_subscriber.py
+```
+Run `mqtt_smoke.py` in another terminal. The subscriber will display each boot
+and heartbeat message as it arrives.
+
+#### 3. Web MQTT client (no installation)
+- Visit [HiveMQ WebSocket Client](https://www.hivemq.com/demos/websocket-client/)
+- Connect to `broker.hivemq.com`
+- Subscribe to `picolight_smoke_test/smoke` (or your custom `MQTT_TOPIC_PREFIX`)
+- You should see the retained boot message immediately, then heartbeats every 15 seconds
 
 ---
 
