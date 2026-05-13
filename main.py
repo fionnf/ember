@@ -276,9 +276,12 @@ def main():
             print("[sync] boss published state")
             _sync_at = utime.ticks_add(now, SYNC_INTERVAL_MS)
 
-        # ── Idle drift — fires on this board and publishes to sync the other ──
+        # ── Idle drift — subtle nudge with slow fade, synced to other board ──
         if engine.check_drift():
-            engine.impulse()
+            prev_steps = engine._fade_steps
+            engine.set_fade_steps(SYNC_FADE_STEPS)  # use slow fade for drift
+            engine.drift()
+            engine.set_fade_steps(prev_steps)        # restore normal speed after
             publish_event(engine.get_event_payload())
 
         # ── Poll touch sensors ──

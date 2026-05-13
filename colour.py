@@ -146,6 +146,31 @@ class ColourEngine:
             return True
         return False
 
+    def drift(self):
+        """Subtle autonomous drift — tiny hue nudges, occasional ±1 LED group resize."""
+        if not self._powered_on:
+            return
+        for i in range(self._n):
+            # Tiny hue shift — 1–5% of the palette, same direction tendency
+            shift = _rand_float(0.01, 0.05)
+            direction = 1 if urandom.getrandbits(1) else -1
+            new_pos = max(0.0, min(1.0, self._pos[i] + direction * shift))
+            self._start_fade(i, new_pos)
+            # Small W nudge — stay within ±8% of current level
+            new_w = max(0.6, min(1.0, self._w_level[i] + _rand_float(-0.08, 0.08)))
+            self._w_target[i] = new_w
+            self._w_step[i]   = 0
+            self._w_fading[i] = True
+
+        # Occasionally shift one random group by ±1 LED
+        if urandom.getrandbits(2) == 0:  # ~25% chance per drift event
+            i = int(_rand_float(0, self._n))
+            j = i - 1 if i == self._n - 1 else i + 1
+            change = 1 if urandom.getrandbits(1) else -1
+            if self._group_sizes[i] - change >= 1 and self._group_sizes[j] + change >= 1:
+                self._group_sizes[i] -= change
+                self._group_sizes[j] += change
+
     # ── Tick ─────────────────────────────────────────────────
 
     def tick(self, strip):
