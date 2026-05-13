@@ -138,6 +138,50 @@
     }
     .cfg-field input:focus { border-color: var(--accent); }
     .cfg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+
+    /* Scenes */
+    #scenes-list {
+      display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem;
+    }
+    .scene-row {
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .scene-swatches {
+      display: flex; gap: 3px; flex-shrink: 0;
+    }
+    .scene-dot {
+      width: 12px; height: 12px; border-radius: 50%;
+    }
+    .scene-name {
+      flex: 1; font-size: 0.82rem; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .scene-load {
+      padding: 0.35rem 0.7rem; font-size: 0.75rem;
+      border-radius: 7px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--text); cursor: pointer;
+      flex-shrink: 0;
+    }
+    .scene-del {
+      padding: 0.35rem 0.5rem; font-size: 0.75rem;
+      border-radius: 7px; border: 1px solid #2a1a1a;
+      background: transparent; color: #664444; cursor: pointer;
+      flex-shrink: 0;
+    }
+    .scene-del:hover { color: #e07070; border-color: #5a2a2a; }
+    .scene-save-row {
+      display: flex; gap: 0.5rem;
+    }
+    .scene-save-row input {
+      flex: 1; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 7px; color: var(--text); font-size: 0.82rem;
+      padding: 0.5rem 0.7rem; outline: none;
+    }
+    .scene-save-row input:focus { border-color: var(--accent); }
+    .scene-save-row button {
+      flex-shrink: 0; padding: 0.5rem 1rem; font-size: 0.82rem;
+    }
+    .no-scenes { font-size: 0.75rem; color: var(--muted); text-align: center; padding: 0.5rem 0; }
   </style>
 </head>
 <body>
@@ -183,6 +227,16 @@
     <input type="range" id="sl-drift-interval" min="5" max="300" value="45"
       style="background: linear-gradient(to right, #48c9b0, #222)">
     <span class="sl-val" id="val-drift-interval">45s</span>
+  </div>
+</div>
+
+<!-- Scenes -->
+<div class="card">
+  <div class="card-title">Scenes</div>
+  <div id="scenes-list"></div>
+  <div class="scene-save-row">
+    <input id="scene-name" placeholder="Scene name…" maxlength="32">
+    <button id="btn-save-scene">Save Current</button>
   </div>
 </div>
 
@@ -603,9 +657,99 @@ document.getElementById("btn-reconnect").addEventListener("click", () => {
   renderAll(); connect();
 });
 
+// ── Scenes ───────────────────────────────────────────────────
+function loadScenes() {
+  try { return JSON.parse(localStorage.getItem("ll_scenes") || "[]"); }
+  catch(e) { return []; }
+}
+
+function saveScenes(scenes) {
+  localStorage.setItem("ll_scenes", JSON.stringify(scenes));
+}
+
+function captureScene(name) {
+  return {
+    name,
+    groups:        getGroups(),
+    boundaries:    Array.from(boundaries),
+    groupPositions: [...groupPositions],
+    groupWLevels:  [...groupWLevels],
+    brightness,
+    fadeSteps,
+    driftEnabled,
+    driftInterval,
+    on: powered,
+  };
+}
+
+function applyScene(scene) {
+  boundaries.clear();
+  (scene.boundaries || []).forEach(b => boundaries.add(b));
+  groupPositions = [...scene.groupPositions];
+  groupWLevels   = [...scene.groupWLevels];
+  brightness     = scene.brightness     ?? brightness;
+  fadeSteps      = scene.fadeSteps      ?? fadeSteps;
+  driftEnabled   = scene.driftEnabled   ?? driftEnabled;
+  driftInterval  = scene.driftInterval  ?? driftInterval;
+  powered        = scene.on             ?? powered;
+  syncBrightnessSlider();
+  syncFadeSlider();
+  syncDriftIntervalSlider();
+  updatePowerBtn();
+  updateDriftBtn();
+  renderAll();
+  publishState();
+}
+
+function renderScenes() {
+  const container = document.getElementById("scenes-list");
+  const scenes = loadScenes();
+  if (scenes.length === 0) {
+    container.innerHTML = '<div class="no-scenes">No saved scenes yet</div>';
+    return;
+  }
+  container.innerHTML = "";
+  scenes.forEach((scene, i) => {
+    const row = document.createElement("div");
+    row.className = "scene-row";
+    const swatches = (scene.groupPositions || []).map(pos => {
+      const [r,g,b] = paletteRGB(pos);
+      return `<div class="scene-dot" style="background:rgb(${r},${g},${b})"></div>`;
+    }).join("");
+    row.innerHTML = `
+      <div class="scene-swatches">${swatches}</div>
+      <span class="scene-name">${scene.name}</span>
+      <button class="scene-load" data-i="${i}">Load</button>
+      <button class="scene-del"  data-i="${i}">✕</button>`;
+    container.appendChild(row);
+  });
+
+  container.querySelectorAll(".scene-load").forEach(btn => {
+    btn.addEventListener("click", () => applyScene(loadScenes()[btn.dataset.i]));
+  });
+  container.querySelectorAll(".scene-del").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const scenes = loadScenes();
+      scenes.splice(btn.dataset.i, 1);
+      saveScenes(scenes);
+      renderScenes();
+    });
+  });
+}
+
+document.getElementById("btn-save-scene").addEventListener("click", () => {
+  const name = document.getElementById("scene-name").value.trim() || "Scene " + (loadScenes().length + 1);
+  const scenes = loadScenes();
+  scenes.push(captureScene(name));
+  saveScenes(scenes);
+  document.getElementById("scene-name").value = "";
+  renderScenes();
+});
+
 // ── Init ──────────────────────────────────────────────────────
 initGroups(cfg.numGroups);
 renderAll();
+renderScenes();
 updatePowerBtn();
 updateDriftBtn();
 updateFadeBtn();
