@@ -209,6 +209,13 @@
     <div class="cfg-field"><label>NUM GROUPS</label><input id="cfg-groups" type="number" min="1" max="10"  value="3"></div>
   </div>
   <button id="btn-reconnect">Reconnect</button>
+  <hr style="border-color:#1d1d28;margin:0.25rem 0">
+  <div class="card-title" style="margin-top:0.4rem">Add WiFi Network to Boards</div>
+  <div class="cfg-row">
+    <div class="cfg-field"><label>SSID</label><input id="new-ssid" placeholder="Network name"></div>
+    <div class="cfg-field"><label>PASSWORD</label><input id="new-password" type="password" placeholder="Password"></div>
+  </div>
+  <button id="btn-add-network">Send to Boards</button>
 </div>
 
 <script>
@@ -571,6 +578,16 @@ document.getElementById("sl-drift-interval").addEventListener("input", function(
 
 document.getElementById("cfg-toggle").addEventListener("click", () => {
   document.getElementById("cfg-panel").classList.toggle("open");
+});
+
+document.getElementById("btn-add-network").addEventListener("click", () => {
+  const ssid     = document.getElementById("new-ssid").value.trim();
+  const password = document.getElementById("new-password").value;
+  if (!ssid) return;
+  publish({ add_network: { ssid, password } });
+  document.getElementById("new-ssid").value     = "";
+  document.getElementById("new-password").value = "";
+  alert(`Sent "${ssid}" to both boards. It will be saved and used on next boot.`);
 });
 
 document.getElementById("btn-reconnect").addEventListener("click", () => {

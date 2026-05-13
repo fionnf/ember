@@ -13,11 +13,24 @@ REPO_RAW = "https://raw.githubusercontent.com/fionnf/linked_friend_lights/master
 SYNC_FILES = ["main.py", "colour.py", "sk6812.py", "touch.py"]
 
 # ── Connect WiFi (mirrors main.py logic, standalone) ─────────
-def _connect():
+def _load_networks():
     try:
         from config import WIFI_NETWORKS
     except Exception:
-        print("[ota] could not read WIFI_NETWORKS from config — skipping update")
+        WIFI_NETWORKS = []
+    extra = []
+    try:
+        import ujson
+        with open("networks.json") as f:
+            extra = ujson.load(f)
+    except Exception:
+        pass
+    return WIFI_NETWORKS + extra
+
+def _connect():
+    networks = _load_networks()
+    if not networks:
+        print("[ota] no networks configured — skipping update")
         return False
 
     wlan = network.WLAN(network.STA_IF)
@@ -30,7 +43,7 @@ def _connect():
     except Exception:
         visible = set()
 
-    for ssid, password in WIFI_NETWORKS:
+    for ssid, password in networks:
         if visible and ssid not in visible:
             continue
         print(f"[ota] connecting to {ssid}...")

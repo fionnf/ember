@@ -10,7 +10,7 @@ import network
 from umqtt.simple import MQTTClient
 
 from config import (
-    BOARD_ID,
+    BOARD_ID, BOSS,
     WIFI_NETWORKS,
     MQTT_BROKER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD,
     MQTT_TOPIC_PREFIX,
@@ -20,6 +20,9 @@ from config import (
     RECONNECT_DELAY_MS,
     WEBREPL_PASSWORD,
 )
+
+SYNC_INTERVAL_MS = 60_000   # boss resyncs follower every 60 s
+SYNC_FADE_STEPS  = 300      # ~5 s slow fade on follower when resyncing
 from sk6812 import SK6812
 from touch   import TouchManager
 from colour  import ColourEngine
@@ -37,23 +40,46 @@ client = None   # MQTTClient, initialised after WiFi
 
 # ── WiFi ─────────────────────────────────────────────────────
 
+NETWORKS_FILE = "networks.json"
+
+def load_extra_networks():
+    """Load user-added networks from networks.json."""
+    try:
+        with open(NETWORKS_FILE) as f:
+            return ujson.load(f)
+    except Exception:
+        return []
+
+def save_network(ssid, password):
+    """Append a new network to networks.json, avoiding duplicates."""
+    nets = load_extra_networks()
+    if any(n[0] == ssid for n in nets):
+        print(f"[wifi] {ssid} already saved")
+        return
+    nets.append([ssid, password])
+    with open(NETWORKS_FILE, "w") as f:
+        ujson.dump(nets, f)
+    print(f"[wifi] saved new network: {ssid}")
+
+def all_networks():
+    return WIFI_NETWORKS + load_extra_networks()
+
 def connect_wifi():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     if wlan.isconnected():
         return wlan
 
-    # Scan for visible SSIDs so we skip networks that aren't in range
     print("[wifi] scanning...")
     visible = set()
     try:
         for ap in wlan.scan():
             visible.add(ap[0].decode("utf-8", "ignore"))
     except Exception:
-        pass  # scan failed — just try all networks anyway
+        pass
     print(f"[wifi] visible networks: {visible}")
 
-    for ssid, password in WIFI_NETWORKS:
+    for ssid, password in all_networks():
         if visible and ssid not in visible:
             print(f"[wifi] {ssid} not in range, skipping")
             continue
@@ -114,7 +140,12 @@ def on_message(topic, msg):
     if drift_interval is not None:
         engine.set_drift_interval(int(drift_interval))
     if groups is not None and on is not False:
-        engine.force_colour(groups)
+        fade_override = SYNC_FADE_STEPS if data.get("sync") else None
+        engine.force_colour(groups, fade_steps_override=fade_override)
+
+    add_net = data.get("add_network")
+    if add_net:
+        save_network(add_net["ssid"], add_net["password"])
 
 
 def connect_mqtt() -> MQTTClient:
@@ -203,6 +234,7 @@ def main():
     last_frame    = utime.ticks_ms()
     _reconnect_at = utime.ticks_add(utime.ticks_ms(), RECONNECT_DELAY_MS)
     _ping_at      = utime.ticks_add(utime.ticks_ms(), 20_000)
+    _sync_at      = utime.ticks_add(utime.ticks_ms(), SYNC_INTERVAL_MS)
     _backoff_ms   = RECONNECT_DELAY_MS
 
     while True:
@@ -235,6 +267,14 @@ def main():
             except Exception as e:
                 print(f"[mqtt] check_msg error: {e}")
                 client = None
+
+        # ── Boss sync — publish current state every 60 s for follower to drift to ──
+        if BOSS and client is not None and utime.ticks_diff(now, _sync_at) >= 0:
+            payload = engine.get_event_payload()
+            payload["sync"] = True
+            publish_event(payload)
+            print("[sync] boss published state")
+            _sync_at = utime.ticks_add(now, SYNC_INTERVAL_MS)
 
         # ── Idle drift — fires on this board and publishes to sync the other ──
         if engine.check_drift():
