@@ -5,47 +5,8 @@
 #  config.py is never touched — it stays per-board.
 # ============================================================
 
-import math
 import network
 import utime
-
-
-# ── Setup pulse ──────────────────────────────────────────────
-# Start pulsing immediately so there's visible feedback from
-# the very first moment of power-on, through WiFi + OTA.
-# Runs best-effort: silently skipped if sk6812/config aren't
-# available yet (e.g. very first flash before any files exist).
-
-class _Pulser:
-    _SPEED = 0.004   # radians per ms
-    _W_MID = 60
-    _W_AMP = 50
-
-    def __init__(self, strip, num_leds):
-        self._strip    = strip
-        self._num_leds = num_leds
-        self._phase    = 0.0
-        self._last_ms  = utime.ticks_ms()
-
-    def tick(self):
-        now = utime.ticks_ms()
-        dt  = utime.ticks_diff(now, self._last_ms)
-        self._last_ms = now
-        self._phase  += self._SPEED * dt
-        w = int(self._W_MID + self._W_AMP * math.sin(self._phase))
-        self._strip.set_all(0, 0, 0, w)
-        self._strip.show()
-
-_pulser = None
-try:
-    from config import LED_PIN, NUM_LEDS
-    from sk6812 import SK6812
-    _strip = SK6812(pin=LED_PIN, num_leds=NUM_LEDS, brightness=0.6)
-    _pulser = _Pulser(_strip, NUM_LEDS)
-    _pulser.tick()
-    print("[boot] pulse started")
-except Exception as e:
-    print(f"[boot] pulse unavailable: {e}")
 
 # ── Files to sync from GitHub ────────────────────────────────
 REPO_RAW = "https://raw.githubusercontent.com/fionnf/linked_friend_lights/master/"
@@ -93,9 +54,7 @@ def _connect():
                 wlan.disconnect()
                 utime.sleep_ms(300)
                 break
-            if _pulser:
-                _pulser.tick()
-            utime.sleep_ms(50)
+            utime.sleep_ms(200)
         if wlan.isconnected():
             print(f"[ota] connected — IP {wlan.ifconfig()[0]}")
             return True
@@ -113,8 +72,6 @@ def _update():
 
     updated = []
     for fname in SYNC_FILES:
-        if _pulser:
-            _pulser.tick()
         url = REPO_RAW + fname
         try:
             r = urequests.get(url, timeout=10)
