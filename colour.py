@@ -30,12 +30,8 @@ def _rand_float(lo, hi):
     return lo + (urandom.getrandbits(16) / 65535.0) * (hi - lo)
 
 def _random_partition(total, n, mn, mx):
-    """
-    Split `total` LEDs into `n` groups, each between mn and mx LEDs.
-    Returns a list of n integers that sum to total.
-    """
     mn = max(1, mn)
-    mx = min(mx, total - (n - 1) * mn)  # ensure others can have at least mn
+    mx = min(mx, total - (n - 1) * mn)
     sizes = []
     remaining = total
     for i in range(n):
@@ -48,7 +44,6 @@ def _random_partition(total, n, mn, mx):
         size = max(mn, min(mx, size))
         sizes.append(size)
         remaining -= size
-    # Distribute any rounding remainder into the last group
     sizes[-1] += remaining
     return sizes
 
@@ -62,59 +57,53 @@ def _palette_colour(position):
     else:
         c1, c2   = TINT_PALETTE[idx], TINT_PALETTE[idx + 1]
         tint_rgb = tuple(int(_lerp(a, b, frac)) for a, b in zip(c1, c2))
-
     sat = position
     r = int(_lerp(BASE_WARM_WHITE[0], tint_rgb[0], sat))
     g = int(_lerp(BASE_WARM_WHITE[1], tint_rgb[1], sat))
     b = int(_lerp(BASE_WARM_WHITE[2], tint_rgb[2], sat))
-    w = int(BASE_WARM_WHITE[3] * (1.0 - sat))  # W fades out as colour takes over
+    w = int(BASE_WARM_WHITE[3] * (1.0 - sat))
     return (r, g, b, w)
 
 
 # ── ColourEngine ─────────────────────────────────────────────
 
 class ColourEngine:
-    """
-    NUM_GROUPS independent colour groups across the strip.
-    Each group fades to its own palette position and warm-white level.
-    """
 
     def __init__(self):
         n = NUM_GROUPS
-        self._n           = n
-        self._pos         = [0.0] * n
-        self._target_pos  = [0.0] * n
-        self._colour      = [BASE_WARM_WHITE] * n
-        self._target_col  = [BASE_WARM_WHITE] * n
-        self._fade_step   = [0] * n
-        self._fading      = [False] * n
-        # Warm-white intensity per group (0.6–1.0)
-        self._w_level     = [1.0] * n
-        self._w_target    = [1.0] * n
-        self._w_step      = [0] * n
-        self._w_fading    = [False] * n
-        # Breathing — stagger starting phases so groups pulse out of sync
+        self._n             = n
+        self._pos           = [0.0] * n
+        self._target_pos    = [0.0] * n
+        self._colour        = [BASE_WARM_WHITE] * n
+        self._target_col    = [BASE_WARM_WHITE] * n
+        self._fade_step     = [0] * n
+        self._fading        = [False] * n
+        self._w_level       = [1.0] * n
+        self._w_target      = [1.0] * n
+        self._w_step        = [0] * n
+        self._w_fading      = [False] * n
         self._breathe_phase = [i * (6.28 / n) for i in range(n)]
-        # LED counts per group — re-randomised on every impulse
         self._group_sizes   = _random_partition(NUM_LEDS, n, GROUP_MIN_LEDS, GROUP_MAX_LEDS)
 
-        self._powered_on  = True
-        self._power_level = 1.0
-        self._power_dir   = 0
-        self._last_drift  = utime.time()
-        self._time_ms     = utime.ticks_ms()
+        self._powered_on    = True
+        self._power_level   = 1.0
+        self._power_dir     = 0
+        self._brightness    = LED_BRIGHTNESS
+        self._reverse       = REVERSE_LEDS
+        self._fade_steps    = FADE_STEPS      # runtime-adjustable
+        self._drift_enabled  = True
+        self._drift_interval = IDLE_DRIFT_INTERVAL_S
+        self._last_drift     = utime.time()
+        self._time_ms       = utime.ticks_ms()
 
     # ── Public controls ─────────────────────────────────────
 
     def impulse(self):
         if not self._powered_on:
             return
-        # Re-partition the strip into new random group sizes
         self._group_sizes = _random_partition(NUM_LEDS, self._n, GROUP_MIN_LEDS, GROUP_MAX_LEDS)
         for i in range(self._n):
-            # Jump to a fully random palette position — no sequential order
-            new_pos = _rand_float(0.0, 1.0)
-            self._start_fade(i, new_pos)
+            self._start_fade(i, _rand_float(0.0, 1.0))
             self._w_target[i] = _rand_float(0.6, 1.0)
             self._w_step[i]   = 0
             self._w_fading[i] = True
@@ -124,7 +113,6 @@ class ColourEngine:
         self._power_dir  = 1 if self._powered_on else -1
 
     def force_colour(self, groups):
-        """Apply exact group state received from remote board."""
         if not self._powered_on:
             return
         for i, g in enumerate(groups[:self._n]):
@@ -137,6 +125,28 @@ class ColourEngine:
     def set_power(self, on):
         if on != self._powered_on:
             self.toggle_power()
+
+    def set_brightness(self, brightness):
+        self._brightness = max(0.0, min(1.0, brightness))
+
+    def set_reverse(self, reverse):
+        self._reverse = reverse
+
+    def set_fade_steps(self, steps):
+        self._fade_steps = max(1, int(steps))
+
+    def set_drift_enabled(self, enabled):
+        self._drift_enabled = bool(enabled)
+        self._last_drift = utime.time()
+
+    def set_drift_interval(self, seconds):
+        self._drift_interval = max(5, int(seconds))
+
+    def check_drift(self):
+        if self._drift_enabled and utime.time() - self._last_drift > self._drift_interval:
+            self._last_drift = utime.time()
+            return True
+        return False
 
     # ── Tick ─────────────────────────────────────────────────
 
@@ -161,31 +171,27 @@ class ColourEngine:
             strip.off()
             return
 
-        # Idle drift
-        if self._powered_on and utime.time() - self._last_drift > IDLE_DRIFT_INTERVAL_S:
-            self._last_drift = utime.time()
-            self.impulse()
-
-        strip.set_brightness(LED_BRIGHTNESS)
+        strip.set_brightness(self._brightness)
         cursor = 0
+        fs = self._fade_steps
 
         for i in range(self._n):
             # Hue fade
             if self._fading[i]:
-                t = self._fade_step[i] / FADE_STEPS
+                t = self._fade_step[i] / fs
                 self._colour[i]    = _lerp_colour(self._colour[i], self._target_col[i], t)
                 self._fade_step[i] += 1
-                if self._fade_step[i] >= FADE_STEPS:
-                    self._fading[i]  = False
-                    self._colour[i]  = self._target_col[i]
-                    self._pos[i]     = self._target_pos[i]
+                if self._fade_step[i] >= fs:
+                    self._fading[i] = False
+                    self._colour[i] = self._target_col[i]
+                    self._pos[i]    = self._target_pos[i]
 
             # W-level fade
             if self._w_fading[i]:
-                t = self._w_step[i] / FADE_STEPS
+                t = self._w_step[i] / fs
                 self._w_level[i] = _lerp(self._w_level[i], self._w_target[i], t)
                 self._w_step[i] += 1
-                if self._w_step[i] >= FADE_STEPS:
+                if self._w_step[i] >= fs:
                     self._w_fading[i] = False
                     self._w_level[i]  = self._w_target[i]
 
@@ -202,7 +208,7 @@ class ColourEngine:
 
             group_end = cursor + self._group_sizes[i]
             for j in range(cursor, group_end):
-                idx = (NUM_LEDS - 1 - j) if REVERSE_LEDS else j
+                idx = (NUM_LEDS - 1 - j) if self._reverse else j
                 strip.set(idx, r, g, b, w)
             cursor = group_end
 
@@ -212,12 +218,19 @@ class ColourEngine:
 
     def get_event_payload(self):
         groups = [
-            {"pos": round(self._target_pos[i], 4),
-             "w":   round(self._w_target[i], 3),
+            {"pos":  round(self._target_pos[i], 4),
+             "w":    round(self._w_target[i], 3),
              "size": self._group_sizes[i]}
             for i in range(self._n)
         ]
-        return {"groups": groups, "on": self._powered_on}
+        return {
+            "groups":         groups,
+            "on":             self._powered_on,
+            "brightness":     round(self._brightness, 3),
+            "fade_steps":     self._fade_steps,
+            "drift_enabled":  self._drift_enabled,
+            "drift_interval": self._drift_interval,
+        }
 
     # ── Internal ─────────────────────────────────────────────
 

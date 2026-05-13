@@ -87,12 +87,32 @@ def on_message(topic, msg):
     if data.get("from") == BOARD_ID:
         return
 
+    # Ignore messages targeted at a different board
+    target = data.get("target")
+    if target is not None and target != BOARD_ID:
+        return
+
     print(f"[mqtt] recv: {data}")
-    groups = data.get("groups")
-    on     = data.get("on")
+    groups        = data.get("groups")
+    on            = data.get("on")
+    brightness    = data.get("brightness")
+    reverse       = data.get("reverse")
+    fade_steps     = data.get("fade_steps")
+    drift_enabled  = data.get("drift_enabled")
+    drift_interval = data.get("drift_interval")
 
     if on is not None:
         engine.set_power(bool(on))
+    if brightness is not None:
+        engine.set_brightness(float(brightness))
+    if reverse is not None:
+        engine.set_reverse(bool(reverse))
+    if fade_steps is not None:
+        engine.set_fade_steps(int(fade_steps))
+    if drift_enabled is not None:
+        engine.set_drift_enabled(bool(drift_enabled))
+    if drift_interval is not None:
+        engine.set_drift_interval(int(drift_interval))
     if groups is not None and on is not False:
         engine.force_colour(groups)
 
@@ -215,6 +235,11 @@ def main():
             except Exception as e:
                 print(f"[mqtt] check_msg error: {e}")
                 client = None
+
+        # ── Idle drift — fires on this board and publishes to sync the other ──
+        if engine.check_drift():
+            engine.impulse()
+            publish_event(engine.get_event_payload())
 
         # ── Poll touch sensors ──
         event = touch.update()
