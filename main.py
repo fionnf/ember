@@ -3,7 +3,7 @@
 #  Only config.py differs between boards.
 # ============================================================
 
-import time
+import math
 import utime
 import ujson
 import network
@@ -64,7 +64,7 @@ def save_network(ssid, password):
 def all_networks():
     return WIFI_NETWORKS + load_extra_networks()
 
-def connect_wifi():
+def connect_wifi(tick=None):
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     if wlan.isconnected():
@@ -92,7 +92,9 @@ def connect_wifi():
                 wlan.disconnect()
                 utime.sleep_ms(500)
                 break
-            utime.sleep_ms(200)
+            if tick:
+                tick()
+            utime.sleep_ms(50)
         if wlan.isconnected():
             print(f"[wifi] connected to {ssid} — IP {wlan.ifconfig()[0]}")
             return wlan
@@ -180,19 +182,78 @@ def publish_event(payload: dict):
         client = None   # trigger reconnect
 
 
-# ── Startup sequence ─────────────────────────────────────────
+OTA_HOUR_UTC = 17   # 5 pm UTC — daily reboot triggers boot.py OTA
 
-def startup_animation():
-    """Brief warm-white fade-in to show the strip is alive."""
-    for step in range(30):
-        t = step / 29
-        w = int(200 * t)
-        r = int(255 * t)
-        g = int(140 * t)
-        b = int(40 * t)
-        strip.set_all(r, g, b, w)
+STATE_FILE = "state.json"
+
+def save_state():
+    try:
+        with open(STATE_FILE, "w") as f:
+            ujson.dump({"on": engine._powered_on}, f)
+    except Exception as e:
+        print(f"[state] save failed: {e}")
+
+def restore_state():
+    try:
+        with open(STATE_FILE) as f:
+            d = ujson.load(f)
+        if not d.get("on", True):
+            engine.set_power(False)
+            engine._power_level = 0.0  # instant off, no fade-in
+            print("[state] restored: off")
+        else:
+            print("[state] restored: on")
+    except Exception:
+        pass  # no saved state — use default (on)
+
+def sync_ntp():
+    try:
+        import ntptime
+        ntptime.settime()
+        print(f"[ntp] time synced: {utime.localtime()}")
+        return True
+    except Exception as e:
+        print(f"[ntp] sync failed: {e}")
+        return False
+
+
+# ── Setup pulse ──────────────────────────────────────────────
+
+class SetupPulser:
+    """Soft warm-white pulse played on the strip during boot setup.
+    Call tick() as often as possible inside blocking setup loops.
+    Call stop() once setup is complete — it fades out cleanly.
+    """
+    _SPEED  = 0.004   # radians per ms — ~1.5 s per full breath
+    _W_MID  = 60      # midpoint brightness (0-255 W channel)
+    _W_AMP  = 50      # amplitude around midpoint
+
+    def __init__(self):
+        self._phase    = 0.0
+        self._last_ms  = utime.ticks_ms()
+        self.active    = True
+
+    def tick(self):
+        if not self.active:
+            return
+        now = utime.ticks_ms()
+        dt  = utime.ticks_diff(now, self._last_ms)
+        self._last_ms = now
+        self._phase  += self._SPEED * dt
+        w = int(self._W_MID + self._W_AMP * math.sin(self._phase))
+        strip.set_all(0, 0, 0, w)
         strip.show()
-        utime.sleep_ms(20)
+
+    def stop(self):
+        """Fade out over ~400 ms then hand off to the engine."""
+        self.active = False
+        w = int(self._W_MID + self._W_AMP * math.sin(self._phase))
+        for step in range(20):
+            w = int(w * (1 - step / 20))
+            strip.set_all(0, 0, 0, w)
+            strip.show()
+            utime.sleep_ms(20)
+        strip.off()
 
 
 # ── Main loop ────────────────────────────────────────────────
@@ -200,16 +261,18 @@ def startup_animation():
 def main():
     global client
 
-    # Initial LED feedback
-    startup_animation()
+    # Pulse the strip immediately — visible feedback while setup runs
+    pulser = SetupPulser()
 
-    # Connect WiFi — best-effort, continue offline if it fails
+    # Connect WiFi — pulse continues through the blocking connect loop
     wifi_ok = False
     try:
-        connect_wifi()
+        connect_wifi(tick=pulser.tick)
         wifi_ok = True
     except OSError as e:
         print(f"[wifi] failed: {e} — running offline")
+
+    pulser.tick()
 
     # Start WebREPL if WiFi is up — allows wireless file editing
     if wifi_ok:
@@ -220,22 +283,41 @@ def main():
         except Exception as e:
             print(f"[webrepl] failed to start: {e}")
 
+    pulser.tick()
+
+    # Sync NTP so we know the wall-clock time for daily OTA
+    ntp_ok = False
+    if wifi_ok:
+        ntp_ok = sync_ntp()
+
+    pulser.tick()
+
     # Connect MQTT — best-effort, continue without sync if it fails
     try:
         client = connect_mqtt()
     except Exception as e:
         print(f"[mqtt] connect failed: {e} — running standalone")
 
+    pulser.tick()
+
     # Calibrate touch baseline (nobody touching at boot)
     print("[touch] calibrating baseline...")
     touch.calibrate_all()
     print("[touch] ready")
 
-    last_frame    = utime.ticks_ms()
-    _reconnect_at = utime.ticks_add(utime.ticks_ms(), RECONNECT_DELAY_MS)
-    _ping_at      = utime.ticks_add(utime.ticks_ms(), 20_000)
-    _sync_at      = utime.ticks_add(utime.ticks_ms(), SYNC_INTERVAL_MS)
-    _backoff_ms   = RECONNECT_DELAY_MS
+    # Restore power state saved before the last OTA reboot
+    restore_state()
+
+    # Setup complete — fade out the pulse and hand off to the engine
+    pulser.stop()
+
+    _ota_check_min = -1   # wall-clock minute we last checked OTA trigger
+    last_frame      = utime.ticks_ms()
+    _reconnect_at   = utime.ticks_add(utime.ticks_ms(), RECONNECT_DELAY_MS)
+    _ping_at        = utime.ticks_add(utime.ticks_ms(), 20_000)
+    _sync_at        = utime.ticks_add(utime.ticks_ms(), SYNC_INTERVAL_MS)
+    _heartbeat_at   = utime.ticks_add(utime.ticks_ms(), 5_000)  # first beat soon after boot
+    _backoff_ms     = RECONNECT_DELAY_MS
 
     while True:
         now = utime.ticks_ms()
@@ -275,6 +357,23 @@ def main():
             publish_event(payload)
             print("[sync] boss published state")
             _sync_at = utime.ticks_add(now, SYNC_INTERVAL_MS)
+
+        # ── Heartbeat — announce presence every 30 s ──
+        if client is not None and utime.ticks_diff(now, _heartbeat_at) >= 0:
+            publish_event({"heartbeat": True})
+            _heartbeat_at = utime.ticks_add(now, 30_000)
+
+        # ── Daily OTA reboot at OTA_HOUR_UTC — save state first ──
+        if ntp_ok:
+            t = utime.localtime()
+            cur_min = t[4]  # minute within hour
+            if t[3] == OTA_HOUR_UTC and cur_min != _ota_check_min:
+                _ota_check_min = cur_min
+                if cur_min == 0:
+                    print("[ota] 5 pm UTC — saving state and rebooting for OTA")
+                    save_state()
+                    import machine
+                    machine.reset()
 
         # ── Idle drift — subtle nudge with slow fade, synced to other board ──
         if engine.check_drift():

@@ -38,6 +38,22 @@
     #dot.connecting   { background: #ff9800; }
     #dot.disconnected { background: #f44336; }
 
+    /* Board presence pills */
+    #board-pills { display: flex; gap: 0.4rem; align-items: center; }
+    .board-pill {
+      display: flex; align-items: center; gap: 0.3rem;
+      font-size: 0.65rem; color: var(--muted);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 0.2rem 0.55rem;
+      transition: border-color 0.4s, color 0.4s;
+    }
+    .board-pill .pill-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #333; transition: background 0.4s;
+    }
+    .board-pill.online { border-color: #2d5a2d; color: #81c784; }
+    .board-pill.online .pill-dot { background: #4caf50; }
+
     .card {
       width: 100%; max-width: 600px;
       background: var(--surface);
@@ -50,15 +66,15 @@
       text-transform: uppercase; color: var(--muted); margin-bottom: 0.8rem;
     }
 
-    /* Strip */
-    #strip { display: flex; height: 48px; gap: 2px; border-radius: 8px; overflow: hidden; }
-    .led { flex: 1; border-radius: 3px; transition: background 0.7s ease, flex 0.5s ease; }
+    /* Strip + divider share a CSS grid so columns are pixel-perfect */
+    #strip-wrap { display: grid; gap: 2px; /* columns set by JS */ }
+    .led {
+      height: 48px; border-radius: 3px;
+      transition: background 0.7s ease;
+    }
     .led.boundary { box-shadow: inset -2px 0 0 rgba(255,255,255,0.2); }
-
-    /* Divider bar */
-    #divider-bar { display: flex; height: 24px; gap: 2px; margin-top: 5px; user-select: none; }
     .div-cell {
-      flex: 1; border-radius: 3px; background: transparent; cursor: pointer;
+      height: 22px; border-radius: 3px; background: transparent; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       font-size: 0.55rem; color: transparent;
       transition: background 0.15s; border: 1px solid transparent;
@@ -188,14 +204,19 @@
 
 <header>
   <h1>Linked Lights</h1>
-  <div id="status"><div id="dot" class="disconnected"></div><span id="status-text">disconnected</span></div>
+  <div style="display:flex;align-items:center;gap:0.6rem;">
+    <div id="board-pills">
+      <div class="board-pill" id="pill-board_a"><div class="pill-dot"></div>A</div>
+      <div class="board-pill" id="pill-board_b"><div class="pill-dot"></div>B</div>
+    </div>
+    <div id="status"><div id="dot" class="disconnected"></div><span id="status-text">disconnected</span></div>
+  </div>
 </header>
 
 <!-- Strip preview -->
 <div class="card">
   <div class="card-title">Strip — click divider bar to set group boundaries</div>
-  <div id="strip"></div>
-  <div id="divider-bar"></div>
+  <div id="strip-wrap"></div>
 </div>
 
 <!-- Global controls -->
@@ -346,6 +367,18 @@ let slowFadeOn     = false;
 const BOARD_ID     = "web_app";
 const SLOW_STEPS   = 400;
 const FAST_STEPS   = 60;
+const boardLastSeen = {};
+const BOARD_TIMEOUT_MS = 90_000;
+
+setInterval(() => {
+  ["board_a", "board_b"].forEach(id => {
+    const pill = document.getElementById("pill-" + id);
+    if (!pill) return;
+    const seen = boardLastSeen[id];
+    const online = seen && (Date.now() - seen) < BOARD_TIMEOUT_MS;
+    pill.classList.toggle("online", online);
+  });
+}, 3000);
 
 function initGroups(n) {
   boundaries.clear();
@@ -391,6 +424,7 @@ function connect() {
   client.on("message", (t, msg) => {
     try {
       const d = JSON.parse(msg.toString());
+      if (d.from) boardLastSeen[d.from] = Date.now();
       if (d.from === BOARD_ID) return;
       if (d.on         !== undefined) { powered = d.on;              updatePowerBtn(); }
       if (d.brightness !== undefined) { brightness = d.brightness;   syncBrightnessSlider(); }
@@ -456,8 +490,11 @@ function randomise() {
 
 // ── Rendering ─────────────────────────────────────────────────
 function renderStrip() {
-  const strip = document.getElementById("strip");
-  strip.innerHTML = "";
+  const wrap = document.getElementById("strip-wrap");
+  wrap.innerHTML = "";
+  wrap.style.gridTemplateColumns = `repeat(${cfg.numLeds}, 1fr)`;
+
+  // Row 1: LEDs
   const groups = getGroups();
   let ledIdx = 0;
   groups.forEach(g => {
@@ -466,15 +503,12 @@ function renderStrip() {
       el.className = "led";
       el.style.background = powered ? rgbStr(g.pos) : "#111";
       if (j === g.size-1 && ledIdx < cfg.numLeds-1) el.classList.add("boundary");
-      strip.appendChild(el);
+      wrap.appendChild(el);
       ledIdx++;
     }
   });
-}
 
-function renderDividerBar() {
-  const bar = document.getElementById("divider-bar");
-  bar.innerHTML = "";
+  // Row 2: divider cells — same column count, auto-aligns
   for (let i = 0; i < cfg.numLeds; i++) {
     const el = document.createElement("div");
     el.className = "div-cell" + (boundaries.has(i) ? " split" : "");
@@ -488,9 +522,11 @@ function renderDividerBar() {
         publishState();
       });
     }
-    bar.appendChild(el);
+    wrap.appendChild(el);
   }
 }
+
+function renderDividerBar() { /* merged into renderStrip */ }
 
 function rebuildGroupData() {
   const n = groupCount();
