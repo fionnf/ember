@@ -13,10 +13,7 @@ from config import (
     NUM_LEDS, LED_BRIGHTNESS,
     NUM_GROUPS, GROUP_MIN_LEDS, GROUP_MAX_LEDS,
 )
-try:
-    from config import REVERSE_LEDS
-except ImportError:
-    REVERSE_LEDS = False
+from config import REVERSE_LEDS
 
 # ── Helpers ──────────────────────────────────────────────────
 
@@ -112,12 +109,13 @@ class ColourEngine:
         self._powered_on = not self._powered_on
         self._power_dir  = 1 if self._powered_on else -1
 
-    def force_colour(self, groups):
+    def force_colour(self, groups, fade_steps_override=None):
         if not self._powered_on:
             return
+        fs = fade_steps_override or self._fade_steps
         for i, g in enumerate(groups[:self._n]):
-            self._group_sizes[i] = g["size"]
-            self._start_fade(i, g["pos"])
+            self._group_sizes[i]  = g["size"]
+            self._start_fade(i, g["pos"], fs)
             self._w_target[i] = g["w"]
             self._w_step[i]   = 0
             self._w_fading[i] = True
@@ -173,9 +171,12 @@ class ColourEngine:
 
         strip.set_brightness(self._brightness)
         cursor = 0
-        fs = self._fade_steps
+        if not hasattr(self, '_fade_steps_per'):
+            self._fade_steps_per = [self._fade_steps] * self._n
 
         for i in range(self._n):
+            fs = self._fade_steps_per[i]
+
             # Hue fade
             if self._fading[i]:
                 t = self._fade_step[i] / fs
@@ -234,8 +235,12 @@ class ColourEngine:
 
     # ── Internal ─────────────────────────────────────────────
 
-    def _start_fade(self, group, new_pos):
+    def _start_fade(self, group, new_pos, steps=None):
         self._target_pos[group] = new_pos
         self._target_col[group] = _palette_colour(new_pos)
+        # Store per-group step target so sync can use a different speed
+        if not hasattr(self, '_fade_steps_per'):
+            self._fade_steps_per = [self._fade_steps] * self._n
+        self._fade_steps_per[group] = steps if steps is not None else self._fade_steps
         self._fade_step[group]  = 0
         self._fading[group]     = True

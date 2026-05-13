@@ -4,6 +4,7 @@
 
 # ── Board identity ──────────────────────────────────────────
 BOARD_ID = "board_a"          # Change to "board_b" on the second Pico
+BOSS     = True               # True on board_a (boss), False on board_b (follower)
 
 # ── WiFi credentials ────────────────────────────────────────
 # List all known networks — the board will try each in order until one connects.
@@ -29,6 +30,7 @@ MQTT_TOPIC_PREFIX = "picolight_lf26"   # ← change this to something personal
 LED_PIN        = 5             # GPIO pin connected to DIN of SK6812 strip
 NUM_LEDS       = 10            # Number of LEDs on the strip
 LED_BRIGHTNESS = 0.6           # 0.0 – 1.0  global brightness cap
+REVERSE_LEDS   = False         # Set True on board_b if connected to the far end of the strip
 
 # ── Capacitive touch sensors ────────────────────────────────
 # List all GPIO pins that have a touch sensor attached.
