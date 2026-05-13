@@ -206,8 +206,8 @@
   <h1>Linked Lights</h1>
   <div style="display:flex;align-items:center;gap:0.6rem;">
     <div id="board-pills">
-      <div class="board-pill" id="pill-board_a"><div class="pill-dot"></div>A</div>
-      <div class="board-pill" id="pill-board_b"><div class="pill-dot"></div>B</div>
+      <div class="board-pill" id="pill-a"><div class="pill-dot"></div><span class="pill-label">A</span></div>
+      <div class="board-pill" id="pill-b"><div class="pill-dot"></div><span class="pill-label">B</span></div>
     </div>
     <div id="status"><div id="dot" class="disconnected"></div><span id="status-text">disconnected</span></div>
   </div>
@@ -251,6 +251,12 @@
   </div>
 </div>
 
+<!-- Per-group controls -->
+<div class="card">
+  <div class="card-title">Groups</div>
+  <div id="group-panels"></div>
+</div>
+
 <!-- Scenes -->
 <div class="card">
   <div class="card-title">Scenes</div>
@@ -261,14 +267,8 @@
   </div>
 </div>
 
-<!-- Per-group controls -->
-<div class="card">
-  <div class="card-title">Groups</div>
-  <div id="group-panels"></div>
-</div>
-
 <!-- Settings -->
-<button id="cfg-toggle">⚙ broker settings</button>
+<button id="cfg-toggle">⚙ settings</button>
 <div class="card" id="cfg-panel">
   <div class="card-title">Broker Settings</div>
   <div class="cfg-field">
@@ -282,6 +282,14 @@
   <div class="cfg-row">
     <div class="cfg-field"><label>NUM LEDS</label><input id="cfg-leds"   type="number" min="1" max="144" value="10"></div>
     <div class="cfg-field"><label>NUM GROUPS</label><input id="cfg-groups" type="number" min="1" max="10"  value="3"></div>
+  </div>
+  <div class="cfg-row">
+    <div class="cfg-field"><label>BOARD A ID</label><input id="cfg-id-a" placeholder="board_a"></div>
+    <div class="cfg-field"><label>BOARD A NAME</label><input id="cfg-name-a" placeholder="A"></div>
+  </div>
+  <div class="cfg-row">
+    <div class="cfg-field"><label>BOARD B ID</label><input id="cfg-id-b" placeholder="board_b"></div>
+    <div class="cfg-field"><label>BOARD B NAME</label><input id="cfg-name-b" placeholder="B"></div>
   </div>
   <button id="btn-reconnect">Reconnect</button>
   <hr style="border-color:#1d1d28;margin:0.25rem 0">
@@ -300,11 +308,19 @@ let cfg = {
   prefix:    localStorage.getItem("ll_prefix")    || "picolight_lf26",
   numLeds:   parseInt(localStorage.getItem("ll_leds")   || "10"),
   numGroups: parseInt(localStorage.getItem("ll_groups") || "3"),
+  boardIdA:  localStorage.getItem("ll_id_a")   || "board_a",
+  boardNameA:localStorage.getItem("ll_name_a") || "A",
+  boardIdB:  localStorage.getItem("ll_id_b")   || "board_b",
+  boardNameB:localStorage.getItem("ll_name_b") || "B",
 };
 document.getElementById("cfg-broker").value  = cfg.broker;
 document.getElementById("cfg-prefix").value  = cfg.prefix;
 document.getElementById("cfg-leds").value    = cfg.numLeds;
 document.getElementById("cfg-groups").value  = cfg.numGroups;
+document.getElementById("cfg-id-a").value    = cfg.boardIdA;
+document.getElementById("cfg-name-a").value  = cfg.boardNameA;
+document.getElementById("cfg-id-b").value    = cfg.boardIdB;
+document.getElementById("cfg-name-b").value  = cfg.boardNameB;
 
 // ── Palette ───────────────────────────────────────────────────
 const PALETTE = [
@@ -370,15 +386,17 @@ const FAST_STEPS   = 60;
 const boardLastSeen = {};
 const BOARD_TIMEOUT_MS = 90_000;
 
-setInterval(() => {
-  ["board_a", "board_b"].forEach(id => {
-    const pill = document.getElementById("pill-" + id);
+function updatePills() {
+  [["pill-a", cfg.boardIdA, cfg.boardNameA], ["pill-b", cfg.boardIdB, cfg.boardNameB]].forEach(([pillId, boardId, name]) => {
+    const pill = document.getElementById(pillId);
     if (!pill) return;
-    const seen = boardLastSeen[id];
+    pill.querySelector(".pill-label").textContent = name;
+    const seen = boardLastSeen[boardId];
     const online = seen && (Date.now() - seen) < BOARD_TIMEOUT_MS;
     pill.classList.toggle("online", online);
   });
-}, 3000);
+}
+setInterval(updatePills, 3000);
 
 function initGroups(n) {
   boundaries.clear();
@@ -681,15 +699,24 @@ document.getElementById("btn-add-network").addEventListener("click", () => {
 });
 
 document.getElementById("btn-reconnect").addEventListener("click", () => {
-  cfg.broker    = document.getElementById("cfg-broker").value.trim();
-  cfg.prefix    = document.getElementById("cfg-prefix").value.trim();
-  cfg.numLeds   = parseInt(document.getElementById("cfg-leds").value);
-  cfg.numGroups = parseInt(document.getElementById("cfg-groups").value);
+  cfg.broker     = document.getElementById("cfg-broker").value.trim();
+  cfg.prefix     = document.getElementById("cfg-prefix").value.trim();
+  cfg.numLeds    = parseInt(document.getElementById("cfg-leds").value);
+  cfg.numGroups  = parseInt(document.getElementById("cfg-groups").value);
+  cfg.boardIdA   = document.getElementById("cfg-id-a").value.trim()   || "board_a";
+  cfg.boardNameA = document.getElementById("cfg-name-a").value.trim() || "A";
+  cfg.boardIdB   = document.getElementById("cfg-id-b").value.trim()   || "board_b";
+  cfg.boardNameB = document.getElementById("cfg-name-b").value.trim() || "B";
   localStorage.setItem("ll_broker", cfg.broker);
   localStorage.setItem("ll_prefix", cfg.prefix);
   localStorage.setItem("ll_leds",   cfg.numLeds);
   localStorage.setItem("ll_groups", cfg.numGroups);
+  localStorage.setItem("ll_id_a",   cfg.boardIdA);
+  localStorage.setItem("ll_name_a", cfg.boardNameA);
+  localStorage.setItem("ll_id_b",   cfg.boardIdB);
+  localStorage.setItem("ll_name_b", cfg.boardNameB);
   initGroups(cfg.numGroups);
+  updatePills();
   renderAll(); connect();
 });
 
@@ -786,6 +813,7 @@ document.getElementById("btn-save-scene").addEventListener("click", () => {
 initGroups(cfg.numGroups);
 renderAll();
 renderScenes();
+updatePills();
 updatePowerBtn();
 updateDriftBtn();
 updateFadeBtn();
