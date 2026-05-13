@@ -88,29 +88,31 @@ def on_message(topic, msg):
         return
 
     print(f"[mqtt] recv: {data}")
-    pos = data.get("pos")
-    on  = data.get("on")
+    groups = data.get("groups")
+    on     = data.get("on")
 
     if on is not None:
         engine.set_power(bool(on))
-    if pos is not None and on is not False:
-        engine.force_colour(float(pos))
+    if groups is not None and on is not False:
+        engine.force_colour(groups)
 
 
 def connect_mqtt() -> MQTTClient:
-    client_id = (BOARD_ID + "_" + MQTT_TOPIC_PREFIX).encode()
+    import ubinascii, machine
+    uid = ubinascii.hexlify(machine.unique_id()).decode()
+    client_id = f"{BOARD_ID}_{uid}".encode()
     c = MQTTClient(
         client_id,
         MQTT_BROKER,
         port=MQTT_PORT,
         user=MQTT_USER.encode() if MQTT_USER else None,
         password=MQTT_PASSWORD.encode() if MQTT_PASSWORD else None,
-        keepalive=30,
+        keepalive=60,
     )
     c.set_callback(on_message)
     c.connect()
     c.subscribe(TOPIC_EVENTS)
-    print(f"[mqtt] connected to {MQTT_BROKER}, subscribed to {TOPIC_EVENTS}")
+    print(f"[mqtt] connected — client_id={client_id}, topic={TOPIC_EVENTS}")
     return c
 
 
@@ -178,19 +180,33 @@ def main():
     touch.calibrate_all()
     print("[touch] ready")
 
-    last_frame = utime.ticks_ms()
+    last_frame    = utime.ticks_ms()
     _reconnect_at = utime.ticks_add(utime.ticks_ms(), RECONNECT_DELAY_MS)
+    _ping_at      = utime.ticks_add(utime.ticks_ms(), 20_000)
+    _backoff_ms   = RECONNECT_DELAY_MS
 
     while True:
         now = utime.ticks_ms()
 
-        # ── Reconnect MQTT in the background if disconnected ──
+        # ── Reconnect MQTT with exponential backoff ──
         if client is None and utime.ticks_diff(now, _reconnect_at) >= 0:
             try:
                 client = connect_mqtt()
+                _backoff_ms = RECONNECT_DELAY_MS   # reset on success
+                _ping_at    = utime.ticks_add(now, 20_000)
             except Exception as e:
                 print(f"[mqtt] reconnect failed: {e}")
-            _reconnect_at = utime.ticks_add(now, RECONNECT_DELAY_MS)
+                _backoff_ms = min(_backoff_ms * 2, 60_000)  # cap at 60 s
+            _reconnect_at = utime.ticks_add(now, _backoff_ms)
+
+        # ── Keepalive ping ──
+        if client is not None and utime.ticks_diff(now, _ping_at) >= 0:
+            try:
+                client.ping()
+            except Exception as e:
+                print(f"[mqtt] ping error: {e}")
+                client = None
+            _ping_at = utime.ticks_add(now, 20_000)
 
         # ── Poll MQTT for incoming messages ──
         if client is not None:

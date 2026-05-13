@@ -123,14 +123,14 @@ class ColourEngine:
         self._powered_on = not self._powered_on
         self._power_dir  = 1 if self._powered_on else -1
 
-    def force_colour(self, palette_pos):
+    def force_colour(self, groups):
+        """Apply exact group state received from remote board."""
         if not self._powered_on:
             return
-        self._group_sizes = _random_partition(NUM_LEDS, self._n, GROUP_MIN_LEDS, GROUP_MAX_LEDS)
-        for i in range(self._n):
-            new_pos = _rand_float(0.0, 1.0)
-            self._start_fade(i, new_pos)
-            self._w_target[i] = _rand_float(0.6, 1.0)
+        for i, g in enumerate(groups[:self._n]):
+            self._group_sizes[i] = g["size"]
+            self._start_fade(i, g["pos"])
+            self._w_target[i] = g["w"]
             self._w_step[i]   = 0
             self._w_fading[i] = True
 
@@ -211,8 +211,13 @@ class ColourEngine:
     # ── MQTT payload ────────────────────────────────────────
 
     def get_event_payload(self):
-        avg_pos = sum(self._pos) / self._n
-        return {"pos": round(avg_pos, 4), "on": self._powered_on}
+        groups = [
+            {"pos": round(self._target_pos[i], 4),
+             "w":   round(self._w_target[i], 3),
+             "size": self._group_sizes[i]}
+            for i in range(self._n)
+        ]
+        return {"groups": groups, "on": self._powered_on}
 
     # ── Internal ─────────────────────────────────────────────
 
