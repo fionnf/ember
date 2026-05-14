@@ -673,9 +673,9 @@ let cfg = {
   numLeds:   parseInt(localStorage.getItem("ll_leds")   || "10"),
   numGroups: parseInt(localStorage.getItem("ll_groups") || "3"),
   boardIdA:  localStorage.getItem("ll_id_a")   || "board_a",
-  boardNameA:localStorage.getItem("ll_name_a") || "LS",
+  boardNameA:localStorage.getItem("ll_name_a") || "FF",
   boardIdB:  localStorage.getItem("ll_id_b")   || "board_b",
-  boardNameB:localStorage.getItem("ll_name_b") || "FF",
+  boardNameB:localStorage.getItem("ll_name_b") || "LS",
 };
 document.getElementById("cfg-broker").value  = cfg.broker;
 document.getElementById("cfg-prefix").value  = cfg.prefix;
@@ -1555,10 +1555,11 @@ function saveScenes(scenes) {
 
 // ── Scenes (unified — built-ins + user-saved) ─────────────────
 const BUILTIN_SCENES = [
-  { name: "🌈 Rainbow",    anim_mode: "rainbow", anim_speed: 3.0 },
-  { name: "🕯 Candle",     anim_mode: "candle",  anim_speed: 3.0,
+  { name: "🌈 Rainbow",        anim_mode: "rainbow", anim_speed: 3.0 },
+  { name: "🌈 Static Rainbow", anim_mode: "rainbow", anim_speed: 0.1, _staticRainbow: true },
+  { name: "🕯 Candle",         anim_mode: "candle",  anim_speed: 3.0,
     groupPositions: [0.02, 0.05, 0.03], groupWLevels: [1, 0.9, 0.95] },
-  { name: "☀️ Warm White", anim_mode: null,
+  { name: "☀️ Warm White",     anim_mode: null,
     groupPositions: [0.0, 0.0, 0.0],   groupWLevels: [1, 1, 1], brightness: 0.8 },
 ];
 
@@ -1616,6 +1617,14 @@ function captureScene(name) {
 
 
 function _applySceneOrBuiltin(item) {
+  if (item._staticRainbow) {
+    // One group per LED, each hue evenly spread — nearly-static rainbow
+    const n = cfg.numLeds;
+    boundaries.clear();
+    for (let i = 1; i < n; i++) boundaries.add(i);
+    groupPositions = Array.from({length: n}, (_, i) => i / n);
+    groupWLevels   = Array.from({length: n}, () => 0);
+  }
   animMode  = item.anim_mode  || "";
   animSpeed = item.anim_speed ?? 1.0;
   if (item.groupPositions) groupPositions = [...item.groupPositions];
