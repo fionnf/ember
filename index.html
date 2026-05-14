@@ -527,6 +527,18 @@ function rgbStr(pos) {
   return `rgb(${r},${g},${b})`;
 }
 
+function hsvRainbow(h) {
+  const h6 = ((h % 1) + 1) % 1 * 6;
+  const i  = Math.floor(h6), f = h6 - i;
+  const t  = Math.round(f * 255), q = Math.round((1 - f) * 255), v = 255;
+  if (i === 0) return [v, t, 0];
+  if (i === 1) return [q, v, 0];
+  if (i === 2) return [0, v, t];
+  if (i === 3) return [0, q, v];
+  if (i === 4) return [t, 0, v];
+  return [v, 0, q];
+}
+
 // Build gradient CSS for a colour slider
 function paletteGradient() {
   const stops = [];
@@ -690,6 +702,7 @@ function syncAnimButtons() {
   document.querySelectorAll(".anim-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.mode === animMode);
   });
+  if (animMode) startAnimLoop(); else { stopAnimLoop(); renderStrip(); }
 }
 function syncAnimSlider() {
   document.getElementById("sl-anim-speed").value = Math.round(animSpeed * 10);
@@ -715,6 +728,90 @@ document.getElementById("sl-anim-speed").addEventListener("input", e => {
   if (animMode === "custom") payload.anim_params = getCustomParams();
   publish(payload);
 });
+
+// ── Strip animation preview loop ──────────────────────────────
+let _webPhase    = 0;
+let _webLastTs   = null;
+let _animFrameId = null;
+
+function _ledColour(ledIdx, groups) {
+  // Find which group this LED belongs to
+  let cursor = 0;
+  for (let gi = 0; gi < groups.length; gi++) {
+    const end = cursor + groups[gi].size;
+    if (ledIdx < end) {
+      if (animMode === "rainbow") {
+        const hue = ((_webPhase / 6.2832) + gi / Math.max(groups.length, 1)) % 1;
+        const [r, g, b] = hsvRainbow(hue);
+        return `rgb(${r},${g},${b})`;
+      } else if (animMode === "wave") {
+        const wave = 0.5 + 0.5 * Math.sin(_webPhase * 3.0 + gi * 1.5);
+        const [r, g, b] = paletteRGB(groups[gi].pos);
+        return `rgb(${Math.round(r*wave)},${Math.round(g*wave)},${Math.round(b*wave)})`;
+      } else if (animMode === "candle") {
+        const flicker = 0.55 + Math.random() * 0.45;
+        const [r, g, b] = paletteRGB(groups[gi].pos);
+        return `rgb(${Math.round(r*flicker)},${Math.round(g*flicker)},${Math.round(b*flicker)})`;
+      } else if (animMode === "custom") {
+        const p = getCustomParams();
+        const h0 = parseFloat(p.hue_start), h1 = parseFloat(p.hue_end);
+        const sync = p.sync;
+        const offset = sync ? 0 : (gi / Math.max(groups.length - 1, 1)) * 0.6;
+        const t = (Math.sin(_webPhase + offset) + 1) * 0.5;
+        let pos;
+        if (p.pattern === "sweep") {
+          const tSaw = ((_webPhase + offset * 6.2832) % 6.2832) / 6.2832;
+          pos = h0 + tSaw * (h1 - h0);
+        } else if (p.pattern === "pulse") {
+          pos = (h0 + h1) * 0.5;
+          const [r, g, b] = paletteRGB(Math.max(0, Math.min(1, pos)));
+          return `rgb(${Math.round(r*t)},${Math.round(g*t)},${Math.round(b*t)})`;
+        } else if (p.pattern === "strobe") {
+          const on = Math.sin(_webPhase + offset * 2) > 0.6;
+          if (!on) return "rgb(0,0,0)";
+          pos = h0;
+        } else {
+          pos = h0 + t * (h1 - h0);
+        }
+        const [r, g, b] = paletteRGB(Math.max(0, Math.min(1, pos)));
+        return `rgb(${r},${g},${b})`;
+      }
+      return powered ? rgbStr(groups[gi].pos) : "#111";
+    }
+    cursor = end;
+  }
+  return "#111";
+}
+
+function _animFrame(ts) {
+  if (_webLastTs !== null) {
+    const dt = ts - _webLastTs;
+    _webPhase += 0.0015 * animSpeed * dt;
+  }
+  _webLastTs = ts;
+
+  const leds = document.querySelectorAll("#strip-wrap .led");
+  const groups = getGroups();
+  leds.forEach((el, i) => {
+    el.style.background = powered ? _ledColour(i, groups) : "#111";
+  });
+  _animFrameId = requestAnimationFrame(_animFrame);
+}
+
+function startAnimLoop() {
+  if (_animFrameId !== null) return;
+  _webPhase  = 0;
+  _webLastTs = null;
+  _animFrameId = requestAnimationFrame(_animFrame);
+}
+
+function stopAnimLoop() {
+  if (_animFrameId !== null) {
+    cancelAnimationFrame(_animFrameId);
+    _animFrameId = null;
+    _webLastTs   = null;
+  }
+}
 
 // ── Custom animation builder ──────────────────────────────────
 let customPattern  = "sweep";

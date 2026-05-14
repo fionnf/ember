@@ -17,6 +17,20 @@ from config import REVERSE_LEDS
 
 # ── Helpers ──────────────────────────────────────────────────
 
+def _hue_rgb(h):
+    """Pure HSV hue (0-1) → (R, G, B) at full saturation and brightness."""
+    h6 = (h % 1.0) * 6.0
+    i  = int(h6)
+    f  = h6 - i
+    t  = int(255 * f)
+    q  = int(255 * (1.0 - f))
+    if i == 0: return (255, t,   0)
+    if i == 1: return (q,   255, 0)
+    if i == 2: return (0,   255, t)
+    if i == 3: return (0,   q,   255)
+    if i == 4: return (t,   0,   255)
+    return     (255, 0,   q)
+
 def _lerp(a, b, t):
     return a + (b - a) * t
 
@@ -244,9 +258,9 @@ class ColourEngine:
 
             # Animation colour overrides
             if self._anim_mode == "rainbow":
-                pos = (self._anim_phase + i / max(self._n, 1)) % 1.0
-                r, g, b, w = _palette_colour(pos)
-                w = int(w * self._w_level[i])
+                hue = (self._anim_phase / 6.2832 + i / max(self._n, 1)) % 1.0
+                r, g, b = _hue_rgb(hue)
+                w = 0  # pure colour, no warm-white channel
             elif self._anim_mode == "wave":
                 wave = 0.5 + 0.5 * math.sin(self._anim_phase * 3.0 + i * 1.5)
                 r, g, b, w = self._colour[i]
