@@ -16,11 +16,11 @@ from config import (
     MQTT_TOPIC_PREFIX,
     LED_PIN, NUM_LEDS, LED_BRIGHTNESS,
     TOUCH_PINS,
-    FADE_DELAY_MS,
     RECONNECT_DELAY_MS,
     WEBREPL_PASSWORD,
 )
 
+FRAME_MS         = 16       # ~60 fps tick rate
 SYNC_INTERVAL_MS = 60_000   # boss resyncs follower every 60 s
 SYNC_FADE_STEPS  = 300      # ~5 s slow fade on follower when resyncing
 from sk6812 import SK6812
@@ -474,7 +474,7 @@ def main():
             publish_event(engine.get_event_payload())
 
         # ── Render frame at target FPS ──
-        if utime.ticks_diff(now, last_frame) >= FADE_DELAY_MS:
+        if utime.ticks_diff(now, last_frame) >= FRAME_MS:
             engine.tick(strip)
             last_frame = now
 
