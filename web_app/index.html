@@ -94,7 +94,8 @@
     }
 
     /* ── Strip preview ── */
-    #strip-wrap { display: grid; gap: 3px; }
+    #leds-row     { display: grid; gap: 3px; }
+    #dividers-row { display: grid; gap: 3px; }
     .led {
       height: 50px; border-radius: 5px;
       transition: background 0.5s ease;
@@ -474,7 +475,8 @@
 <!-- Strip preview -->
 <div class="card">
   <div class="card-title">Strip — tap dividers to split groups</div>
-  <div id="strip-wrap"></div>
+  <div id="leds-row"></div>
+  <div id="dividers-row" style="margin-top:3px"></div>
 </div>
 
 <!-- Controls -->
@@ -1018,7 +1020,7 @@ function _animFrame(ts) {
   _webLastTs = ts;
   if (animMode === "candle") _candleLastTs = ts;
 
-  if (!_ledCache) _ledCache = document.querySelectorAll("#strip-wrap .led");
+  if (!_ledCache) _ledCache = document.querySelectorAll("#leds-row .led");
   const groups = getGroups();
   const dark = "#111";
   for (let i = 0; i < _ledCache.length; i++) {
@@ -1178,9 +1180,13 @@ function randomise() {
 // ── Rendering ─────────────────────────────────────────────────
 function renderStrip() {
   _invalidateLedCache();
-  const wrap = document.getElementById("strip-wrap");
-  wrap.innerHTML = "";
-  wrap.style.gridTemplateColumns = `repeat(${cfg.numLeds}, 1fr)`;
+  const cols = `repeat(${cfg.numLeds}, 1fr)`;
+  const ledsRow = document.getElementById("leds-row");
+  const divRow  = document.getElementById("dividers-row");
+  ledsRow.innerHTML = "";
+  divRow.innerHTML  = "";
+  ledsRow.style.gridTemplateColumns = cols;
+  divRow.style.gridTemplateColumns  = cols;
   const groups = getGroups();
   let ledIdx = 0;
   groups.forEach(g => {
@@ -1189,7 +1195,7 @@ function renderStrip() {
       el.className = "led";
       el.style.background = powered ? rgbStr(g.pos) : "#111";
       if (j === g.size-1 && ledIdx < cfg.numLeds-1) el.classList.add("boundary");
-      wrap.appendChild(el);
+      ledsRow.appendChild(el);
       ledIdx++;
     }
   });
@@ -1203,7 +1209,7 @@ function renderStrip() {
         rebuildGroupData(); renderAll(); publishState();
       });
     }
-    wrap.appendChild(el);
+    divRow.appendChild(el);
   }
 }
 
