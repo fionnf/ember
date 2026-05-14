@@ -6,26 +6,27 @@
   <title>Linked Lights</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:        #080810;
+      --bg:        #060608;
       --surface:   rgba(255,255,255,0.04);
       --surface2:  rgba(255,255,255,0.07);
-      --border:    rgba(255,255,255,0.08);
-      --border2:   rgba(255,255,255,0.14);
-      --text:      #e8e8f0;
-      --text2:     #9898b8;
-      --muted:     #505068;
+      --surface3:  rgba(255,255,255,0.11);
+      --border:    rgba(255,255,255,0.07);
+      --border2:   rgba(255,255,255,0.13);
+      --text:      #ebebf5;
+      --text2:     #8888a8;
+      --muted:     #44445a;
       --accent:    #f0a030;
-      --accent2:   #f07020;
-      --green:     #40c070;
-      --red:       #e05050;
-      --radius:    16px;
-      --radius-sm: 10px;
-      --radius-xs: 7px;
+      --accent2:   #e86820;
+      --green:     #3ec46d;
+      --red:       #e04848;
+      --r:    16px;
+      --r-sm: 11px;
+      --r-xs: 8px;
     }
 
     body {
@@ -36,130 +37,154 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 1.5rem 1rem 5rem;
-      gap: 0.85rem;
-    }
-
-    /* Subtle noise/grain overlay for depth */
-    body::before {
-      content: "";
-      position: fixed; inset: 0; z-index: -1; pointer-events: none;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-      background-size: 200px;
+      padding: 1.4rem 1rem 5rem;
+      gap: 0.75rem;
     }
 
     /* ── Header ── */
     header {
       width: 100%; max-width: 580px;
       display: flex; justify-content: space-between; align-items: center;
-      padding: 0.25rem 0;
     }
     h1 {
-      font-size: 1rem; font-weight: 600; letter-spacing: 0.18em;
+      font-size: 0.95rem; font-weight: 700; letter-spacing: 0.2em;
       text-transform: uppercase;
-      background: linear-gradient(90deg, #fff 0%, var(--accent) 100%);
+      background: linear-gradient(100deg, #ffffff 0%, var(--accent) 100%);
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
-    #header-right { display: flex; align-items: center; gap: 0.6rem; }
-    #status { display: flex; align-items: center; gap: 0.35rem; font-size: 0.68rem; color: var(--muted); }
+    #header-right { display: flex; align-items: center; gap: 0.5rem; }
+    #status { display: flex; align-items: center; gap: 0.3rem; font-size: 0.65rem; color: var(--muted); }
     #dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); transition: background 0.4s, box-shadow 0.4s; }
-    #dot.connected    { background: var(--green); box-shadow: 0 0 6px var(--green); }
-    #dot.connecting   { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    #dot.connected    { background: var(--green); box-shadow: 0 0 7px var(--green); }
+    #dot.connecting   { background: var(--accent); box-shadow: 0 0 7px var(--accent); animation: pulse-dot 1s infinite; }
     #dot.disconnected { background: var(--red); }
+    @keyframes pulse-dot { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
 
     /* Board presence pills */
-    #board-pills { display: flex; gap: 0.35rem; }
+    #board-pills { display: flex; gap: 0.4rem; }
     .board-pill {
-      display: flex; align-items: center; gap: 0.3rem;
-      font-size: 0.63rem; font-weight: 500; color: var(--muted);
+      display: flex; align-items: center; gap: 0.45rem;
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: 20px; padding: 0.22rem 0.6rem;
-      transition: border-color 0.5s, color 0.5s, background 0.5s;
+      border-radius: var(--r-sm); padding: 0.35rem 0.7rem;
+      transition: border-color 0.5s, background 0.5s;
     }
     .board-pill .pill-dot {
-      width: 5px; height: 5px; border-radius: 50%;
+      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
       background: var(--muted); transition: background 0.5s, box-shadow 0.5s;
     }
-    .board-pill.online {
-      border-color: rgba(64,192,112,0.4);
-      background: rgba(64,192,112,0.07);
-      color: var(--green);
-    }
-    .board-pill.online .pill-dot { background: var(--green); box-shadow: 0 0 5px var(--green); }
+    .pill-info { display: flex; flex-direction: column; }
+    .pill-label { font-size: 0.7rem; font-weight: 600; color: var(--text2); line-height: 1.3; }
+    .pill-sub   { font-size: 0.57rem; color: var(--muted); line-height: 1.2; white-space: nowrap; max-width: 88px; overflow: hidden; text-overflow: ellipsis; }
+    .board-pill.online { border-color: rgba(62,196,109,0.28); background: rgba(62,196,109,0.06); }
+    .board-pill.online .pill-dot  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .board-pill.online .pill-label { color: var(--text); }
+    .board-pill.online .pill-sub  { color: var(--green); }
 
     /* ── Cards ── */
     .card {
       width: 100%; max-width: 580px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1.1rem 1.2rem;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      border-radius: var(--r);
+      padding: 1rem 1.1rem;
     }
     .card-title {
-      font-size: 0.62rem; font-weight: 600; letter-spacing: 0.12em;
-      text-transform: uppercase; color: var(--muted); margin-bottom: 0.9rem;
-    }
-    .section-divider {
-      height: 1px; background: var(--border); margin: 0.85rem -1.2rem;
+      font-size: 0.6rem; font-weight: 600; letter-spacing: 0.13em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 0.85rem;
     }
 
     /* ── Strip preview ── */
     #strip-wrap { display: grid; gap: 3px; }
     .led {
-      height: 52px; border-radius: 5px;
-      transition: background 0.6s ease;
-      box-shadow: 0 0 0 0 transparent;
+      height: 50px; border-radius: 5px;
+      transition: background 0.5s ease;
     }
-    .led.lit { box-shadow: 0 2px 10px rgba(255,255,255,0.08); }
-    .led.boundary { box-shadow: inset -2px 0 0 rgba(255,255,255,0.15); }
+    .led.boundary { box-shadow: inset -2px 0 0 rgba(255,255,255,0.12); }
     .div-cell {
-      height: 20px; border-radius: 4px; background: transparent; cursor: pointer;
+      height: 18px; border-radius: 4px; background: transparent; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       font-size: 0.5rem; color: transparent;
-      transition: background 0.15s, border-color 0.15s;
-      border: 1px solid transparent;
+      transition: background 0.15s; border: 1px solid transparent;
     }
     .div-cell:hover { background: rgba(255,255,255,0.05); border-color: var(--border2); }
-    .div-cell.split {
-      background: rgba(240,160,48,0.1);
-      border-color: rgba(240,160,48,0.5);
-      color: var(--accent);
-    }
+    .div-cell.split { background: rgba(240,160,48,0.1); border-color: rgba(240,160,48,0.4); color: var(--accent); }
 
-    /* ── Buttons ── */
-    .btn-row { display: flex; gap: 0.55rem; margin-bottom: 0.6rem; }
-    button {
-      flex: 1; padding: 0.75rem 0.6rem;
-      border: 1px solid var(--border); border-radius: var(--radius-sm);
+    /* ── Controls card ── */
+    .ctrl-top {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+      margin-bottom: 0.75rem;
+    }
+    .power-btn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.3rem; padding: 1.1rem 0.5rem;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
       background: var(--surface2); color: var(--text2);
-      font-family: inherit; font-size: 0.82rem; font-weight: 500; cursor: pointer;
-      letter-spacing: 0.03em;
-      transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s, opacity 0.15s;
+      font-family: inherit; cursor: pointer;
+      transition: all 0.2s;
     }
-    button:hover  { background: rgba(255,255,255,0.1); border-color: var(--border2); color: var(--text); }
-    button:active { transform: scale(0.96); }
-    button:disabled { opacity: 0.25; cursor: default; pointer-events: none; }
+    .power-btn .power-ring {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 2.5px solid var(--muted);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .power-btn .power-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; }
+    .power-btn.on  {
+      background: rgba(62,196,109,0.08); border-color: rgba(62,196,109,0.3);
+    }
+    .power-btn.on .power-ring {
+      border-color: var(--green); box-shadow: 0 0 14px rgba(62,196,109,0.4);
+      color: var(--green);
+    }
+    .power-btn.on .power-label { color: var(--green); }
+    .power-btn.off .power-ring { border-color: var(--red); color: var(--red); }
+    .power-btn.off .power-label { color: var(--red); }
 
-    .btn-accent {
+    .tap-btn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.3rem; padding: 1.1rem 0.5rem;
+      border: none; border-radius: var(--r-sm);
       background: linear-gradient(135deg, var(--accent2), var(--accent));
-      border-color: transparent; color: #0a0a0a; font-weight: 600;
+      color: rgba(0,0,0,0.85); font-family: inherit; cursor: pointer;
+      transition: filter 0.15s, transform 0.1s; position: relative; overflow: hidden;
     }
-    .btn-accent:hover { filter: brightness(1.1); background: linear-gradient(135deg, var(--accent2), var(--accent)); color: #0a0a0a; }
-    .btn-on  { background: rgba(64,192,112,0.12); border-color: rgba(64,192,112,0.35); color: var(--green); }
-    .btn-off { background: rgba(224,80,80,0.1);   border-color: rgba(224,80,80,0.3);   color: var(--red); }
-    .btn-active { background: rgba(240,160,48,0.12); border-color: rgba(240,160,48,0.4); color: var(--accent); }
+    .tap-btn .tap-icon { font-size: 1.4rem; line-height: 1; }
+    .tap-btn .tap-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; }
+    .tap-btn:hover { filter: brightness(1.08); }
+    .tap-btn:active { transform: scale(0.96); }
+    .tap-btn::after {
+      content: ""; position: absolute; inset: 0;
+      background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.25) 0%, transparent 60%);
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .tap-btn:active::after { opacity: 1; }
+
+    .ctrl-secondary {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.85rem;
+    }
+    .ctrl-pill {
+      display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+      padding: 0.65rem 0.5rem;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      background: transparent; color: var(--text2);
+      font-family: inherit; font-size: 0.78rem; font-weight: 500; cursor: pointer;
+      transition: all 0.18s;
+    }
+    .ctrl-pill:hover { border-color: var(--border2); color: var(--text); background: var(--surface2); }
+    .ctrl-pill .pill-icon { font-size: 0.9rem; }
+    .ctrl-pill.active { background: rgba(240,160,48,0.1); border-color: rgba(240,160,48,0.4); color: var(--accent); }
+    .ctrl-pill:disabled { opacity: 0.25; pointer-events: none; }
 
     /* ── Sliders ── */
     .sl-row {
-      display: flex; align-items: center; gap: 0.75rem;
-      margin-bottom: 0.6rem;
+      display: flex; align-items: center; gap: 0.7rem;
+      margin-bottom: 0.55rem;
     }
     .sl-row:last-child { margin-bottom: 0; }
-    .sl-label { font-size: 0.7rem; color: var(--text2); width: 82px; flex-shrink: 0; }
-    .sl-val   { font-size: 0.7rem; color: var(--text2); width: 40px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-
+    .sl-label { font-size: 0.68rem; color: var(--text2); width: 80px; flex-shrink: 0; }
+    .sl-val   { font-size: 0.68rem; color: var(--text2); width: 40px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
     input[type=range] {
       flex: 1; -webkit-appearance: none; height: 5px;
       border-radius: 3px; outline: none; cursor: pointer;
@@ -168,92 +193,97 @@
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none; width: 20px; height: 20px;
       border-radius: 50%; background: #fff;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.5), 0 0 0 2px rgba(255,255,255,0.1);
-      cursor: pointer; transition: transform 0.1s, box-shadow 0.1s;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.5);
+      cursor: pointer; transition: transform 0.1s, box-shadow 0.15s;
     }
     input[type=range]::-webkit-slider-thumb:active {
-      transform: scale(1.2);
-      box-shadow: 0 2px 10px rgba(240,160,48,0.4), 0 0 0 3px rgba(240,160,48,0.2);
+      transform: scale(1.25);
+      box-shadow: 0 2px 12px rgba(240,160,48,0.5), 0 0 0 3px rgba(240,160,48,0.15);
     }
 
-    /* ── Multi-handle palette bar ── */
+    /* ── Palette bar ── */
     #palette-bar-wrap {
-      position: relative; height: 48px; margin-bottom: 1rem; user-select: none;
+      position: relative; height: 50px; margin-bottom: 1rem; user-select: none;
     }
     #palette-bar {
       position: absolute; left: 13px; right: 13px; top: 50%; height: 16px;
       transform: translateY(-50%); border-radius: 8px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+      box-shadow: 0 2px 14px rgba(0,0,0,0.5);
     }
     .g-handle {
-      position: absolute; top: 50%; width: 28px; height: 28px;
+      position: absolute; top: 50%; width: 30px; height: 30px;
       border-radius: 50%; transform: translate(-50%, -50%);
-      border: 2.5px solid rgba(255,255,255,0.9);
-      box-shadow: 0 2px 10px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.3);
+      border: 2.5px solid rgba(255,255,255,0.85);
+      box-shadow: 0 3px 12px rgba(0,0,0,0.65);
       cursor: grab; display: flex; align-items: center; justify-content: center;
-      font-size: 0.6rem; font-weight: 700; color: rgba(0,0,0,0.7);
-      transition: box-shadow 0.15s, transform 0.15s; z-index: 2;
+      font-size: 0.58rem; font-weight: 700; color: rgba(0,0,0,0.6);
+      transition: transform 0.15s, box-shadow 0.15s; z-index: 2;
     }
-    .g-handle:hover { transform: translate(-50%, -55%); box-shadow: 0 4px 16px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.3); }
-    .g-handle:active { cursor: grabbing; transform: translate(-50%, -55%); z-index: 3; }
+    .g-handle:hover { transform: translate(-50%, -62%); box-shadow: 0 6px 18px rgba(0,0,0,0.7); }
+    .g-handle:active { cursor: grabbing; z-index: 3; }
 
     /* ── Group panels ── */
-    #group-panels { display: flex; flex-direction: column; gap: 0.45rem; }
+    #group-panels { display: flex; flex-direction: column; gap: 0.4rem; }
     .group-panel {
-      background: rgba(0,0,0,0.2); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: 0.65rem 0.9rem;
-      display: flex; align-items: center; gap: 0.8rem;
+      background: rgba(0,0,0,0.18); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 0.6rem 0.85rem;
+      display: flex; align-items: center; gap: 0.75rem;
     }
     .g-swatch {
-      width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
-      transition: background 0.6s ease; border: 1px solid rgba(255,255,255,0.08);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+      width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+      transition: background 0.5s ease; border: 1px solid rgba(255,255,255,0.07);
     }
-    .g-title { font-size: 0.75rem; font-weight: 500; color: var(--text); white-space: nowrap; }
-    .g-sub   { font-size: 0.62rem; color: var(--muted); }
+    .g-title { font-size: 0.73rem; font-weight: 600; color: var(--text); }
+    .g-sub   { font-size: 0.6rem; color: var(--muted); }
 
-    /* ── Animation mode buttons ── */
-    .anim-btns { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
-    .anim-btn {
-      flex: 1; min-width: 70px; padding: 0.65rem 0.4rem;
-      border: 1px solid var(--border); border-radius: var(--radius-sm);
-      background: transparent; color: var(--muted);
-      font-family: inherit; font-size: 0.78rem; font-weight: 500; cursor: pointer;
-      transition: all 0.2s;
+    /* ── Animation card ── */
+    .anim-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.45rem;
+      margin-bottom: 0.85rem;
     }
-    .anim-btn:hover { border-color: var(--border2); color: var(--text2); background: var(--surface2); }
-    .anim-btn.active {
-      background: rgba(240,160,48,0.12);
+    .anim-tile {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.3rem; padding: 0.7rem 0.3rem 0.65rem;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      background: transparent; color: var(--muted);
+      font-family: inherit; cursor: pointer;
+      transition: all 0.18s;
+    }
+    .anim-tile:hover { border-color: var(--border2); color: var(--text2); background: var(--surface2); }
+    .anim-tile .tile-icon { font-size: 1.2rem; line-height: 1; }
+    .anim-tile .tile-name { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.03em; }
+    .anim-tile.active {
+      background: rgba(240,160,48,0.1);
       border-color: rgba(240,160,48,0.45);
       color: var(--accent);
     }
+    .anim-tile.active .tile-icon { filter: drop-shadow(0 0 4px rgba(240,160,48,0.6)); }
 
-    /* ── Custom animation builder ── */
+    /* Custom builder */
     #custom-anim-toggle {
       width: 100%; background: transparent; border: 1px dashed var(--border);
-      border-radius: var(--radius-sm); color: var(--muted); font-family: inherit; font-size: 0.76rem;
-      padding: 0.65rem; cursor: pointer; margin-top: 0.7rem;
-      transition: border-color 0.2s, color 0.2s, background 0.2s; text-align: center;
-      letter-spacing: 0.05em;
+      border-radius: var(--r-sm); color: var(--muted); font-family: inherit; font-size: 0.74rem;
+      padding: 0.6rem; cursor: pointer; margin-top: 0.65rem;
+      transition: all 0.2s; text-align: center; letter-spacing: 0.04em;
     }
     #custom-anim-toggle:hover { border-color: var(--accent); color: var(--accent); background: rgba(240,160,48,0.04); }
     #custom-anim-panel {
-      display: none; flex-direction: column; gap: 0.75rem;
-      margin-top: 0.75rem; padding-top: 0.75rem;
+      display: none; flex-direction: column; gap: 0.7rem;
+      margin-top: 0.7rem; padding-top: 0.7rem;
       border-top: 1px solid var(--border);
     }
     #custom-anim-panel.open { display: flex; }
-
     .pattern-btns { display: flex; gap: 0.4rem; }
     .pattern-btn {
-      flex: 1; padding: 0.55rem 0.3rem; border-radius: var(--radius-xs);
+      flex: 1; padding: 0.55rem 0.2rem; border-radius: var(--r-xs);
       border: 1px solid var(--border); background: transparent;
-      color: var(--muted); font-family: inherit; font-size: 0.75rem; cursor: pointer;
+      color: var(--muted); font-family: inherit; font-size: 0.73rem; cursor: pointer;
       transition: all 0.18s;
     }
     .pattern-btn:hover { border-color: var(--border2); color: var(--text2); }
     .pattern-btn.active { background: rgba(240,160,48,0.1); border-color: rgba(240,160,48,0.4); color: var(--accent); }
-
     .hue-range-wrap { position: relative; height: 38px; }
     .hue-range-track {
       position: absolute; left: 11px; right: 11px; top: 50%; height: 12px;
@@ -268,90 +298,92 @@
       position: absolute; top: 50%; width: 24px; height: 24px;
       border-radius: 50%; transform: translate(-50%, -50%);
       border: 2px solid rgba(255,255,255,0.9); box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-      cursor: grab; z-index: 2; transition: transform 0.15s;
+      cursor: grab; z-index: 2; transition: transform 0.12s;
     }
-    .hue-handle:hover { transform: translate(-50%, -60%); }
+    .hue-handle:hover { transform: translate(-50%, -65%); }
     .hue-handle:active { cursor: grabbing; }
 
-    /* ── Scenes / Presets ── */
-    #scenes-list {
-      display: flex; flex-direction: column; gap: 0.45rem; margin-bottom: 0.75rem;
+    /* ── Library (presets + scenes) ── */
+    .lib-tabs {
+      display: flex; gap: 0; margin-bottom: 0.85rem;
+      background: rgba(0,0,0,0.2); border-radius: var(--r-xs);
+      padding: 3px;
+    }
+    .lib-tab {
+      flex: 1; padding: 0.5rem; border-radius: 6px;
+      border: none; background: transparent;
+      font-family: inherit; font-size: 0.76rem; font-weight: 600;
+      color: var(--muted); cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .lib-tab:hover { color: var(--text2); }
+    .lib-tab.active { background: var(--surface3); color: var(--text); }
+    .lib-panel { display: none; }
+    .lib-panel.active { display: block; }
+
+    /* Scene / preset rows */
+    .scene-grid {
+      display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.75rem;
     }
     .scene-row {
-      display: flex; align-items: center; gap: 0.55rem;
-      padding: 0.55rem 0.75rem;
-      background: rgba(0,0,0,0.2); border: 1px solid var(--border);
-      border-radius: var(--radius-xs);
-      transition: border-color 0.15s, background 0.15s;
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.6rem 0.75rem;
+      background: rgba(0,0,0,0.18); border: 1px solid var(--border);
+      border-radius: var(--r-xs);
+      transition: border-color 0.15s, background 0.15s; cursor: default;
     }
     .scene-row:hover { border-color: var(--border2); background: var(--surface2); }
     .scene-swatches { display: flex; gap: 3px; flex-shrink: 0; }
     .scene-dot { width: 11px; height: 11px; border-radius: 50%; }
+    .scene-anim-badge {
+      font-size: 0.58rem; color: var(--muted); background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 4px;
+      padding: 0.1rem 0.38rem; flex-shrink: 0; letter-spacing: 0.04em;
+    }
     .scene-name {
-      flex: 1; font-size: 0.82rem; font-weight: 500; color: var(--text);
+      flex: 1; font-size: 0.8rem; font-weight: 500; color: var(--text);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .scene-tag {
-      font-size: 0.6rem; color: var(--muted); background: var(--surface2);
-      border: 1px solid var(--border); border-radius: 4px;
-      padding: 0.1rem 0.35rem; flex-shrink: 0;
-    }
     .scene-load {
-      padding: 0.35rem 0.75rem; font-size: 0.73rem; font-weight: 500;
-      border-radius: var(--radius-xs); border: 1px solid var(--border);
-      background: var(--surface2); color: var(--text2); cursor: pointer;
+      padding: 0.32rem 0.7rem; font-size: 0.72rem; font-weight: 500;
+      border-radius: var(--r-xs); border: 1px solid var(--border);
+      background: transparent; color: var(--text2); cursor: pointer;
       flex-shrink: 0; font-family: inherit;
-      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      transition: border-color 0.15s, color 0.15s;
     }
     .scene-load:hover { border-color: var(--border2); color: var(--text); }
     .scene-del {
-      padding: 0.35rem 0.55rem; font-size: 0.73rem;
-      border-radius: var(--radius-xs); border: 1px solid transparent;
+      padding: 0.32rem 0.5rem; font-size: 0.72rem;
+      border-radius: var(--r-xs); border: 1px solid transparent;
       background: transparent; color: var(--muted); cursor: pointer;
       flex-shrink: 0; font-family: inherit;
       transition: color 0.15s, border-color 0.15s;
     }
-    .scene-del:hover { color: var(--red); border-color: rgba(224,80,80,0.3); }
-    .scene-save-row { display: flex; gap: 0.5rem; }
-    .scene-save-row input {
-      flex: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--border);
-      border-radius: var(--radius-xs); color: var(--text); font-family: inherit; font-size: 0.82rem;
+    .scene-del:hover { color: var(--red); border-color: rgba(224,72,72,0.3); }
+    .save-row { display: flex; gap: 0.5rem; }
+    .save-row input {
+      flex: 1; background: rgba(0,0,0,0.25); border: 1px solid var(--border);
+      border-radius: var(--r-xs); color: var(--text); font-family: inherit; font-size: 0.8rem;
       padding: 0.55rem 0.75rem; outline: none; transition: border-color 0.2s;
     }
-    .scene-save-row input:focus { border-color: rgba(240,160,48,0.5); }
-    .scene-save-row input::placeholder { color: var(--muted); }
-    .scene-save-row button { flex-shrink: 0; padding: 0.55rem 1.1rem; font-size: 0.82rem; }
-    .no-scenes { font-size: 0.75rem; color: var(--muted); text-align: center; padding: 0.75rem 0; }
-
-    /* ── Settings (config) ── */
-    #cfg-toggle {
-      background: transparent; border: 1px solid var(--border);
-      border-radius: 20px; color: var(--muted);
-      font-family: inherit; font-size: 0.68rem; font-weight: 500;
-      cursor: pointer; letter-spacing: 0.08em; text-transform: uppercase;
-      padding: 0.35rem 0.85rem;
-      transition: border-color 0.2s, color 0.2s, background 0.2s;
-      align-self: center;
+    .save-row input:focus { border-color: rgba(240,160,48,0.45); }
+    .save-row input::placeholder { color: var(--muted); }
+    .save-row button {
+      flex-shrink: 0; padding: 0.55rem 1rem; font-size: 0.8rem;
+      border: 1px solid var(--border); border-radius: var(--r-xs);
+      background: var(--surface2); color: var(--text2);
+      font-family: inherit; cursor: pointer; font-weight: 500;
+      transition: all 0.15s;
     }
-    #cfg-toggle:hover { border-color: var(--border2); color: var(--text2); background: var(--surface2); }
-    #cfg-panel { display: none; flex-direction: column; gap: 0.65rem; }
-    #cfg-panel.open { display: flex; }
-    .cfg-field { display: flex; flex-direction: column; gap: 0.3rem; }
-    .cfg-field label { font-size: 0.64rem; font-weight: 600; color: var(--muted); letter-spacing: 0.09em; text-transform: uppercase; }
-    .cfg-field input {
-      background: rgba(0,0,0,0.3); border: 1px solid var(--border);
-      border-radius: var(--radius-xs); color: var(--text); font-family: inherit; font-size: 0.85rem;
-      padding: 0.55rem 0.75rem; outline: none; transition: border-color 0.2s;
-    }
-    .cfg-field input:focus { border-color: rgba(240,160,48,0.5); }
-    .cfg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+    .save-row button:hover { border-color: var(--border2); color: var(--text); }
+    .no-scenes { font-size: 0.72rem; color: var(--muted); text-align: center; padding: 0.85rem 0; }
 
     /* ── Sunrise alarms ── */
     .alarm-card {
-      background: rgba(0,0,0,0.2); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: 0.85rem 1rem; margin-bottom: 0.55rem;
+      background: rgba(0,0,0,0.18); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 0.85rem 0.95rem; margin-bottom: 0.5rem;
     }
-    .alarm-header { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.65rem; }
+    .alarm-header { display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.6rem; }
     .alarm-toggle {
       width: 38px; height: 21px; border-radius: 11px; border: none;
       background: rgba(255,255,255,0.1); cursor: pointer; position: relative;
@@ -362,7 +394,7 @@
       background: #fff; border-radius: 50%; top: 3px; left: 3px;
       transition: left 0.25s; box-shadow: 0 1px 4px rgba(0,0,0,0.4);
     }
-    .alarm-toggle.on { background: rgba(64,192,112,0.5); }
+    .alarm-toggle.on { background: rgba(62,196,109,0.5); }
     .alarm-toggle.on::after { left: 20px; }
     .alarm-time {
       font-size: 1.2rem; font-weight: 600; color: var(--text);
@@ -371,25 +403,61 @@
       transition: border-color 0.2s;
     }
     .alarm-time:focus { border-color: var(--accent); }
-    .alarm-days { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 0.6rem; }
+    .alarm-days { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 0.55rem; }
     .day-btn {
-      width: 31px; height: 31px; border-radius: 50%;
+      width: 30px; height: 30px; border-radius: 50%;
       border: 1px solid var(--border); background: transparent;
-      color: var(--muted); font-family: inherit; font-size: 0.64rem; font-weight: 500;
+      color: var(--muted); font-family: inherit; font-size: 0.63rem; font-weight: 500;
       cursor: pointer; transition: all 0.15s;
     }
     .day-btn:hover { border-color: var(--border2); color: var(--text2); }
-    .day-btn.on { background: rgba(240,160,48,0.15); border-color: rgba(240,160,48,0.45); color: var(--accent); }
+    .day-btn.on { background: rgba(240,160,48,0.14); border-color: rgba(240,160,48,0.45); color: var(--accent); }
     .alarm-del {
       margin-left: auto; background: none; border: none; color: var(--muted);
-      font-size: 1rem; cursor: pointer; padding: 0.2rem 0.4rem;
+      font-size: 0.95rem; cursor: pointer; padding: 0.2rem 0.4rem;
       flex: none; transition: color 0.15s;
     }
     .alarm-del:hover { color: var(--red); }
-    .add-alarm-btn { width: 100%; margin-top: 0.3rem; }
+    .add-alarm-btn {
+      width: 100%; margin-top: 0.3rem; padding: 0.7rem;
+      border: 1px dashed var(--border); border-radius: var(--r-sm);
+      background: transparent; color: var(--muted);
+      font-family: inherit; font-size: 0.78rem; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .add-alarm-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(240,160,48,0.04); }
+
+    /* ── Settings ── */
+    #cfg-toggle {
+      background: transparent; border: 1px solid var(--border);
+      border-radius: 20px; color: var(--muted);
+      font-family: inherit; font-size: 0.65rem; font-weight: 600;
+      cursor: pointer; letter-spacing: 0.09em; text-transform: uppercase;
+      padding: 0.35rem 0.9rem;
+      transition: all 0.2s; align-self: center;
+    }
+    #cfg-toggle:hover { border-color: var(--border2); color: var(--text2); background: var(--surface2); }
+    #cfg-panel { display: none; flex-direction: column; gap: 0.6rem; }
+    #cfg-panel.open { display: flex; }
+    .cfg-field { display: flex; flex-direction: column; gap: 0.28rem; }
+    .cfg-field label { font-size: 0.62rem; font-weight: 600; color: var(--muted); letter-spacing: 0.09em; text-transform: uppercase; }
+    .cfg-field input {
+      background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+      border-radius: var(--r-xs); color: var(--text); font-family: inherit; font-size: 0.84rem;
+      padding: 0.52rem 0.7rem; outline: none; transition: border-color 0.2s;
+    }
+    .cfg-field input:focus { border-color: rgba(240,160,48,0.45); }
+    .cfg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; }
+    .cfg-btn {
+      padding: 0.65rem; border: 1px solid var(--border); border-radius: var(--r-xs);
+      background: var(--surface2); color: var(--text2);
+      font-family: inherit; font-size: 0.8rem; font-weight: 500; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .cfg-btn:hover { border-color: var(--border2); color: var(--text); }
 
     /* ── Scrollbar ── */
-    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
   </style>
@@ -400,8 +468,20 @@
   <h1>Linked Lights</h1>
   <div id="header-right">
     <div id="board-pills">
-      <div class="board-pill" id="pill-a"><div class="pill-dot"></div><span class="pill-label">A</span></div>
-      <div class="board-pill" id="pill-b"><div class="pill-dot"></div><span class="pill-label">B</span></div>
+      <div class="board-pill" id="pill-a">
+        <div class="pill-dot"></div>
+        <div class="pill-info">
+          <span class="pill-label" id="pill-a-label">A</span>
+          <span class="pill-sub"  id="pill-a-sub">offline</span>
+        </div>
+      </div>
+      <div class="board-pill" id="pill-b">
+        <div class="pill-dot"></div>
+        <div class="pill-info">
+          <span class="pill-label" id="pill-b-label">B</span>
+          <span class="pill-sub"  id="pill-b-sub">offline</span>
+        </div>
+      </div>
     </div>
     <div id="status"><div id="dot" class="disconnected"></div><span id="status-text">disconnected</span></div>
   </div>
@@ -409,37 +489,46 @@
 
 <!-- Strip preview -->
 <div class="card">
-  <div class="card-title">Strip — click divider bar to set group boundaries</div>
+  <div class="card-title">Strip — tap dividers to split groups</div>
   <div id="strip-wrap"></div>
 </div>
 
-<!-- Global controls -->
+<!-- Controls -->
 <div class="card">
-  <div class="card-title">Controls</div>
-  <div class="btn-row">
-    <button class="btn-accent" id="btn-tap"   disabled>Tap</button>
-    <button id="btn-power"  disabled>Power</button>
-    <button id="btn-reset"  disabled>Reset</button>
+  <div class="ctrl-top">
+    <button class="power-btn off" id="btn-power" disabled>
+      <div class="power-ring">⏻</div>
+      <span class="power-label">Off</span>
+    </button>
+    <button class="tap-btn" id="btn-tap" disabled>
+      <span class="tap-icon">✦</span>
+      <span class="tap-label">Tap</span>
+    </button>
   </div>
-  <div class="btn-row">
-    <button id="btn-drift"  disabled>Auto Drift: On</button>
+  <div class="ctrl-secondary">
+    <button class="ctrl-pill" id="btn-reset" disabled>
+      <span class="pill-icon">↺</span> Reset
+    </button>
+    <button class="ctrl-pill active" id="btn-drift" disabled>
+      <span class="pill-icon">〜</span> Drift: On
+    </button>
   </div>
   <div class="sl-row">
     <span class="sl-label">Brightness</span>
     <input type="range" id="sl-brightness" min="0" max="100" value="60"
-      style="background: linear-gradient(to right, #111, #fff)">
+      style="background:linear-gradient(to right,rgba(255,255,255,0.06),rgba(255,255,255,0.9))">
     <span class="sl-val" id="val-brightness">60%</span>
   </div>
   <div class="sl-row">
     <span class="sl-label">Fade Speed</span>
     <input type="range" id="sl-fade" min="20" max="600" value="60"
-      style="background: linear-gradient(to right, #7c6fff, #222)">
+      style="background:linear-gradient(to right,rgba(240,160,48,0.15),rgba(240,160,48,0.7))">
     <span class="sl-val" id="val-fade">1s</span>
   </div>
-  <div class="sl-row" style="margin-bottom:0">
+  <div class="sl-row">
     <span class="sl-label">Drift Every</span>
     <input type="range" id="sl-drift-interval" min="5" max="300" value="45"
-      style="background: linear-gradient(to right, #48c9b0, #222)">
+      style="background:linear-gradient(to right,rgba(62,196,109,0.12),rgba(62,196,109,0.5))">
     <span class="sl-val" id="val-drift-interval">45s</span>
   </div>
 </div>
@@ -447,24 +536,39 @@
 <!-- Animation -->
 <div class="card">
   <div class="card-title">Animation</div>
-  <div class="anim-btns">
-    <button class="anim-btn active" data-mode="">Off</button>
-    <button class="anim-btn" data-mode="rainbow">Rainbow</button>
-    <button class="anim-btn" data-mode="wave">Wave</button>
-    <button class="anim-btn" data-mode="candle">Candle</button>
-    <button class="anim-btn" data-mode="custom" id="btn-custom-anim">Custom</button>
+  <div class="anim-grid">
+    <button class="anim-tile active" data-mode="">
+      <span class="tile-icon">◎</span>
+      <span class="tile-name">Off</span>
+    </button>
+    <button class="anim-tile" data-mode="rainbow">
+      <span class="tile-icon">🌈</span>
+      <span class="tile-name">Rainbow</span>
+    </button>
+    <button class="anim-tile" data-mode="wave">
+      <span class="tile-icon">〰</span>
+      <span class="tile-name">Wave</span>
+    </button>
+    <button class="anim-tile" data-mode="candle">
+      <span class="tile-icon">🕯</span>
+      <span class="tile-name">Candle</span>
+    </button>
+    <button class="anim-tile" data-mode="custom" id="btn-custom-anim">
+      <span class="tile-icon">✦</span>
+      <span class="tile-name">Custom</span>
+    </button>
   </div>
   <div class="sl-row">
     <span class="sl-label">Speed</span>
     <input type="range" id="sl-anim-speed" min="1" max="50" value="10"
-      style="background: linear-gradient(to right, #48c9b0, #c94880)">
+      style="background:linear-gradient(to right,rgba(62,196,109,0.2),rgba(224,104,32,0.7))">
     <span class="sl-val" id="val-anim-speed">1.0×</span>
   </div>
 
   <button id="custom-anim-toggle">+ Build Custom Animation</button>
   <div id="custom-anim-panel">
     <div>
-      <div class="card-title" style="margin-bottom:0.5rem">Pattern</div>
+      <div class="card-title" style="margin-bottom:0.45rem">Pattern</div>
       <div class="pattern-btns">
         <button class="pattern-btn active" data-pattern="sweep">Sweep</button>
         <button class="pattern-btn" data-pattern="bounce">Bounce</button>
@@ -473,7 +577,7 @@
       </div>
     </div>
     <div>
-      <div class="card-title" style="margin-bottom:0.5rem">Colour Range — drag to set start / end hue</div>
+      <div class="card-title" style="margin-bottom:0.45rem">Colour Range</div>
       <div class="hue-range-wrap" id="hue-range-wrap">
         <div class="hue-range-track" id="hue-range-track"></div>
         <div class="hue-range-fill" id="hue-range-fill"></div>
@@ -483,21 +587,22 @@
     </div>
     <div class="sl-row" style="margin-bottom:0">
       <span class="sl-label">Groups</span>
-      <div style="flex:1;display:flex;gap:0.5rem">
-        <button class="pattern-btn" id="btn-sync-groups" style="flex:none;padding:0.45rem 0.9rem">
-          Offset
-        </button>
-        <span style="font-size:0.7rem;color:var(--muted);align-self:center">
-          Offset = groups animate out of phase with each other
-        </span>
+      <div style="flex:1;display:flex;gap:0.5rem;align-items:center">
+        <button class="pattern-btn" id="btn-sync-groups" style="flex:none;padding:0.42rem 0.85rem">Offset</button>
+        <span style="font-size:0.67rem;color:var(--muted)">out-of-phase with each other</span>
       </div>
     </div>
-    <div style="display:flex;gap:0.5rem;margin-top:0.2rem">
-      <button class="btn-accent" id="btn-apply-custom" style="flex:1">Apply</button>
-      <input id="custom-anim-name" placeholder="Name…" maxlength="28"
-        style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;
-               color:var(--text);font-size:0.82rem;padding:0.5rem 0.7rem;outline:none">
-      <button id="btn-save-custom" style="flex:none">Save</button>
+    <div style="display:flex;gap:0.5rem;margin-top:0.1rem">
+      <button style="flex:1;padding:0.6rem;border:none;border-radius:var(--r-xs);
+        background:linear-gradient(135deg,var(--accent2),var(--accent));
+        color:rgba(0,0,0,0.85);font-family:inherit;font-size:0.8rem;font-weight:700;cursor:pointer"
+        id="btn-apply-custom">Apply</button>
+      <input id="custom-anim-name" placeholder="Name to save…" maxlength="28"
+        style="flex:1;background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:var(--r-xs);
+               color:var(--text);font-family:inherit;font-size:0.8rem;padding:0.55rem 0.7rem;outline:none">
+      <button id="btn-save-custom"
+        style="flex:none;padding:0.55rem 0.9rem;border:1px solid var(--border);border-radius:var(--r-xs);
+               background:transparent;color:var(--text2);font-family:inherit;font-size:0.8rem;cursor:pointer">Save</button>
     </div>
   </div>
 </div>
@@ -506,7 +611,7 @@
 <div class="card">
   <div class="card-title">Sunrise Alarm</div>
   <div id="alarms-list"></div>
-  <button class="btn-accent add-alarm-btn" id="btn-add-alarm">+ Add Alarm</button>
+  <button class="add-alarm-btn" id="btn-add-alarm">+ Add Alarm</button>
 </div>
 
 <!-- Per-group controls -->
@@ -518,57 +623,63 @@
   <div id="group-panels"></div>
 </div>
 
-<!-- Presets -->
+<!-- Library: Presets + Scenes combined -->
 <div class="card">
-  <div class="card-title">Presets</div>
-  <div id="presets-list" style="display:flex;flex-direction:column;gap:0.5rem"></div>
-  <div class="scene-save-row" style="margin-top:0.6rem">
-    <input id="preset-name" placeholder="Save current as preset…" maxlength="32">
-    <button id="btn-save-preset">Save</button>
+  <div class="lib-tabs">
+    <button class="lib-tab active" data-tab="presets">Presets</button>
+    <button class="lib-tab" data-tab="scenes">Saved Scenes</button>
   </div>
-</div>
 
-<div class="card">
-  <div class="card-title">Saved Scenes</div>
-  <div id="scenes-list"></div>
-  <div class="scene-save-row">
-    <input id="scene-name" placeholder="Scene name…" maxlength="32">
-    <button id="btn-save-scene">Save Current</button>
+  <div id="lib-presets" class="lib-panel active">
+    <div id="presets-list" class="scene-grid"></div>
+    <div class="save-row">
+      <input id="preset-name" placeholder="Save current state as preset…" maxlength="32">
+      <button id="btn-save-preset">Save</button>
+    </div>
+  </div>
+
+  <div id="lib-scenes" class="lib-panel">
+    <div id="scenes-list" class="scene-grid"></div>
+    <div class="save-row">
+      <input id="scene-name" placeholder="Scene name…" maxlength="32">
+      <button id="btn-save-scene">Save Current</button>
+    </div>
   </div>
 </div>
 
 <!-- Settings -->
-<button id="cfg-toggle">⚙ settings</button>
+<button id="cfg-toggle">⚙ Settings</button>
 <div class="card" id="cfg-panel">
-  <div class="card-title">Broker Settings</div>
+  <div class="card-title">Broker</div>
   <div class="cfg-field">
-    <label>BROKER (WebSocket URL)</label>
+    <label>WebSocket URL</label>
     <input id="cfg-broker" value="wss://broker.hivemq.com:8884/mqtt">
   </div>
   <div class="cfg-field">
-    <label>TOPIC PREFIX</label>
+    <label>Topic Prefix</label>
     <input id="cfg-prefix" value="picolight_lf26">
   </div>
   <div class="cfg-row">
-    <div class="cfg-field"><label>NUM LEDS</label><input id="cfg-leds"   type="number" min="1" max="144" value="10"></div>
-    <div class="cfg-field"><label>NUM GROUPS</label><input id="cfg-groups" type="number" min="1" max="10"  value="3"></div>
+    <div class="cfg-field"><label>LEDs</label><input id="cfg-leds"   type="number" min="1" max="144" value="10"></div>
+    <div class="cfg-field"><label>Groups</label><input id="cfg-groups" type="number" min="1" max="10"  value="3"></div>
+  </div>
+  <div class="card-title" style="margin-top:0.5rem">Board Names</div>
+  <div class="cfg-row">
+    <div class="cfg-field"><label>Board A ID</label><input id="cfg-id-a" placeholder="board_a"></div>
+    <div class="cfg-field"><label>Board A Name</label><input id="cfg-name-a" placeholder="A"></div>
   </div>
   <div class="cfg-row">
-    <div class="cfg-field"><label>BOARD A ID</label><input id="cfg-id-a" placeholder="board_a"></div>
-    <div class="cfg-field"><label>BOARD A NAME</label><input id="cfg-name-a" placeholder="A"></div>
+    <div class="cfg-field"><label>Board B ID</label><input id="cfg-id-b" placeholder="board_b"></div>
+    <div class="cfg-field"><label>Board B Name</label><input id="cfg-name-b" placeholder="B"></div>
   </div>
-  <div class="cfg-row">
-    <div class="cfg-field"><label>BOARD B ID</label><input id="cfg-id-b" placeholder="board_b"></div>
-    <div class="cfg-field"><label>BOARD B NAME</label><input id="cfg-name-b" placeholder="B"></div>
-  </div>
-  <button id="btn-reconnect">Reconnect</button>
-  <hr style="border-color:#1d1d28;margin:0.25rem 0">
-  <div class="card-title" style="margin-top:0.4rem">Add WiFi Network to Boards</div>
+  <button class="cfg-btn" id="btn-reconnect">Reconnect</button>
+  <hr style="border:none;border-top:1px solid var(--border);margin:0.15rem 0">
+  <div class="card-title" style="margin-top:0.3rem">Add WiFi Network</div>
   <div class="cfg-row">
     <div class="cfg-field"><label>SSID</label><input id="new-ssid" placeholder="Network name"></div>
-    <div class="cfg-field"><label>PASSWORD</label><input id="new-password" type="password" placeholder="Password"></div>
+    <div class="cfg-field"><label>Password</label><input id="new-password" type="password" placeholder="Password"></div>
   </div>
-  <button id="btn-add-network">Send to Boards</button>
+  <button class="cfg-btn" id="btn-add-network">Send to Boards</button>
 </div>
 
 <script>
@@ -579,9 +690,9 @@ let cfg = {
   numLeds:   parseInt(localStorage.getItem("ll_leds")   || "10"),
   numGroups: parseInt(localStorage.getItem("ll_groups") || "3"),
   boardIdA:  localStorage.getItem("ll_id_a")   || "board_a",
-  boardNameA:localStorage.getItem("ll_name_a") || "A",
+  boardNameA:localStorage.getItem("ll_name_a") || "FF",
   boardIdB:  localStorage.getItem("ll_id_b")   || "board_b",
-  boardNameB:localStorage.getItem("ll_name_b") || "B",
+  boardNameB:localStorage.getItem("ll_name_b") || "LS",
 };
 document.getElementById("cfg-broker").value  = cfg.broker;
 document.getElementById("cfg-prefix").value  = cfg.prefix;
@@ -639,7 +750,6 @@ function hsvRainbow(h) {
   return [v, 0, q];
 }
 
-// Build gradient CSS for a colour slider
 function paletteGradient() {
   const stops = [];
   const steps = 24;
@@ -659,23 +769,46 @@ let groupWLevels   = [];
 let powered        = true;
 let brightness     = 0.6;
 let fadeSteps      = 60;
-let driftEnabled   = true;
+let driftEnabled   = false;
 let driftInterval  = 45;
 const BOARD_ID     = "web_app";
-const boardLastSeen = {};
+const boardLastSeen   = {};
+const boardLastChange = {};
 const BOARD_TIMEOUT_MS = 90_000;
 let animMode  = "";
 let animSpeed = 1.0;
 let alarms    = [];
 
+// Board pill "last known state" description
+function boardStateDesc(d) {
+  if (d.heartbeat) return "online";
+  if (d.on === false) return "lights off";
+  if (d.on === true)  return "lights on";
+  if (d.anim_mode === "rainbow") return "rainbow";
+  if (d.anim_mode === "candle")  return "candle";
+  if (d.anim_mode === "wave")    return "wave";
+  if (d.anim_mode === "custom")  return "custom anim";
+  if (d.anim_mode === null || d.anim_mode === "")  return "static";
+  if (d.groups) return "colours changed";
+  if (d.brightness !== undefined) return `${Math.round(d.brightness*100)}% bright`;
+  return "updated";
+}
+
 function updatePills() {
-  [["pill-a", cfg.boardIdA, cfg.boardNameA], ["pill-b", cfg.boardIdB, cfg.boardNameB]].forEach(([pillId, boardId, name]) => {
+  [
+    ["pill-a", "pill-a-label", "pill-a-sub", cfg.boardIdA, cfg.boardNameA],
+    ["pill-b", "pill-b-label", "pill-b-sub", cfg.boardIdB, cfg.boardNameB],
+  ].forEach(([pillId, labelId, subId, boardId, name]) => {
     const pill = document.getElementById(pillId);
     if (!pill) return;
-    pill.querySelector(".pill-label").textContent = name;
-    const seen = boardLastSeen[boardId];
+    document.getElementById(labelId).textContent = name;
+    const seen   = boardLastSeen[boardId];
     const online = seen && (Date.now() - seen) < BOARD_TIMEOUT_MS;
     pill.classList.toggle("online", online);
+    const sub = document.getElementById(subId);
+    sub.textContent = online
+      ? (boardLastChange[boardId] || "online")
+      : "offline";
   });
 }
 setInterval(updatePills, 3000);
@@ -726,12 +859,11 @@ function connect() {
     client.subscribe(topicAlarms());
   });
   client.on("message", (t, msg) => {
-    const topic = t.toString();
+    const topicStr = t.toString();
     try {
       const d = JSON.parse(msg.toString());
 
-      // Retained scenes/names
-      if (topic === topicScenes()) {
+      if (topicStr === topicScenes()) {
         if (d.scenes)  { saveScenes(d.scenes);  renderScenes(); }
         if (d.presets) { localStorage.setItem("ll_presets", JSON.stringify(d.presets)); renderPresets(); }
         if (d.boardNameA) { cfg.boardNameA = d.boardNameA; localStorage.setItem("ll_name_a", d.boardNameA); }
@@ -742,13 +874,16 @@ function connect() {
         return;
       }
 
-      // Retained alarms
-      if (topic === topicAlarms()) {
+      if (topicStr === topicAlarms()) {
         if (Array.isArray(d)) { alarms = d; renderAlarms(); }
         return;
       }
 
-      if (d.from) boardLastSeen[d.from] = Date.now();
+      if (d.from) {
+        boardLastSeen[d.from] = Date.now();
+        boardLastChange[d.from] = boardStateDesc(d);
+        updatePills();
+      }
       if (d.from === BOARD_ID) return;
       if (d.on         !== undefined) { powered = d.on;              updatePowerBtn(); }
       if (d.brightness !== undefined) { brightness = d.brightness;   syncBrightnessSlider(); }
@@ -797,9 +932,19 @@ function publishState() {
   publish(p);
 }
 
+// ── Library tabs ──────────────────────────────────────────────
+document.querySelectorAll(".lib-tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".lib-tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".lib-panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("lib-" + btn.dataset.tab).classList.add("active");
+  });
+});
+
 // ── Animation ─────────────────────────────────────────────────
 function syncAnimButtons() {
-  document.querySelectorAll(".anim-btn").forEach(btn => {
+  document.querySelectorAll(".anim-tile").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.mode === animMode);
   });
   if (animMode) startAnimLoop(); else { stopAnimLoop(); renderStrip(); }
@@ -808,7 +953,7 @@ function syncAnimSlider() {
   document.getElementById("sl-anim-speed").value = Math.round(animSpeed * 10);
   document.getElementById("val-anim-speed").textContent = animSpeed.toFixed(1) + "×";
 }
-document.querySelectorAll(".anim-btn").forEach(btn => {
+document.querySelectorAll(".anim-tile").forEach(btn => {
   btn.addEventListener("click", () => {
     animMode = btn.dataset.mode;
     syncAnimButtons();
@@ -833,9 +978,14 @@ document.getElementById("sl-anim-speed").addEventListener("input", e => {
 let _webPhase    = 0;
 let _webLastTs   = null;
 let _animFrameId = null;
+let _ledCache    = null;   // cached NodeList, cleared on renderStrip
+const _FRAME_MS  = 33;     // ~30 fps cap
+const _CANDLE_MS = 100;    // candle updates at 10 fps
+let _candleLastTs = 0;
+
+function _invalidateLedCache() { _ledCache = null; }
 
 function _ledColour(ledIdx, groups) {
-  // Find which group this LED belongs to
   let cursor = 0;
   for (let gi = 0; gi < groups.length; gi++) {
     const end = cursor + groups[gi].size;
@@ -855,8 +1005,7 @@ function _ledColour(ledIdx, groups) {
       } else if (animMode === "custom") {
         const p = getCustomParams();
         const h0 = parseFloat(p.hue_start), h1 = parseFloat(p.hue_end);
-        const sync = p.sync;
-        const offset = sync ? 0 : (gi / Math.max(groups.length - 1, 1)) * 0.6;
+        const offset = p.sync ? 0 : (gi / Math.max(groups.length - 1, 1)) * 0.6;
         const t = (Math.sin(_webPhase + offset) + 1) * 0.5;
         let pos;
         if (p.pattern === "sweep") {
@@ -867,8 +1016,7 @@ function _ledColour(ledIdx, groups) {
           const [r, g, b] = paletteRGB(Math.max(0, Math.min(1, pos)));
           return `rgb(${Math.round(r*t)},${Math.round(g*t)},${Math.round(b*t)})`;
         } else if (p.pattern === "strobe") {
-          const on = Math.sin(_webPhase + offset * 2) > 0.6;
-          if (!on) return "rgb(0,0,0)";
+          if (Math.sin(_webPhase + offset * 2) <= 0.6) return "rgb(0,0,0)";
           pos = h0;
         } else {
           pos = h0 + t * (h1 - h0);
@@ -884,33 +1032,39 @@ function _ledColour(ledIdx, groups) {
 }
 
 function _animFrame(ts) {
-  if (_webLastTs !== null) {
-    const dt = ts - _webLastTs;
-    _webPhase += 0.0015 * animSpeed * dt;
+  // Throttle to ~30fps
+  if (_webLastTs !== null && ts - _webLastTs < _FRAME_MS) {
+    _animFrameId = requestAnimationFrame(_animFrame);
+    return;
   }
+  // Skip candle DOM update if it fired too recently
+  if (animMode === "candle" && ts - _candleLastTs < _CANDLE_MS) {
+    if (_webLastTs !== null) _webPhase += 0.0015 * animSpeed * (ts - _webLastTs);
+    _webLastTs = ts;
+    _animFrameId = requestAnimationFrame(_animFrame);
+    return;
+  }
+  if (_webLastTs !== null) _webPhase += 0.0015 * animSpeed * (ts - _webLastTs);
   _webLastTs = ts;
+  if (animMode === "candle") _candleLastTs = ts;
 
-  const leds = document.querySelectorAll("#strip-wrap .led");
+  if (!_ledCache) _ledCache = document.querySelectorAll("#strip-wrap .led");
   const groups = getGroups();
-  leds.forEach((el, i) => {
-    el.style.background = powered ? _ledColour(i, groups) : "#111";
-  });
+  const dark = "#111";
+  for (let i = 0; i < _ledCache.length; i++) {
+    _ledCache[i].style.background = powered ? _ledColour(i, groups) : dark;
+  }
   _animFrameId = requestAnimationFrame(_animFrame);
 }
 
 function startAnimLoop() {
   if (_animFrameId !== null) return;
-  _webPhase  = 0;
-  _webLastTs = null;
+  _webPhase = 0; _webLastTs = null; _candleLastTs = 0;
   _animFrameId = requestAnimationFrame(_animFrame);
 }
 
 function stopAnimLoop() {
-  if (_animFrameId !== null) {
-    cancelAnimationFrame(_animFrameId);
-    _animFrameId = null;
-    _webLastTs   = null;
-  }
+  if (_animFrameId !== null) { cancelAnimationFrame(_animFrameId); _animFrameId = null; _webLastTs = null; }
 }
 
 // ── Custom animation builder ──────────────────────────────────
@@ -923,7 +1077,6 @@ function getCustomParams() {
   return { pattern: customPattern, hue_start: customHueStart, hue_end: customHueEnd, sync: customSync };
 }
 
-// Toggle panel open/close
 document.getElementById("custom-anim-toggle").addEventListener("click", () => {
   const panel = document.getElementById("custom-anim-panel");
   const open  = panel.classList.toggle("open");
@@ -931,7 +1084,6 @@ document.getElementById("custom-anim-toggle").addEventListener("click", () => {
     ? "− Custom Animation" : "+ Build Custom Animation";
 });
 
-// Pattern buttons
 document.querySelectorAll(".pattern-btn[data-pattern]").forEach(btn => {
   btn.addEventListener("click", () => {
     customPattern = btn.dataset.pattern;
@@ -940,36 +1092,29 @@ document.querySelectorAll(".pattern-btn[data-pattern]").forEach(btn => {
   });
 });
 
-// Sync toggle
 document.getElementById("btn-sync-groups").addEventListener("click", btn => {
   customSync = !customSync;
   btn.target.textContent = customSync ? "In Sync" : "Offset";
   btn.target.classList.toggle("active", customSync);
 });
 
-// Hue range dual-handle
 (function initHueRange() {
-  const wrap  = document.getElementById("hue-range-wrap");
   const track = document.getElementById("hue-range-track");
   const fill  = document.getElementById("hue-range-fill");
   const hS    = document.getElementById("hue-handle-start");
   const hE    = document.getElementById("hue-handle-end");
-
   track.style.background = COLOUR_GRADIENT;
 
   function updateFill() {
     const lo = Math.min(customHueStart, customHueEnd);
     const hi = Math.max(customHueStart, customHueEnd);
     fill.style.left  = `calc(10px + ${lo} * (100% - 20px))`;
-    fill.style.width = `calc(${(hi - lo)} * (100% - 20px))`;
+    fill.style.width = `calc(${hi - lo} * (100% - 20px))`;
   }
-
   function posFromEvent(e) {
     const rect = track.getBoundingClientRect();
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-    return Math.max(0, Math.min(1, x / rect.width));
+    return Math.max(0, Math.min(1, ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width));
   }
-
   function makeHandleDraggable(handle, isStart) {
     let dragging = false;
     handle.addEventListener("mousedown",  e => { dragging = true; e.preventDefault(); });
@@ -984,8 +1129,7 @@ document.getElementById("btn-sync-groups").addEventListener("click", btn => {
       updateFill();
     });
     document.addEventListener("touchmove", e => {
-      if (!dragging) return;
-      e.preventDefault();
+      if (!dragging) return; e.preventDefault();
       const pos = posFromEvent(e);
       if (isStart) customHueStart = pos; else customHueEnd = pos;
       const [r,g,b] = paletteRGB(pos);
@@ -996,31 +1140,23 @@ document.getElementById("btn-sync-groups").addEventListener("click", btn => {
     document.addEventListener("mouseup",  () => { dragging = false; });
     document.addEventListener("touchend", () => { dragging = false; });
   }
-
   makeHandleDraggable(hS, true);
   makeHandleDraggable(hE, false);
-
-  // Initial positions
-  function syncHueHandles() {
-    const [r0,g0,b0] = paletteRGB(customHueStart);
-    const [r1,g1,b1] = paletteRGB(customHueEnd);
-    hS.style.background = `rgb(${r0},${g0},${b0})`;
-    hE.style.background = `rgb(${r1},${g1},${b1})`;
-    hS.style.left = `calc(10px + ${customHueStart} * (100% - 20px))`;
-    hE.style.left = `calc(10px + ${customHueEnd}   * (100% - 20px))`;
-    updateFill();
-  }
-  syncHueHandles();
+  const [r0,g0,b0] = paletteRGB(customHueStart);
+  const [r1,g1,b1] = paletteRGB(customHueEnd);
+  hS.style.background = `rgb(${r0},${g0},${b0})`;
+  hE.style.background = `rgb(${r1},${g1},${b1})`;
+  hS.style.left = `calc(10px + ${customHueStart} * (100% - 20px))`;
+  hE.style.left = `calc(10px + ${customHueEnd}   * (100% - 20px))`;
+  updateFill();
 })();
 
-// Apply button
 document.getElementById("btn-apply-custom").addEventListener("click", () => {
   animMode = "custom";
   syncAnimButtons();
   publish({ anim_mode: "custom", anim_speed: animSpeed, anim_params: getCustomParams() });
 });
 
-// Save custom as preset
 document.getElementById("btn-save-custom").addEventListener("click", () => {
   const name = document.getElementById("custom-anim-name").value.trim()
     || `Custom ${loadScenes().length + 1}`;
@@ -1071,11 +1207,10 @@ function randomise() {
 
 // ── Rendering ─────────────────────────────────────────────────
 function renderStrip() {
+  _invalidateLedCache();
   const wrap = document.getElementById("strip-wrap");
   wrap.innerHTML = "";
   wrap.style.gridTemplateColumns = `repeat(${cfg.numLeds}, 1fr)`;
-
-  // Row 1: LEDs
   const groups = getGroups();
   let ledIdx = 0;
   groups.forEach(g => {
@@ -1088,19 +1223,14 @@ function renderStrip() {
       ledIdx++;
     }
   });
-
-  // Row 2: divider cells — same column count, auto-aligns
   for (let i = 0; i < cfg.numLeds; i++) {
     const el = document.createElement("div");
     el.className = "div-cell" + (boundaries.has(i) ? " split" : "");
     el.textContent = boundaries.has(i) ? "┃" : "";
     if (i > 0) {
       el.addEventListener("click", () => {
-        if (boundaries.has(i)) boundaries.delete(i);
-        else boundaries.add(i);
-        rebuildGroupData();
-        renderAll();
-        publishState();
+        if (boundaries.has(i)) boundaries.delete(i); else boundaries.add(i);
+        rebuildGroupData(); renderAll(); publishState();
       });
     }
     wrap.appendChild(el);
@@ -1121,10 +1251,7 @@ function renderPaletteBar() {
   const wrap = document.getElementById("palette-bar-wrap");
   const bar  = document.getElementById("palette-bar");
   bar.style.background = COLOUR_GRADIENT;
-
-  // Remove old handles
   wrap.querySelectorAll(".g-handle").forEach(h => h.remove());
-
   const groups = getGroups();
   groups.forEach((g, i) => {
     const handle = document.createElement("div");
@@ -1135,30 +1262,23 @@ function renderPaletteBar() {
     handle.style.background = `rgb(${r},${gb},${b})`;
     handle.style.left = `calc(12px + ${g.pos} * (100% - 24px))`;
     wrap.appendChild(handle);
-
     let dragging = false;
-
     function posFromEvent(e) {
       const rect = bar.getBoundingClientRect();
-      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-      return Math.max(0, Math.min(1, x / rect.width));
+      return Math.max(0, Math.min(1, ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width));
     }
-
     function onMove(e) {
-      if (!dragging) return;
-      e.preventDefault();
+      if (!dragging) return; e.preventDefault();
       const pos = posFromEvent(e);
       groupPositions[i] = pos;
       const [r,gb,b] = paletteRGB(pos);
       handle.style.background = `rgb(${r},${gb},${b})`;
       handle.style.left = `calc(12px + ${pos} * (100% - 24px))`;
       document.getElementById(`gsw-${i}`).style.background = rgbStr(pos);
-      renderStrip();
-      publishState();
+      renderStrip(); publishState();
     }
-
     handle.addEventListener("mousedown",  e => { dragging = true; e.preventDefault(); });
-    handle.addEventListener("touchstart", e => { dragging = true; }, { passive: true });
+    handle.addEventListener("touchstart", () => { dragging = true; }, { passive: true });
     document.addEventListener("mousemove",  onMove);
     document.addEventListener("touchmove",  onMove, { passive: false });
     document.addEventListener("mouseup",  () => { dragging = false; });
@@ -1181,9 +1301,9 @@ function renderGroupPanels() {
           <span class="g-sub" id="gsub-${i}">${g.size} LED${g.size!==1?"s":""}</span>
         </div>
         <div class="sl-row" style="margin-bottom:0">
-          <span class="sl-label" style="width:72px">Warm White</span>
+          <span class="sl-label" style="width:68px">Warm White</span>
           <input type="range" min="0" max="1000" value="${Math.round(g.w*1000)}"
-            style="background:linear-gradient(to right,#222,#ffe4a0)"
+            style="background:linear-gradient(to right,rgba(0,0,0,0.3),rgba(255,228,160,0.7))"
             oninput="onGroupW(${i},this.value/1000)">
           <span class="sl-val" id="gww-${i}">${Math.round(g.w*100)}%</span>
         </div>
@@ -1221,15 +1341,16 @@ function onGroupW(i, val) {
 // ── Global handlers ───────────────────────────────────────────
 function updatePowerBtn() {
   const btn = document.getElementById("btn-power");
-  btn.textContent = powered ? "Turn Off" : "Turn On";
-  btn.className   = powered ? "btn-on" : "btn-off";
+  btn.className = powered ? "power-btn on" : "power-btn off";
+  btn.querySelector(".power-label").textContent = powered ? "On" : "Off";
   renderStrip();
 }
 
 function updateDriftBtn() {
   const btn = document.getElementById("btn-drift");
-  btn.textContent = driftEnabled ? "Auto Drift: On" : "Auto Drift: Off";
-  btn.className   = driftEnabled ? "btn-active" : "";
+  btn.textContent = "";
+  btn.innerHTML = `<span class="pill-icon">〜</span> Drift: ${driftEnabled ? "On" : "Off"}`;
+  btn.classList.toggle("active", driftEnabled);
 }
 
 document.getElementById("btn-tap").addEventListener("click", () => {
@@ -1251,7 +1372,6 @@ document.getElementById("btn-reset").addEventListener("click", () => {
 document.getElementById("btn-drift").addEventListener("click", () => {
   driftEnabled = !driftEnabled; updateDriftBtn(); publishState();
 });
-
 
 document.getElementById("sl-brightness").addEventListener("input", function() {
   brightness = this.value/100;
@@ -1282,7 +1402,7 @@ document.getElementById("btn-add-network").addEventListener("click", () => {
   publish({ add_network: { ssid, password } });
   document.getElementById("new-ssid").value     = "";
   document.getElementById("new-password").value = "";
-  alert(`Sent "${ssid}" to both boards. It will be saved and used on next boot.`);
+  alert(`Sent "${ssid}" to both boards.`);
 });
 
 document.getElementById("btn-reconnect").addEventListener("click", () => {
@@ -1304,7 +1424,6 @@ document.getElementById("btn-reconnect").addEventListener("click", () => {
   localStorage.setItem("ll_name_b", cfg.boardNameB);
   initGroups(cfg.numGroups);
   updatePills();
-  // Re-publish retained scenes so board names propagate to all clients
   publishRetained(topicScenes, {
     scenes: loadScenes(),
     boardIdA: cfg.boardIdA, boardNameA: cfg.boardNameA,
@@ -1338,24 +1457,23 @@ function renderAlarms() {
     ).join("");
     el.innerHTML = `
       <div class="alarm-header">
-        <button class="alarm-toggle ${alarm.enabled?"on":""}" data-idx="${idx}" title="Enable/disable"></button>
+        <button class="alarm-toggle ${alarm.enabled?"on":""}" data-idx="${idx}"></button>
         <input class="alarm-time" type="time" value="${hh}:${mm}" data-idx="${idx}">
-        <button class="alarm-del" data-idx="${idx}" title="Delete">✕</button>
+        <button class="alarm-del" data-idx="${idx}">✕</button>
       </div>
       <div class="alarm-days">${dayBtns}</div>
       <div class="sl-row">
         <span class="sl-label">Duration</span>
         <input type="range" min="5" max="120" value="${alarm.duration_min}"
-          style="flex:1;background:linear-gradient(to right,#7c6fff,#222)" data-field="duration_min" data-idx="${idx}">
+          style="flex:1;background:linear-gradient(to right,rgba(240,160,48,0.15),rgba(240,160,48,0.65))" data-field="duration_min" data-idx="${idx}">
         <span class="sl-val dur-val">${alarm.duration_min} min</span>
       </div>
       <div class="sl-row" style="margin-bottom:0">
         <span class="sl-label">Target</span>
         <input type="range" min="10" max="100" value="${Math.round(alarm.brightness*100)}"
-          style="flex:1;background:linear-gradient(to right,#111,#fff)" data-field="brightness" data-idx="${idx}">
+          style="flex:1;background:linear-gradient(to right,rgba(255,255,255,0.06),rgba(255,255,255,0.8))" data-field="brightness" data-idx="${idx}">
         <span class="sl-val br-val">${Math.round(alarm.brightness*100)}%</span>
       </div>`;
-    // day toggles
     el.querySelectorAll(".day-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const d = parseInt(btn.dataset.d);
@@ -1366,25 +1484,19 @@ function renderAlarms() {
         publishAlarms();
       });
     });
-    // enable toggle
     el.querySelector(".alarm-toggle").addEventListener("click", btn => {
       alarms[idx].enabled = !alarms[idx].enabled;
       btn.target.classList.toggle("on", alarms[idx].enabled);
       publishAlarms();
     });
-    // time input
     el.querySelector(".alarm-time").addEventListener("change", e => {
       const [h,m] = e.target.value.split(":").map(Number);
       alarms[idx].hour = h; alarms[idx].minute = m;
       publishAlarms();
     });
-    // delete
     el.querySelector(".alarm-del").addEventListener("click", () => {
-      alarms.splice(idx, 1);
-      renderAlarms();
-      publishAlarms();
+      alarms.splice(idx, 1); renderAlarms(); publishAlarms();
     });
-    // sliders
     el.querySelectorAll("input[data-field]").forEach(sl => {
       sl.addEventListener("input", () => {
         const field = sl.dataset.field;
@@ -1404,9 +1516,7 @@ function renderAlarms() {
 }
 
 document.getElementById("btn-add-alarm").addEventListener("click", () => {
-  alarms.push(defaultAlarm());
-  renderAlarms();
-  publishAlarms();
+  alarms.push(defaultAlarm()); renderAlarms(); publishAlarms();
 });
 
 // ── Scenes ────────────────────────────────────────────────────
@@ -1417,7 +1527,6 @@ function loadScenes() {
 
 function saveScenes(scenes) {
   localStorage.setItem("ll_scenes", JSON.stringify(scenes));
-  // Persist to MQTT so all clients share the same scenes
   publishRetained(topicScenes, {
     scenes,
     boardIdA: cfg.boardIdA, boardNameA: cfg.boardNameA,
@@ -1425,7 +1534,7 @@ function saveScenes(scenes) {
   });
 }
 
-// ── Preset scenes ─────────────────────────────────────────────
+// ── Presets ───────────────────────────────────────────────────
 const BUILTIN_PRESETS = [
   { name: "🌈 Rainbow",    anim_mode: "rainbow", anim_speed: 1.0 },
   { name: "🕯 Candle",     anim_mode: "candle",  anim_speed: 1.5,
@@ -1441,10 +1550,8 @@ function loadUserPresets() {
 
 function saveUserPresets(presets) {
   localStorage.setItem("ll_presets", JSON.stringify(presets));
-  // Sync to MQTT so all clients share the same user presets
   publishRetained(topicScenes, {
-    scenes:      loadScenes(),
-    presets,
+    scenes: loadScenes(), presets,
     boardIdA: cfg.boardIdA, boardNameA: cfg.boardNameA,
     boardIdB: cfg.boardIdB, boardNameB: cfg.boardNameB,
   });
@@ -1471,29 +1578,50 @@ function applyPreset(preset) {
   publish(payload);
 }
 
+function swatchRGB(pos) {
+  // Vivid palette colour for dot previews — skip warm-white blend so dots are readable
+  if (pos < 0.05) return [255, 210, 140]; // warm white → show as warm amber
+  const n = PALETTE.length;
+  const scaled = Math.min(pos, 0.9999) * (n - 1);
+  const idx = Math.floor(scaled), frac = scaled - idx;
+  const c1 = PALETTE[idx], c2 = PALETTE[Math.min(idx + 1, n - 1)];
+  return [0,1,2].map(i => Math.round(lerp(c1[i], c2[i], frac)));
+}
+
+function _animBadge(item) {
+  if (!item.anim_mode) return "";
+  const icons = { rainbow:"🌈", candle:"🕯", wave:"〰️", custom:"✦" };
+  return `<span class="scene-anim-badge">${icons[item.anim_mode] || item.anim_mode}</span>`;
+}
+
+function _sceneSwatches(item) {
+  if (item.anim_mode === "rainbow") {
+    // Show a mini rainbow gradient instead of blank dots
+    return `<div style="width:36px;height:11px;border-radius:6px;background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);flex-shrink:0"></div>`;
+  }
+  const positions = item.groupPositions || (item.groups ? item.groups.map(g => g.pos) : []);
+  if (!positions.length) return "";
+  return `<div class="scene-swatches">${positions.map(pos => {
+    const [r,g,b] = swatchRGB(pos);
+    return `<div class="scene-dot" style="background:rgb(${r},${g},${b})"></div>`;
+  }).join("")}</div>`;
+}
+
 function renderPresets() {
-  const container  = document.getElementById("presets-list");
+  const container = document.getElementById("presets-list");
   const userPresets = loadUserPresets();
   const all = [
     ...BUILTIN_PRESETS.map(p => ({ preset: p, builtin: true })),
     ...userPresets.map((p, i) => ({ preset: p, builtin: false, idx: i })),
   ];
-
-  if (all.length === 0) {
-    container.innerHTML = '<div class="no-scenes">No presets yet</div>';
-    return;
-  }
-
+  if (all.length === 0) { container.innerHTML = '<div class="no-scenes">No presets yet</div>'; return; }
   container.innerHTML = "";
   all.forEach(({ preset, builtin, idx }) => {
-    const row  = document.createElement("div");
+    const row = document.createElement("div");
     row.className = "scene-row";
-    const swatches = (preset.groupPositions || []).map(pos => {
-      const [r,g,b] = paletteRGB(pos);
-      return `<div class="scene-dot" style="background:rgb(${r},${g},${b})"></div>`;
-    }).join("");
     row.innerHTML = `
-      <div class="scene-swatches">${swatches || ""}</div>
+      ${_sceneSwatches(preset)}
+      ${_animBadge(preset)}
       <span class="scene-name">${preset.name}</span>
       <button class="scene-load">Load</button>
       ${builtin ? "" : `<button class="scene-del">✕</button>`}`;
@@ -1501,9 +1629,7 @@ function renderPresets() {
     if (!builtin) {
       row.querySelector(".scene-del").addEventListener("click", () => {
         const up = loadUserPresets();
-        up.splice(idx, 1);
-        saveUserPresets(up);
-        renderPresets();
+        up.splice(idx, 1); saveUserPresets(up); renderPresets();
       });
     }
     container.appendChild(row);
@@ -1516,30 +1642,23 @@ document.getElementById("btn-save-preset").addEventListener("click", () => {
   const up = loadUserPresets();
   up.push({
     name,
-    groupPositions: [...groupPositions],
-    groupWLevels:   [...groupWLevels],
-    boundaries:     Array.from(boundaries),
+    groupPositions: [...groupPositions], groupWLevels: [...groupWLevels],
+    boundaries: Array.from(boundaries),
     brightness, fadeSteps, on: powered,
-    anim_mode:   animMode  || null,
-    anim_speed:  animSpeed,
+    anim_mode: animMode || null, anim_speed: animSpeed,
     anim_params: animMode === "custom" ? getCustomParams() : undefined,
   });
-  saveUserPresets(up);
-  renderPresets();
+  saveUserPresets(up); renderPresets();
   document.getElementById("preset-name").value = "";
 });
 
 function captureScene(name) {
   return {
     name,
-    groups:         getGroups(),
-    boundaries:     Array.from(boundaries),
-    groupPositions: [...groupPositions],
-    groupWLevels:   [...groupWLevels],
+    groups: getGroups(), boundaries: Array.from(boundaries),
+    groupPositions: [...groupPositions], groupWLevels: [...groupWLevels],
     brightness, fadeSteps, driftEnabled, driftInterval,
-    on: powered,
-    anim_mode:  animMode  || null,
-    anim_speed: animSpeed,
+    on: powered, anim_mode: animMode || null, anim_speed: animSpeed,
   };
 }
 
@@ -1558,40 +1677,31 @@ function applyScene(scene) {
   syncBrightnessSlider(); syncFadeSlider(); syncDriftIntervalSlider();
   syncAnimButtons(); syncAnimSlider();
   updatePowerBtn(); updateDriftBtn();
-  renderAll();
-  publishState();
+  renderAll(); publishState();
 }
 
 function renderScenes() {
   const container = document.getElementById("scenes-list");
   const scenes = loadScenes();
-  if (scenes.length === 0) {
-    container.innerHTML = '<div class="no-scenes">No saved scenes yet</div>';
-    return;
-  }
+  if (scenes.length === 0) { container.innerHTML = '<div class="no-scenes">No saved scenes yet</div>'; return; }
   container.innerHTML = "";
   scenes.forEach((scene, i) => {
     const row = document.createElement("div");
     row.className = "scene-row";
-    const swatches = (scene.groupPositions || []).map(pos => {
-      const [r,g,b] = paletteRGB(pos);
-      return `<div class="scene-dot" style="background:rgb(${r},${g},${b})"></div>`;
-    }).join("");
     row.innerHTML = `
-      <div class="scene-swatches">${swatches}</div>
+      ${_sceneSwatches(scene)}
+      ${_animBadge(scene)}
       <span class="scene-name">${scene.name}</span>
       <button class="scene-load" data-i="${i}">Load</button>
       <button class="scene-del"  data-i="${i}">✕</button>`;
     container.appendChild(row);
   });
-
   container.querySelectorAll(".scene-load").forEach(btn => {
     btn.addEventListener("click", () => applyScene(loadScenes()[btn.dataset.i]));
   });
   container.querySelectorAll(".scene-del").forEach(btn => {
     btn.addEventListener("click", () => {
-      const scenes = loadScenes();
-      scenes.splice(btn.dataset.i, 1);
+      const scenes = loadScenes(); scenes.splice(btn.dataset.i, 1);
       saveScenes(scenes); renderScenes();
     });
   });
@@ -1624,12 +1734,12 @@ connect();
 </script>
 
 <a href="https://www.fionnferreira.com/gacha?token=lennart"
-   style="display:block;width:100%;max-width:600px;padding:0.85rem;text-align:center;
-          border-radius:12px;border:1px solid #1d1d28;background:#13131a;
-          color:#50506a;font-size:0.82rem;letter-spacing:0.06em;text-decoration:none;
+   style="display:block;width:100%;max-width:580px;padding:0.8rem;text-align:center;
+          border-radius:12px;border:1px solid var(--border);
+          color:var(--muted);font-size:0.78rem;letter-spacing:0.06em;text-decoration:none;
           transition:color 0.2s,border-color 0.2s;"
-   onmouseover="this.style.color='#d0d0e0';this.style.borderColor='#3d3d50'"
-   onmouseout="this.style.color='#50506a';this.style.borderColor='#1d1d28'">
+   onmouseover="this.style.color='var(--text2)';this.style.borderColor='var(--border2)'"
+   onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">
   ← Zurück zu Gacha
 </a>
 
