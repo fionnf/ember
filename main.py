@@ -423,10 +423,12 @@ def main():
                     _alarm_fired.clear()
                 for alarm in _alarms:
                     key = (alarm.get("hour", 0), alarm.get("minute", 0))
+                    boards = alarm.get("boards", [])
                     if (alarm.get("enabled", True)
                             and t[3] == key[0] and cur_min == key[1]
                             and t[6] in alarm.get("days", list(range(7)))
-                            and key not in _alarm_fired):
+                            and key not in _alarm_fired
+                            and (not boards or BOARD_ID in boards)):
                         _alarm_fired.add(key)
                         dur_ms = int(alarm.get("duration_min", 30)) * 60_000
                         _sunrise["active"]    = True

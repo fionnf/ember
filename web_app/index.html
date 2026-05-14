@@ -388,7 +388,16 @@
       transition: border-color 0.2s;
     }
     .alarm-time:focus { border-color: var(--accent); }
-    .alarm-days { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 0.55rem; }
+    .alarm-days { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .alarm-boards { display: flex; gap: 6px; margin-bottom: 0.55rem; }
+    .board-btn {
+      padding: 0.25rem 0.65rem; border-radius: var(--r-xs);
+      border: 1px solid var(--border); background: transparent;
+      color: var(--muted); font-family: inherit; font-size: 0.68rem; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .board-btn:hover { border-color: var(--border2); color: var(--text2); }
+    .board-btn.on { background: rgba(240,160,48,0.13); border-color: rgba(240,160,48,0.45); color: var(--accent); }
     .day-btn {
       width: 30px; height: 30px; border-radius: 50%;
       border: 1px solid var(--border); background: transparent;
@@ -546,9 +555,9 @@
   </div>
   <div class="sl-row">
     <span class="sl-label">Speed</span>
-    <input type="range" id="sl-anim-speed" min="1" max="50" value="10"
+    <input type="range" id="sl-anim-speed" min="5" max="100" value="30"
       style="background:linear-gradient(to right,rgba(62,196,109,0.2),rgba(224,104,32,0.7))">
-    <span class="sl-val" id="val-anim-speed">1.0×</span>
+    <span class="sl-val" id="val-anim-speed">3.0×</span>
   </div>
 
   <button id="custom-anim-toggle">+ Build Custom Animation</button>
@@ -748,7 +757,7 @@ const boardLastSeen   = {};
 const boardLastChange = {};
 const BOARD_TIMEOUT_MS = 90_000;
 let animMode  = "";
-let animSpeed = 1.0;
+let animSpeed = 3.0;
 let alarms    = [];
 
 // Board pill "last known state" description
@@ -1412,7 +1421,7 @@ document.getElementById("btn-reconnect").addEventListener("click", () => {
 const DAY_LABELS = ["Mo","Tu","We","Th","Fr","Sa","Su"];
 
 function defaultAlarm() {
-  return { enabled: true, hour: 7, minute: 0, duration_min: 30, brightness: 1.0, days: [0,1,2,3,4] };
+  return { enabled: true, hour: 7, minute: 0, duration_min: 30, brightness: 1.0, days: [0,1,2,3,4], boards: [cfg.boardIdA, cfg.boardIdB] };
 }
 
 function publishAlarms() {
@@ -1431,6 +1440,13 @@ function renderAlarms() {
     const dayBtns = DAY_LABELS.map((d,i) =>
       `<button class="day-btn ${alarm.days.includes(i)?"on":""}" data-d="${i}">${d}</button>`
     ).join("");
+    const alarmBoards = alarm.boards || [cfg.boardIdA, cfg.boardIdB];
+    const boardBtns = [
+      { id: cfg.boardIdA, name: cfg.boardNameA },
+      { id: cfg.boardIdB, name: cfg.boardNameB },
+    ].map(b =>
+      `<button class="board-btn ${alarmBoards.includes(b.id)?"on":""}" data-bid="${b.id}">${b.name}</button>`
+    ).join("");
     el.innerHTML = `
       <div class="alarm-header">
         <button class="alarm-toggle ${alarm.enabled?"on":""}" data-idx="${idx}"></button>
@@ -1438,6 +1454,7 @@ function renderAlarms() {
         <button class="alarm-del" data-idx="${idx}">✕</button>
       </div>
       <div class="alarm-days">${dayBtns}</div>
+      <div class="alarm-boards">${boardBtns}</div>
       <div class="sl-row">
         <span class="sl-label">Duration</span>
         <input type="range" min="5" max="120" value="${alarm.duration_min}"
@@ -1457,6 +1474,16 @@ function renderAlarms() {
         const i = days.indexOf(d);
         if (i >= 0) days.splice(i, 1); else days.push(d);
         btn.classList.toggle("on", alarms[idx].days.includes(d));
+        publishAlarms();
+      });
+    });
+    el.querySelectorAll(".board-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (!alarms[idx].boards) alarms[idx].boards = [cfg.boardIdA, cfg.boardIdB];
+        const bid = btn.dataset.bid;
+        const i = alarms[idx].boards.indexOf(bid);
+        if (i >= 0) alarms[idx].boards.splice(i, 1); else alarms[idx].boards.push(bid);
+        btn.classList.toggle("on", alarms[idx].boards.includes(bid));
         publishAlarms();
       });
     });
@@ -1512,8 +1539,8 @@ function saveScenes(scenes) {
 
 // ── Scenes (unified — built-ins + user-saved) ─────────────────
 const BUILTIN_SCENES = [
-  { name: "🌈 Rainbow",    anim_mode: "rainbow", anim_speed: 1.0 },
-  { name: "🕯 Candle",     anim_mode: "candle",  anim_speed: 1.5,
+  { name: "🌈 Rainbow",    anim_mode: "rainbow", anim_speed: 3.0 },
+  { name: "🕯 Candle",     anim_mode: "candle",  anim_speed: 3.0,
     groupPositions: [0.02, 0.05, 0.03], groupWLevels: [1, 0.9, 0.95] },
   { name: "☀️ Warm White", anim_mode: null,
     groupPositions: [0.0, 0.0, 0.0],   groupWLevels: [1, 1, 1], brightness: 0.8 },
