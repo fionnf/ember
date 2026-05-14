@@ -93,6 +93,11 @@ class ColourEngine:
         self._last_drift     = utime.time()
         self._time_ms       = utime.ticks_ms()
 
+        self._anim_mode   = None   # None | "rainbow" | "wave" | "candle" | "custom"
+        self._anim_speed  = 1.0
+        self._anim_phase  = 0.0
+        self._anim_params = {}    # extra params for "custom" mode
+
     # ── Public controls ─────────────────────────────────────
 
     def impulse(self):
@@ -139,6 +144,13 @@ class ColourEngine:
 
     def set_drift_interval(self, seconds):
         self._drift_interval = max(5, int(seconds))
+
+    def set_animation(self, mode, speed=1.0, params=None):
+        self._anim_mode   = mode if mode else None
+        self._anim_speed  = max(0.1, float(speed if speed is not None else 1.0))
+        self._anim_params = params or {}
+        if mode:
+            self._anim_phase = 0.0
 
     def check_drift(self):
         if self._drift_enabled and utime.time() - self._last_drift > self._drift_interval:
@@ -199,11 +211,14 @@ class ColourEngine:
         if not hasattr(self, '_fade_steps_per'):
             self._fade_steps_per = [self._fade_steps] * self._n
 
+        if self._anim_mode:
+            self._anim_phase += 0.00015 * self._anim_speed * dt
+
         for i in range(self._n):
             fs = self._fade_steps_per[i]
 
-            # Hue fade
-            if self._fading[i]:
+            # Hue fade (skipped during animation modes)
+            if self._fading[i] and not self._anim_mode:
                 t = self._fade_step[i] / fs
                 self._colour[i]    = _lerp_colour(self._colour[i], self._target_col[i], t)
                 self._fade_step[i] += 1
@@ -226,11 +241,58 @@ class ColourEngine:
             breath = 1.0 + math.sin(self._breathe_phase[i]) * BREATHE_DEPTH
 
             scale = breath * self._power_level
-            r, g, b, w = self._colour[i]
+
+            # Animation colour overrides
+            if self._anim_mode == "rainbow":
+                pos = (self._anim_phase + i / max(self._n, 1)) % 1.0
+                r, g, b, w = _palette_colour(pos)
+                w = int(w * self._w_level[i])
+            elif self._anim_mode == "wave":
+                wave = 0.5 + 0.5 * math.sin(self._anim_phase * 3.0 + i * 1.5)
+                r, g, b, w = self._colour[i]
+                w = int(w * self._w_level[i] * wave)
+                r = int(r * wave); g = int(g * wave); b = int(b * wave)
+            elif self._anim_mode == "candle":
+                flicker = _rand_float(0.55, 1.0)
+                r, g, b, w = self._colour[i]
+                w = int(w * self._w_level[i] * flicker)
+                r = int(r * flicker); g = int(g * flicker); b = int(b * flicker)
+            elif self._anim_mode == "custom":
+                p        = self._anim_params
+                pattern  = p.get("pattern",   "sweep")
+                h0       = float(p.get("hue_start", 0.0))
+                h1       = float(p.get("hue_end",   1.0))
+                sync     = bool(p.get("sync", False))
+                offset   = 0.0 if sync else (i / max(self._n - 1, 1)) * 0.6
+                t        = (math.sin(self._anim_phase + offset) + 1) * 0.5  # 0..1
+                if pattern == "sweep":
+                    pos = h0 + t * (h1 - h0)
+                    r, g, b, w = _palette_colour(max(0.0, min(1.0, pos)))
+                    w = int(w * self._w_level[i])
+                elif pattern == "pulse":
+                    pos = (h0 + h1) * 0.5
+                    r, g, b, w = _palette_colour(pos)
+                    r = int(r * t); g = int(g * t); b = int(b * t)
+                    w = int(w * self._w_level[i] * t)
+                elif pattern == "strobe":
+                    on = math.sin(self._anim_phase + offset * 2) > 0.6
+                    if on:
+                        r, g, b, w = _palette_colour(h0)
+                        w = int(w * self._w_level[i])
+                    else:
+                        r = g = b = w = 0
+                else:  # bounce — hue oscillates between h0 and h1
+                    pos = h0 + t * (h1 - h0)
+                    r, g, b, w = _palette_colour(max(0.0, min(1.0, pos)))
+                    w = int(w * self._w_level[i])
+            else:
+                r, g, b, w = self._colour[i]
+                w = int(w * self._w_level[i])
+
             r = min(255, int(r * scale))
             g = min(255, int(g * scale))
             b = min(255, int(b * scale))
-            w = min(255, int(w * self._w_level[i] * scale))
+            w = min(255, int(w * scale))
 
             group_end = cursor + self._group_sizes[i]
             for j in range(cursor, group_end):
@@ -256,6 +318,9 @@ class ColourEngine:
             "fade_steps":     self._fade_steps,
             "drift_enabled":  self._drift_enabled,
             "drift_interval": self._drift_interval,
+            "anim_mode":      self._anim_mode,
+            "anim_speed":     round(self._anim_speed, 2),
+            "anim_params":    self._anim_params,
         }
 
     # ── Internal ─────────────────────────────────────────────

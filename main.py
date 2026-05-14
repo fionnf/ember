@@ -128,6 +128,9 @@ def on_message(topic, msg):
     fade_steps     = data.get("fade_steps")
     drift_enabled  = data.get("drift_enabled")
     drift_interval = data.get("drift_interval")
+    anim_mode      = data.get("anim_mode", "__unset__")
+    anim_speed     = data.get("anim_speed")
+    anim_params    = data.get("anim_params")
 
     if on is not None:
         engine.set_power(bool(on))
@@ -141,13 +144,19 @@ def on_message(topic, msg):
         engine.set_drift_enabled(bool(drift_enabled))
     if drift_interval is not None:
         engine.set_drift_interval(int(drift_interval))
-    if groups is not None and on is not False:
+    if anim_mode != "__unset__":
+        engine.set_animation(anim_mode, anim_speed if anim_speed is not None else 1.0, anim_params)
+    if groups is not None and on is not False and not engine._anim_mode:
         fade_override = SYNC_FADE_STEPS if data.get("sync") else None
         engine.force_colour(groups, fade_steps_override=fade_override)
 
     add_net = data.get("add_network")
     if add_net:
         save_network(add_net["ssid"], add_net["password"])
+
+    if "set_alarms" in data:
+        save_alarms(data["set_alarms"])
+        print(f"[alarm] saved {len(_alarms)} alarms")
 
 
 def connect_mqtt() -> MQTTClient:
@@ -184,7 +193,29 @@ def publish_event(payload: dict):
 
 OTA_HOUR_UTC = 17   # 5 pm UTC — daily reboot triggers boot.py OTA
 
-STATE_FILE = "state.json"
+STATE_FILE  = "state.json"
+ALARM_FILE  = "alarms.json"
+
+# ── Alarms ───────────────────────────────────────────────────
+
+_alarms = []
+
+def load_alarms():
+    global _alarms
+    try:
+        with open(ALARM_FILE) as f:
+            _alarms = ujson.load(f)
+    except Exception:
+        _alarms = []
+
+def save_alarms(data):
+    global _alarms
+    _alarms = data
+    try:
+        with open(ALARM_FILE, "w") as f:
+            ujson.dump(data, f)
+    except Exception as e:
+        print(f"[alarm] save failed: {e}")
 
 def save_state():
     try:
@@ -308,10 +339,16 @@ def main():
     # Restore power state saved before the last OTA reboot
     restore_state()
 
+    # Load saved alarms
+    load_alarms()
+
     # Setup complete — fade out the pulse and hand off to the engine
     pulser.stop()
 
-    _ota_check_min = -1   # wall-clock minute we last checked OTA trigger
+    _ota_check_min  = -1
+    _alarm_checked_min = -1
+    _sunrise = {"active": False, "start_ms": 0, "dur_ms": 0, "target_br": 1.0}
+    _alarm_fired = set()  # (hour, minute) pairs fired this calendar day
     last_frame      = utime.ticks_ms()
     _reconnect_at   = utime.ticks_add(utime.ticks_ms(), RECONNECT_DELAY_MS)
     _ping_at        = utime.ticks_add(utime.ticks_ms(), 20_000)
@@ -374,6 +411,44 @@ def main():
                     save_state()
                     import machine
                     machine.reset()
+
+        # ── Sunrise alarm check ──
+        if ntp_ok and _alarms:
+            t = utime.localtime()
+            cur_min = t[4]
+            if cur_min != _alarm_checked_min:
+                _alarm_checked_min = cur_min
+                # Reset fired set at midnight
+                if t[3] == 0 and cur_min == 0:
+                    _alarm_fired.clear()
+                for alarm in _alarms:
+                    key = (alarm.get("hour", 0), alarm.get("minute", 0))
+                    if (alarm.get("enabled", True)
+                            and t[3] == key[0] and cur_min == key[1]
+                            and t[6] in alarm.get("days", list(range(7)))
+                            and key not in _alarm_fired):
+                        _alarm_fired.add(key)
+                        dur_ms = int(alarm.get("duration_min", 30)) * 60_000
+                        _sunrise["active"]    = True
+                        _sunrise["start_ms"]  = now
+                        _sunrise["dur_ms"]    = dur_ms
+                        _sunrise["target_br"] = float(alarm.get("brightness", 1.0))
+                        engine.set_power(True)
+                        engine.set_brightness(0.0)
+                        print(f"[alarm] sunrise! {key[0]:02d}:{key[1]:02d}")
+                        publish_event(engine.get_event_payload())
+                        break
+
+        # ── Sunrise ramp ──
+        if _sunrise["active"]:
+            elapsed = utime.ticks_diff(now, _sunrise["start_ms"])
+            if elapsed >= _sunrise["dur_ms"]:
+                engine.set_brightness(_sunrise["target_br"])
+                _sunrise["active"] = False
+                publish_event(engine.get_event_payload())
+            else:
+                progress = elapsed / _sunrise["dur_ms"]
+                engine.set_brightness(progress * _sunrise["target_br"])
 
         # ── Idle drift — subtle nudge with slow fade, synced to other board ──
         if engine.check_drift():
