@@ -94,7 +94,8 @@
     }
 
     /* ── Strip preview ── */
-    #strip-wrap { display: grid; gap: 3px; }
+    #leds-row     { display: grid; gap: 3px; }
+    #dividers-row { display: grid; gap: 3px; }
     .led {
       height: 50px; border-radius: 5px;
       transition: background 0.5s ease;
@@ -304,22 +305,6 @@
     .hue-handle:active { cursor: grabbing; }
 
     /* ── Library (presets + scenes) ── */
-    .lib-tabs {
-      display: flex; gap: 0; margin-bottom: 0.85rem;
-      background: rgba(0,0,0,0.2); border-radius: var(--r-xs);
-      padding: 3px;
-    }
-    .lib-tab {
-      flex: 1; padding: 0.5rem; border-radius: 6px;
-      border: none; background: transparent;
-      font-family: inherit; font-size: 0.76rem; font-weight: 600;
-      color: var(--muted); cursor: pointer;
-      transition: background 0.15s, color 0.15s;
-    }
-    .lib-tab:hover { color: var(--text2); }
-    .lib-tab.active { background: var(--surface3); color: var(--text); }
-    .lib-panel { display: none; }
-    .lib-panel.active { display: block; }
 
     /* Scene / preset rows */
     .scene-grid {
@@ -403,7 +388,16 @@
       transition: border-color 0.2s;
     }
     .alarm-time:focus { border-color: var(--accent); }
-    .alarm-days { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 0.55rem; }
+    .alarm-days { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .alarm-boards { display: flex; gap: 6px; margin-bottom: 0.55rem; }
+    .board-btn {
+      padding: 0.25rem 0.65rem; border-radius: var(--r-xs);
+      border: 1px solid var(--border); background: transparent;
+      color: var(--muted); font-family: inherit; font-size: 0.68rem; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .board-btn:hover { border-color: var(--border2); color: var(--text2); }
+    .board-btn.on { background: rgba(240,160,48,0.13); border-color: rgba(240,160,48,0.45); color: var(--accent); }
     .day-btn {
       width: 30px; height: 30px; border-radius: 50%;
       border: 1px solid var(--border); background: transparent;
@@ -490,7 +484,8 @@
 <!-- Strip preview -->
 <div class="card">
   <div class="card-title">Strip — tap dividers to split groups</div>
-  <div id="strip-wrap"></div>
+  <div id="leds-row"></div>
+  <div id="dividers-row" style="margin-top:3px"></div>
 </div>
 
 <!-- Controls -->
@@ -560,9 +555,9 @@
   </div>
   <div class="sl-row">
     <span class="sl-label">Speed</span>
-    <input type="range" id="sl-anim-speed" min="1" max="50" value="10"
+    <input type="range" id="sl-anim-speed" min="5" max="100" value="30"
       style="background:linear-gradient(to right,rgba(62,196,109,0.2),rgba(224,104,32,0.7))">
-    <span class="sl-val" id="val-anim-speed">1.0×</span>
+    <span class="sl-val" id="val-anim-speed">3.0×</span>
   </div>
 
   <button id="custom-anim-toggle">+ Build Custom Animation</button>
@@ -623,27 +618,13 @@
   <div id="group-panels"></div>
 </div>
 
-<!-- Library: Presets + Scenes combined -->
+<!-- Library -->
 <div class="card">
-  <div class="lib-tabs">
-    <button class="lib-tab active" data-tab="presets">Presets</button>
-    <button class="lib-tab" data-tab="scenes">Saved Scenes</button>
-  </div>
-
-  <div id="lib-presets" class="lib-panel active">
-    <div id="presets-list" class="scene-grid"></div>
-    <div class="save-row">
-      <input id="preset-name" placeholder="Save current state as preset…" maxlength="32">
-      <button id="btn-save-preset">Save</button>
-    </div>
-  </div>
-
-  <div id="lib-scenes" class="lib-panel">
-    <div id="scenes-list" class="scene-grid"></div>
-    <div class="save-row">
-      <input id="scene-name" placeholder="Scene name…" maxlength="32">
-      <button id="btn-save-scene">Save Current</button>
-    </div>
+  <div class="card-title">Scenes</div>
+  <div id="scenes-list" class="scene-grid"></div>
+  <div class="save-row">
+    <input id="scene-name" placeholder="Save current state…" maxlength="32">
+    <button id="btn-save-scene">Save</button>
   </div>
 </div>
 
@@ -776,7 +757,7 @@ const boardLastSeen   = {};
 const boardLastChange = {};
 const BOARD_TIMEOUT_MS = 90_000;
 let animMode  = "";
-let animSpeed = 1.0;
+let animSpeed = 3.0;
 let alarms    = [];
 
 // Board pill "last known state" description
@@ -871,7 +852,7 @@ function connect() {
 
       if (topicStr === topicScenes()) {
         if (d.scenes)  { saveScenes(d.scenes);  renderScenes(); }
-        if (d.presets) { localStorage.setItem("ll_presets", JSON.stringify(d.presets)); renderPresets(); }
+        if (d.presets) { /* legacy — ignore */ }
         if (d.boardNameA) { cfg.boardNameA = d.boardNameA; localStorage.setItem("ll_name_a", d.boardNameA); }
         if (d.boardNameB) { cfg.boardNameB = d.boardNameB; localStorage.setItem("ll_name_b", d.boardNameB); }
         if (d.boardIdA)   { cfg.boardIdA   = d.boardIdA;   localStorage.setItem("ll_id_a",   d.boardIdA); }
@@ -909,7 +890,10 @@ function connect() {
         groupWLevels   = d.groups.map(x => x.w);
         boundaries.clear();
         let cursor = 0;
-        d.groups.slice(0,-1).forEach(g => { cursor += g.size; boundaries.add(cursor); });
+        d.groups.slice(0,-1).forEach(g => {
+          cursor += g.size;
+          if (cursor > 0 && cursor < cfg.numLeds) boundaries.add(cursor);
+        });
         renderAll();
       }
     } catch(e) {}
@@ -938,15 +922,6 @@ function publishState() {
   publish(p);
 }
 
-// ── Library tabs ──────────────────────────────────────────────
-document.querySelectorAll(".lib-tab").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".lib-tab").forEach(t => t.classList.remove("active"));
-    document.querySelectorAll(".lib-panel").forEach(p => p.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById("lib-" + btn.dataset.tab).classList.add("active");
-  });
-});
 
 // ── Animation ─────────────────────────────────────────────────
 function syncAnimButtons() {
@@ -1054,7 +1029,7 @@ function _animFrame(ts) {
   _webLastTs = ts;
   if (animMode === "candle") _candleLastTs = ts;
 
-  if (!_ledCache) _ledCache = document.querySelectorAll("#strip-wrap .led");
+  if (!_ledCache) _ledCache = document.querySelectorAll("#leds-row .led");
   const groups = getGroups();
   const dark = "#111";
   for (let i = 0; i < _ledCache.length; i++) {
@@ -1214,9 +1189,13 @@ function randomise() {
 // ── Rendering ─────────────────────────────────────────────────
 function renderStrip() {
   _invalidateLedCache();
-  const wrap = document.getElementById("strip-wrap");
-  wrap.innerHTML = "";
-  wrap.style.gridTemplateColumns = `repeat(${cfg.numLeds}, 1fr)`;
+  const cols = `repeat(${cfg.numLeds}, 1fr)`;
+  const ledsRow = document.getElementById("leds-row");
+  const divRow  = document.getElementById("dividers-row");
+  ledsRow.innerHTML = "";
+  divRow.innerHTML  = "";
+  ledsRow.style.gridTemplateColumns = cols;
+  divRow.style.gridTemplateColumns  = cols;
   const groups = getGroups();
   let ledIdx = 0;
   groups.forEach(g => {
@@ -1225,7 +1204,7 @@ function renderStrip() {
       el.className = "led";
       el.style.background = powered ? rgbStr(g.pos) : "#111";
       if (j === g.size-1 && ledIdx < cfg.numLeds-1) el.classList.add("boundary");
-      wrap.appendChild(el);
+      ledsRow.appendChild(el);
       ledIdx++;
     }
   });
@@ -1239,7 +1218,7 @@ function renderStrip() {
         rebuildGroupData(); renderAll(); publishState();
       });
     }
-    wrap.appendChild(el);
+    divRow.appendChild(el);
   }
 }
 
@@ -1442,7 +1421,7 @@ document.getElementById("btn-reconnect").addEventListener("click", () => {
 const DAY_LABELS = ["Mo","Tu","We","Th","Fr","Sa","Su"];
 
 function defaultAlarm() {
-  return { enabled: true, hour: 7, minute: 0, duration_min: 30, brightness: 1.0, days: [0,1,2,3,4] };
+  return { enabled: true, hour: 7, minute: 0, duration_min: 30, brightness: 1.0, days: [0,1,2,3,4], boards: [cfg.boardIdA, cfg.boardIdB] };
 }
 
 function publishAlarms() {
@@ -1461,6 +1440,13 @@ function renderAlarms() {
     const dayBtns = DAY_LABELS.map((d,i) =>
       `<button class="day-btn ${alarm.days.includes(i)?"on":""}" data-d="${i}">${d}</button>`
     ).join("");
+    const alarmBoards = alarm.boards || [cfg.boardIdA, cfg.boardIdB];
+    const boardBtns = [
+      { id: cfg.boardIdA, name: cfg.boardNameA },
+      { id: cfg.boardIdB, name: cfg.boardNameB },
+    ].map(b =>
+      `<button class="board-btn ${alarmBoards.includes(b.id)?"on":""}" data-bid="${b.id}">${b.name}</button>`
+    ).join("");
     el.innerHTML = `
       <div class="alarm-header">
         <button class="alarm-toggle ${alarm.enabled?"on":""}" data-idx="${idx}"></button>
@@ -1468,6 +1454,7 @@ function renderAlarms() {
         <button class="alarm-del" data-idx="${idx}">✕</button>
       </div>
       <div class="alarm-days">${dayBtns}</div>
+      <div class="alarm-boards">${boardBtns}</div>
       <div class="sl-row">
         <span class="sl-label">Duration</span>
         <input type="range" min="5" max="120" value="${alarm.duration_min}"
@@ -1487,6 +1474,16 @@ function renderAlarms() {
         const i = days.indexOf(d);
         if (i >= 0) days.splice(i, 1); else days.push(d);
         btn.classList.toggle("on", alarms[idx].days.includes(d));
+        publishAlarms();
+      });
+    });
+    el.querySelectorAll(".board-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (!alarms[idx].boards) alarms[idx].boards = [cfg.boardIdA, cfg.boardIdB];
+        const bid = btn.dataset.bid;
+        const i = alarms[idx].boards.indexOf(bid);
+        if (i >= 0) alarms[idx].boards.splice(i, 1); else alarms[idx].boards.push(bid);
+        btn.classList.toggle("on", alarms[idx].boards.includes(bid));
         publishAlarms();
       });
     });
@@ -1540,49 +1537,26 @@ function saveScenes(scenes) {
   });
 }
 
-// ── Presets ───────────────────────────────────────────────────
-const BUILTIN_PRESETS = [
-  { name: "🌈 Rainbow",    anim_mode: "rainbow", anim_speed: 1.0 },
-  { name: "🕯 Candle",     anim_mode: "candle",  anim_speed: 1.5,
+// ── Scenes (unified — built-ins + user-saved) ─────────────────
+const BUILTIN_SCENES = [
+  { name: "🌈 Rainbow",    anim_mode: "rainbow", anim_speed: 3.0 },
+  { name: "🕯 Candle",     anim_mode: "candle",  anim_speed: 3.0,
     groupPositions: [0.02, 0.05, 0.03], groupWLevels: [1, 0.9, 0.95] },
   { name: "☀️ Warm White", anim_mode: null,
     groupPositions: [0.0, 0.0, 0.0],   groupWLevels: [1, 1, 1], brightness: 0.8 },
 ];
 
-function loadUserPresets() {
-  try { return JSON.parse(localStorage.getItem("ll_presets") || "[]"); }
-  catch(e) { return []; }
-}
-
-function saveUserPresets(presets) {
-  localStorage.setItem("ll_presets", JSON.stringify(presets));
-  publishRetained(topicScenes, {
-    scenes: loadScenes(), presets,
-    boardIdA: cfg.boardIdA, boardNameA: cfg.boardNameA,
-    boardIdB: cfg.boardIdB, boardNameB: cfg.boardNameB,
-  });
-}
-
-function applyPreset(preset) {
-  animMode  = preset.anim_mode  || "";
-  animSpeed = preset.anim_speed || 1.0;
-  syncAnimButtons(); syncAnimSlider();
-  if (preset.groupPositions) groupPositions = [...preset.groupPositions];
-  if (preset.groupWLevels)   groupWLevels   = [...preset.groupWLevels];
-  if (preset.brightness !== undefined) { brightness = preset.brightness; syncBrightnessSlider(); }
-  if (preset.anim_params) {
-    customPattern  = preset.anim_params.pattern   || "sweep";
-    customHueStart = preset.anim_params.hue_start ?? 0.0;
-    customHueEnd   = preset.anim_params.hue_end   ?? 1.0;
-    customSync     = preset.anim_params.sync      ?? false;
-  }
-  renderAll();
-  const payload = { anim_mode: animMode || null, anim_speed: animSpeed,
-    groups: getGroups(), brightness, fade_steps: fadeSteps,
-    drift_enabled: driftEnabled, drift_interval: driftInterval, on: powered };
-  if (animMode === "custom") payload.anim_params = preset.anim_params;
-  publish(payload);
-}
+// Migrate legacy ll_presets into ll_scenes once
+(function migrateLegacyPresets() {
+  try {
+    const old = JSON.parse(localStorage.getItem("ll_presets") || "[]");
+    if (!old.length) return;
+    const existing = JSON.parse(localStorage.getItem("ll_scenes") || "[]");
+    const merged = [...existing, ...old];
+    localStorage.setItem("ll_scenes", JSON.stringify(merged));
+    localStorage.removeItem("ll_presets");
+  } catch(e) {}
+})();
 
 function swatchRGB(pos) {
   // Vivid palette colour for dot previews — skip warm-white blend so dots are readable
@@ -1613,50 +1587,6 @@ function _sceneSwatches(item) {
   }).join("")}</div>`;
 }
 
-function renderPresets() {
-  const container = document.getElementById("presets-list");
-  const userPresets = loadUserPresets();
-  const all = [
-    ...BUILTIN_PRESETS.map(p => ({ preset: p, builtin: true })),
-    ...userPresets.map((p, i) => ({ preset: p, builtin: false, idx: i })),
-  ];
-  if (all.length === 0) { container.innerHTML = '<div class="no-scenes">No presets yet</div>'; return; }
-  container.innerHTML = "";
-  all.forEach(({ preset, builtin, idx }) => {
-    const row = document.createElement("div");
-    row.className = "scene-row";
-    row.innerHTML = `
-      ${_sceneSwatches(preset)}
-      ${_animBadge(preset)}
-      <span class="scene-name">${preset.name}</span>
-      <button class="scene-load">Load</button>
-      ${builtin ? "" : `<button class="scene-del">✕</button>`}`;
-    row.querySelector(".scene-load").addEventListener("click", () => applyPreset(preset));
-    if (!builtin) {
-      row.querySelector(".scene-del").addEventListener("click", () => {
-        const up = loadUserPresets();
-        up.splice(idx, 1); saveUserPresets(up); renderPresets();
-      });
-    }
-    container.appendChild(row);
-  });
-}
-
-document.getElementById("btn-save-preset").addEventListener("click", () => {
-  const name = document.getElementById("preset-name").value.trim()
-    || "Preset " + (loadUserPresets().length + 1);
-  const up = loadUserPresets();
-  up.push({
-    name,
-    groupPositions: [...groupPositions], groupWLevels: [...groupWLevels],
-    boundaries: Array.from(boundaries),
-    brightness, fadeSteps, on: powered,
-    anim_mode: animMode || null, anim_speed: animSpeed,
-    anim_params: animMode === "custom" ? getCustomParams() : undefined,
-  });
-  saveUserPresets(up); renderPresets();
-  document.getElementById("preset-name").value = "";
-});
 
 function captureScene(name) {
   return {
@@ -1668,48 +1598,53 @@ function captureScene(name) {
   };
 }
 
-function applyScene(scene) {
-  boundaries.clear();
-  (scene.boundaries || []).forEach(b => boundaries.add(b));
-  groupPositions = [...scene.groupPositions];
-  groupWLevels   = [...scene.groupWLevels];
-  brightness     = scene.brightness     ?? brightness;
-  fadeSteps      = scene.fadeSteps      ?? fadeSteps;
-  driftEnabled   = scene.driftEnabled   ?? driftEnabled;
-  driftInterval  = scene.driftInterval  ?? driftInterval;
-  powered        = scene.on             ?? powered;
-  animMode       = scene.anim_mode      || "";
-  animSpeed      = scene.anim_speed     ?? animSpeed;
+
+function _applySceneOrBuiltin(item) {
+  animMode  = item.anim_mode  || "";
+  animSpeed = item.anim_speed ?? 1.0;
+  if (item.groupPositions) groupPositions = [...item.groupPositions];
+  if (item.groupWLevels)   groupWLevels   = [...item.groupWLevels];
+  if (item.boundaries)     { boundaries.clear(); item.boundaries.forEach(b => boundaries.add(b)); }
+  if (item.brightness  !== undefined) brightness  = item.brightness;
+  if (item.fadeSteps   !== undefined) fadeSteps   = item.fadeSteps;
+  if (item.driftEnabled!== undefined) driftEnabled= item.driftEnabled;
+  if (item.driftInterval!==undefined) driftInterval=item.driftInterval;
+  if (item.on          !== undefined) powered     = item.on;
+  if (item.anim_params) {
+    customPattern  = item.anim_params.pattern   || "sweep";
+    customHueStart = item.anim_params.hue_start ?? 0.0;
+    customHueEnd   = item.anim_params.hue_end   ?? 1.0;
+    customSync     = item.anim_params.sync      ?? false;
+  }
   syncBrightnessSlider(); syncFadeSlider(); syncDriftIntervalSlider();
-  syncAnimButtons(); syncAnimSlider();
-  updatePowerBtn(); updateDriftBtn();
+  syncAnimButtons(); syncAnimSlider(); updatePowerBtn(); updateDriftBtn();
   renderAll(); publishState();
 }
 
 function renderScenes() {
   const container = document.getElementById("scenes-list");
-  const scenes = loadScenes();
-  if (scenes.length === 0) { container.innerHTML = '<div class="no-scenes">No saved scenes yet</div>'; return; }
+  const userScenes = loadScenes();
+  const all = [
+    ...BUILTIN_SCENES.map(s => ({ item: s, builtin: true })),
+    ...userScenes.map((s, i) => ({ item: s, builtin: false, idx: i })),
+  ];
   container.innerHTML = "";
-  scenes.forEach((scene, i) => {
+  all.forEach(({ item, builtin, idx }) => {
     const row = document.createElement("div");
     row.className = "scene-row";
     row.innerHTML = `
-      ${_sceneSwatches(scene)}
-      ${_animBadge(scene)}
-      <span class="scene-name">${scene.name}</span>
-      <button class="scene-load" data-i="${i}">Load</button>
-      <button class="scene-del"  data-i="${i}">✕</button>`;
+      ${_sceneSwatches(item)}
+      ${_animBadge(item)}
+      <span class="scene-name">${item.name}</span>
+      <button class="scene-load">Load</button>
+      ${builtin ? "" : `<button class="scene-del">✕</button>`}`;
+    row.querySelector(".scene-load").addEventListener("click", () => _applySceneOrBuiltin(item));
+    if (!builtin) {
+      row.querySelector(".scene-del").addEventListener("click", () => {
+        const s = loadScenes(); s.splice(idx, 1); saveScenes(s); renderScenes();
+      });
+    }
     container.appendChild(row);
-  });
-  container.querySelectorAll(".scene-load").forEach(btn => {
-    btn.addEventListener("click", () => applyScene(loadScenes()[btn.dataset.i]));
-  });
-  container.querySelectorAll(".scene-del").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const scenes = loadScenes(); scenes.splice(btn.dataset.i, 1);
-      saveScenes(scenes); renderScenes();
-    });
   });
 }
 
@@ -1726,7 +1661,6 @@ document.getElementById("btn-save-scene").addEventListener("click", () => {
 initGroups(cfg.numGroups);
 renderAll();
 renderScenes();
-renderPresets();
 renderAlarms();
 syncAnimButtons();
 syncAnimSlider();
