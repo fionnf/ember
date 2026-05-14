@@ -418,10 +418,14 @@
   <div id="group-panels"></div>
 </div>
 
-<!-- Scenes -->
+<!-- Presets -->
 <div class="card">
   <div class="card-title">Presets</div>
-  <div id="presets-list" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.2rem"></div>
+  <div id="presets-list" style="display:flex;flex-direction:column;gap:0.5rem"></div>
+  <div class="scene-save-row" style="margin-top:0.6rem">
+    <input id="preset-name" placeholder="Save current as preset…" maxlength="32">
+    <button id="btn-save-preset">Save</button>
+  </div>
 </div>
 
 <div class="card">
@@ -616,7 +620,8 @@ function connect() {
 
       // Retained scenes/names
       if (topic === topicScenes()) {
-        if (d.scenes)     { saveScenes(d.scenes); renderScenes(); }
+        if (d.scenes)  { saveScenes(d.scenes);  renderScenes(); }
+        if (d.presets) { localStorage.setItem("ll_presets", JSON.stringify(d.presets)); renderPresets(); }
         if (d.boardNameA) { cfg.boardNameA = d.boardNameA; localStorage.setItem("ll_name_a", d.boardNameA); }
         if (d.boardNameB) { cfg.boardNameB = d.boardNameB; localStorage.setItem("ll_name_b", d.boardNameB); }
         if (d.boardIdA)   { cfg.boardIdA   = d.boardIdA;   localStorage.setItem("ll_id_a",   d.boardIdA); }
@@ -1216,39 +1221,27 @@ function saveScenes(scenes) {
 }
 
 // ── Preset scenes ─────────────────────────────────────────────
-const PRESETS = [
-  {
-    name: "🌈 Rainbow",
-    anim_mode: "rainbow", anim_speed: 1.0,
-  },
-  {
-    name: "🕯 Candle",
-    anim_mode: "candle", anim_speed: 1.5,
-    groupPositions: [0.02, 0.05, 0.03], groupWLevels: [1,0.9,0.95],
-  },
-  {
-    name: "🌊 Wave",
-    anim_mode: "wave", anim_speed: 1.2,
-  },
-  {
-    name: "🌅 Sunset",
-    anim_mode: null,
-    groupPositions: [0.07, 0.10, 0.13], groupWLevels: [1, 0.8, 0.6],
-    brightness: 0.85,
-  },
-  {
-    name: "🌌 Night",
-    anim_mode: null,
-    groupPositions: [0.65, 0.70, 0.60], groupWLevels: [0.3, 0.25, 0.35],
-    brightness: 0.2,
-  },
-  {
-    name: "☀️ Warm White",
-    anim_mode: null,
-    groupPositions: [0.0, 0.0, 0.0], groupWLevels: [1, 1, 1],
-    brightness: 0.8,
-  },
+const BUILTIN_PRESETS = [
+  { name: "🌈 Rainbow", anim_mode: "rainbow", anim_speed: 1.0 },
+  { name: "🕯 Candle",  anim_mode: "candle",  anim_speed: 1.5,
+    groupPositions: [0.02, 0.05, 0.03], groupWLevels: [1, 0.9, 0.95] },
 ];
+
+function loadUserPresets() {
+  try { return JSON.parse(localStorage.getItem("ll_presets") || "[]"); }
+  catch(e) { return []; }
+}
+
+function saveUserPresets(presets) {
+  localStorage.setItem("ll_presets", JSON.stringify(presets));
+  // Sync to MQTT so all clients share the same user presets
+  publishRetained(topicScenes, {
+    scenes:      loadScenes(),
+    presets,
+    boardIdA: cfg.boardIdA, boardNameA: cfg.boardNameA,
+    boardIdB: cfg.boardIdB, boardNameB: cfg.boardNameB,
+  });
+}
 
 function applyPreset(preset) {
   animMode  = preset.anim_mode  || "";
@@ -1257,25 +1250,72 @@ function applyPreset(preset) {
   if (preset.groupPositions) groupPositions = [...preset.groupPositions];
   if (preset.groupWLevels)   groupWLevels   = [...preset.groupWLevels];
   if (preset.brightness !== undefined) { brightness = preset.brightness; syncBrightnessSlider(); }
+  if (preset.anim_params)    customParams   = { ...preset.anim_params };
   renderAll();
-  publish({ anim_mode: animMode || null, anim_speed: animSpeed,
-            groups: getGroups(), brightness,
-            fade_steps: fadeSteps, drift_enabled: driftEnabled, drift_interval: driftInterval,
-            on: powered });
+  const payload = { anim_mode: animMode || null, anim_speed: animSpeed,
+    groups: getGroups(), brightness, fade_steps: fadeSteps,
+    drift_enabled: driftEnabled, drift_interval: driftInterval, on: powered };
+  if (animMode === "custom") payload.anim_params = preset.anim_params;
+  publish(payload);
 }
 
 function renderPresets() {
-  const container = document.getElementById("presets-list");
+  const container  = document.getElementById("presets-list");
+  const userPresets = loadUserPresets();
+  const all = [
+    ...BUILTIN_PRESETS.map(p => ({ preset: p, builtin: true })),
+    ...userPresets.map((p, i) => ({ preset: p, builtin: false, idx: i })),
+  ];
+
+  if (all.length === 0) {
+    container.innerHTML = '<div class="no-scenes">No presets yet</div>';
+    return;
+  }
+
   container.innerHTML = "";
-  PRESETS.forEach(p => {
-    const btn = document.createElement("button");
-    btn.className = "scene-load";
-    btn.style.flex = "1";
-    btn.textContent = p.name;
-    btn.addEventListener("click", () => applyPreset(p));
-    container.appendChild(btn);
+  all.forEach(({ preset, builtin, idx }) => {
+    const row  = document.createElement("div");
+    row.className = "scene-row";
+    const swatches = (preset.groupPositions || []).map(pos => {
+      const [r,g,b] = paletteRGB(pos);
+      return `<div class="scene-dot" style="background:rgb(${r},${g},${b})"></div>`;
+    }).join("");
+    row.innerHTML = `
+      <div class="scene-swatches">${swatches || ""}</div>
+      <span class="scene-name">${preset.name}</span>
+      <button class="scene-load">Load</button>
+      ${builtin ? "" : `<button class="scene-del">✕</button>`}`;
+    row.querySelector(".scene-load").addEventListener("click", () => applyPreset(preset));
+    if (!builtin) {
+      row.querySelector(".scene-del").addEventListener("click", () => {
+        const up = loadUserPresets();
+        up.splice(idx, 1);
+        saveUserPresets(up);
+        renderPresets();
+      });
+    }
+    container.appendChild(row);
   });
 }
+
+document.getElementById("btn-save-preset").addEventListener("click", () => {
+  const name = document.getElementById("preset-name").value.trim()
+    || "Preset " + (loadUserPresets().length + 1);
+  const up = loadUserPresets();
+  up.push({
+    name,
+    groupPositions: [...groupPositions],
+    groupWLevels:   [...groupWLevels],
+    boundaries:     Array.from(boundaries),
+    brightness, fadeSteps, on: powered,
+    anim_mode:   animMode  || null,
+    anim_speed:  animSpeed,
+    anim_params: animMode === "custom" ? getCustomParams() : undefined,
+  });
+  saveUserPresets(up);
+  renderPresets();
+  document.getElementById("preset-name").value = "";
+});
 
 function captureScene(name) {
   return {
