@@ -158,6 +158,12 @@ def on_message(topic, msg):
         save_alarms(data["set_alarms"])
         print(f"[alarm] saved {len(_alarms)} alarms")
 
+    if data.get("reboot"):
+        print("[mqtt] reboot requested — saving state and rebooting")
+        save_state()
+        import machine
+        machine.reset()
+
 
 def connect_mqtt() -> MQTTClient:
     import ubinascii, machine

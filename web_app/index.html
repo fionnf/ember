@@ -661,6 +661,8 @@
     <div class="cfg-field"><label>Password</label><input id="new-password" type="password" placeholder="Password"></div>
   </div>
   <button class="cfg-btn" id="btn-add-network">Send to Boards</button>
+  <hr style="border:none;border-top:1px solid var(--border);margin:0.15rem 0">
+  <button class="cfg-btn" id="btn-reboot" style="color:var(--red);border-color:rgba(224,72,72,0.3)">↺ Reboot Both Boards (triggers OTA update)</button>
 </div>
 
 <script>
@@ -903,10 +905,19 @@ function connect() {
   client.on("reconnect", () => setStatus("connecting",   "reconnecting…"));
 }
 
+let _publishFlashTimer = null;
+function _flashDot() {
+  const dot = document.getElementById("dot");
+  dot.style.opacity = "0.3";
+  clearTimeout(_publishFlashTimer);
+  _publishFlashTimer = setTimeout(() => { dot.style.opacity = ""; }, 200);
+}
+
 function publish(payload) {
   if (!client || !client.connected) return;
   payload.from = BOARD_ID;
   client.publish(topic(), JSON.stringify(payload));
+  _flashDot();
 }
 
 function publishRetained(topicFn, payload) {
@@ -1415,6 +1426,11 @@ document.getElementById("btn-reconnect").addEventListener("click", () => {
     boardIdB: cfg.boardIdB, boardNameB: cfg.boardNameB,
   });
   renderAll(); connect();
+});
+
+document.getElementById("btn-reboot").addEventListener("click", () => {
+  if (!confirm("Reboot both boards? They will go offline for ~30 seconds while they update.")) return;
+  publish({ reboot: true });
 });
 
 // ── Alarms ────────────────────────────────────────────────────
