@@ -304,22 +304,6 @@
     .hue-handle:active { cursor: grabbing; }
 
     /* ── Library (presets + scenes) ── */
-    .lib-tabs {
-      display: flex; gap: 0; margin-bottom: 0.85rem;
-      background: rgba(0,0,0,0.2); border-radius: var(--r-xs);
-      padding: 3px;
-    }
-    .lib-tab {
-      flex: 1; padding: 0.5rem; border-radius: 6px;
-      border: none; background: transparent;
-      font-family: inherit; font-size: 0.76rem; font-weight: 600;
-      color: var(--muted); cursor: pointer;
-      transition: background 0.15s, color 0.15s;
-    }
-    .lib-tab:hover { color: var(--text2); }
-    .lib-tab.active { background: var(--surface3); color: var(--text); }
-    .lib-panel { display: none; }
-    .lib-panel.active { display: block; }
 
     /* Scene / preset rows */
     .scene-grid {
@@ -623,27 +607,13 @@
   <div id="group-panels"></div>
 </div>
 
-<!-- Library: Presets + Scenes combined -->
+<!-- Library -->
 <div class="card">
-  <div class="lib-tabs">
-    <button class="lib-tab active" data-tab="presets">Presets</button>
-    <button class="lib-tab" data-tab="scenes">Saved Scenes</button>
-  </div>
-
-  <div id="lib-presets" class="lib-panel active">
-    <div id="presets-list" class="scene-grid"></div>
-    <div class="save-row">
-      <input id="preset-name" placeholder="Save current state as preset…" maxlength="32">
-      <button id="btn-save-preset">Save</button>
-    </div>
-  </div>
-
-  <div id="lib-scenes" class="lib-panel">
-    <div id="scenes-list" class="scene-grid"></div>
-    <div class="save-row">
-      <input id="scene-name" placeholder="Scene name…" maxlength="32">
-      <button id="btn-save-scene">Save Current</button>
-    </div>
+  <div class="card-title">Scenes</div>
+  <div id="scenes-list" class="scene-grid"></div>
+  <div class="save-row">
+    <input id="scene-name" placeholder="Save current state…" maxlength="32">
+    <button id="btn-save-scene">Save</button>
   </div>
 </div>
 
@@ -871,7 +841,7 @@ function connect() {
 
       if (topicStr === topicScenes()) {
         if (d.scenes)  { saveScenes(d.scenes);  renderScenes(); }
-        if (d.presets) { localStorage.setItem("ll_presets", JSON.stringify(d.presets)); renderPresets(); }
+        if (d.presets) { /* legacy — ignore */ }
         if (d.boardNameA) { cfg.boardNameA = d.boardNameA; localStorage.setItem("ll_name_a", d.boardNameA); }
         if (d.boardNameB) { cfg.boardNameB = d.boardNameB; localStorage.setItem("ll_name_b", d.boardNameB); }
         if (d.boardIdA)   { cfg.boardIdA   = d.boardIdA;   localStorage.setItem("ll_id_a",   d.boardIdA); }
@@ -941,15 +911,6 @@ function publishState() {
   publish(p);
 }
 
-// ── Library tabs ──────────────────────────────────────────────
-document.querySelectorAll(".lib-tab").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".lib-tab").forEach(t => t.classList.remove("active"));
-    document.querySelectorAll(".lib-panel").forEach(p => p.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById("lib-" + btn.dataset.tab).classList.add("active");
-  });
-});
 
 // ── Animation ─────────────────────────────────────────────────
 function syncAnimButtons() {
@@ -1543,8 +1504,8 @@ function saveScenes(scenes) {
   });
 }
 
-// ── Presets ───────────────────────────────────────────────────
-const BUILTIN_PRESETS = [
+// ── Scenes (unified — built-ins + user-saved) ─────────────────
+const BUILTIN_SCENES = [
   { name: "🌈 Rainbow",    anim_mode: "rainbow", anim_speed: 1.0 },
   { name: "🕯 Candle",     anim_mode: "candle",  anim_speed: 1.5,
     groupPositions: [0.02, 0.05, 0.03], groupWLevels: [1, 0.9, 0.95] },
@@ -1552,40 +1513,17 @@ const BUILTIN_PRESETS = [
     groupPositions: [0.0, 0.0, 0.0],   groupWLevels: [1, 1, 1], brightness: 0.8 },
 ];
 
-function loadUserPresets() {
-  try { return JSON.parse(localStorage.getItem("ll_presets") || "[]"); }
-  catch(e) { return []; }
-}
-
-function saveUserPresets(presets) {
-  localStorage.setItem("ll_presets", JSON.stringify(presets));
-  publishRetained(topicScenes, {
-    scenes: loadScenes(), presets,
-    boardIdA: cfg.boardIdA, boardNameA: cfg.boardNameA,
-    boardIdB: cfg.boardIdB, boardNameB: cfg.boardNameB,
-  });
-}
-
-function applyPreset(preset) {
-  animMode  = preset.anim_mode  || "";
-  animSpeed = preset.anim_speed || 1.0;
-  syncAnimButtons(); syncAnimSlider();
-  if (preset.groupPositions) groupPositions = [...preset.groupPositions];
-  if (preset.groupWLevels)   groupWLevels   = [...preset.groupWLevels];
-  if (preset.brightness !== undefined) { brightness = preset.brightness; syncBrightnessSlider(); }
-  if (preset.anim_params) {
-    customPattern  = preset.anim_params.pattern   || "sweep";
-    customHueStart = preset.anim_params.hue_start ?? 0.0;
-    customHueEnd   = preset.anim_params.hue_end   ?? 1.0;
-    customSync     = preset.anim_params.sync      ?? false;
-  }
-  renderAll();
-  const payload = { anim_mode: animMode || null, anim_speed: animSpeed,
-    groups: getGroups(), brightness, fade_steps: fadeSteps,
-    drift_enabled: driftEnabled, drift_interval: driftInterval, on: powered };
-  if (animMode === "custom") payload.anim_params = preset.anim_params;
-  publish(payload);
-}
+// Migrate legacy ll_presets into ll_scenes once
+(function migrateLegacyPresets() {
+  try {
+    const old = JSON.parse(localStorage.getItem("ll_presets") || "[]");
+    if (!old.length) return;
+    const existing = JSON.parse(localStorage.getItem("ll_scenes") || "[]");
+    const merged = [...existing, ...old];
+    localStorage.setItem("ll_scenes", JSON.stringify(merged));
+    localStorage.removeItem("ll_presets");
+  } catch(e) {}
+})();
 
 function swatchRGB(pos) {
   // Vivid palette colour for dot previews — skip warm-white blend so dots are readable
@@ -1616,50 +1554,6 @@ function _sceneSwatches(item) {
   }).join("")}</div>`;
 }
 
-function renderPresets() {
-  const container = document.getElementById("presets-list");
-  const userPresets = loadUserPresets();
-  const all = [
-    ...BUILTIN_PRESETS.map(p => ({ preset: p, builtin: true })),
-    ...userPresets.map((p, i) => ({ preset: p, builtin: false, idx: i })),
-  ];
-  if (all.length === 0) { container.innerHTML = '<div class="no-scenes">No presets yet</div>'; return; }
-  container.innerHTML = "";
-  all.forEach(({ preset, builtin, idx }) => {
-    const row = document.createElement("div");
-    row.className = "scene-row";
-    row.innerHTML = `
-      ${_sceneSwatches(preset)}
-      ${_animBadge(preset)}
-      <span class="scene-name">${preset.name}</span>
-      <button class="scene-load">Load</button>
-      ${builtin ? "" : `<button class="scene-del">✕</button>`}`;
-    row.querySelector(".scene-load").addEventListener("click", () => applyPreset(preset));
-    if (!builtin) {
-      row.querySelector(".scene-del").addEventListener("click", () => {
-        const up = loadUserPresets();
-        up.splice(idx, 1); saveUserPresets(up); renderPresets();
-      });
-    }
-    container.appendChild(row);
-  });
-}
-
-document.getElementById("btn-save-preset").addEventListener("click", () => {
-  const name = document.getElementById("preset-name").value.trim()
-    || "Preset " + (loadUserPresets().length + 1);
-  const up = loadUserPresets();
-  up.push({
-    name,
-    groupPositions: [...groupPositions], groupWLevels: [...groupWLevels],
-    boundaries: Array.from(boundaries),
-    brightness, fadeSteps, on: powered,
-    anim_mode: animMode || null, anim_speed: animSpeed,
-    anim_params: animMode === "custom" ? getCustomParams() : undefined,
-  });
-  saveUserPresets(up); renderPresets();
-  document.getElementById("preset-name").value = "";
-});
 
 function captureScene(name) {
   return {
@@ -1671,48 +1565,53 @@ function captureScene(name) {
   };
 }
 
-function applyScene(scene) {
-  boundaries.clear();
-  (scene.boundaries || []).forEach(b => boundaries.add(b));
-  groupPositions = [...scene.groupPositions];
-  groupWLevels   = [...scene.groupWLevels];
-  brightness     = scene.brightness     ?? brightness;
-  fadeSteps      = scene.fadeSteps      ?? fadeSteps;
-  driftEnabled   = scene.driftEnabled   ?? driftEnabled;
-  driftInterval  = scene.driftInterval  ?? driftInterval;
-  powered        = scene.on             ?? powered;
-  animMode       = scene.anim_mode      || "";
-  animSpeed      = scene.anim_speed     ?? animSpeed;
+
+function _applySceneOrBuiltin(item) {
+  animMode  = item.anim_mode  || "";
+  animSpeed = item.anim_speed ?? 1.0;
+  if (item.groupPositions) groupPositions = [...item.groupPositions];
+  if (item.groupWLevels)   groupWLevels   = [...item.groupWLevels];
+  if (item.boundaries)     { boundaries.clear(); item.boundaries.forEach(b => boundaries.add(b)); }
+  if (item.brightness  !== undefined) brightness  = item.brightness;
+  if (item.fadeSteps   !== undefined) fadeSteps   = item.fadeSteps;
+  if (item.driftEnabled!== undefined) driftEnabled= item.driftEnabled;
+  if (item.driftInterval!==undefined) driftInterval=item.driftInterval;
+  if (item.on          !== undefined) powered     = item.on;
+  if (item.anim_params) {
+    customPattern  = item.anim_params.pattern   || "sweep";
+    customHueStart = item.anim_params.hue_start ?? 0.0;
+    customHueEnd   = item.anim_params.hue_end   ?? 1.0;
+    customSync     = item.anim_params.sync      ?? false;
+  }
   syncBrightnessSlider(); syncFadeSlider(); syncDriftIntervalSlider();
-  syncAnimButtons(); syncAnimSlider();
-  updatePowerBtn(); updateDriftBtn();
+  syncAnimButtons(); syncAnimSlider(); updatePowerBtn(); updateDriftBtn();
   renderAll(); publishState();
 }
 
 function renderScenes() {
   const container = document.getElementById("scenes-list");
-  const scenes = loadScenes();
-  if (scenes.length === 0) { container.innerHTML = '<div class="no-scenes">No saved scenes yet</div>'; return; }
+  const userScenes = loadScenes();
+  const all = [
+    ...BUILTIN_SCENES.map(s => ({ item: s, builtin: true })),
+    ...userScenes.map((s, i) => ({ item: s, builtin: false, idx: i })),
+  ];
   container.innerHTML = "";
-  scenes.forEach((scene, i) => {
+  all.forEach(({ item, builtin, idx }) => {
     const row = document.createElement("div");
     row.className = "scene-row";
     row.innerHTML = `
-      ${_sceneSwatches(scene)}
-      ${_animBadge(scene)}
-      <span class="scene-name">${scene.name}</span>
-      <button class="scene-load" data-i="${i}">Load</button>
-      <button class="scene-del"  data-i="${i}">✕</button>`;
+      ${_sceneSwatches(item)}
+      ${_animBadge(item)}
+      <span class="scene-name">${item.name}</span>
+      <button class="scene-load">Load</button>
+      ${builtin ? "" : `<button class="scene-del">✕</button>`}`;
+    row.querySelector(".scene-load").addEventListener("click", () => _applySceneOrBuiltin(item));
+    if (!builtin) {
+      row.querySelector(".scene-del").addEventListener("click", () => {
+        const s = loadScenes(); s.splice(idx, 1); saveScenes(s); renderScenes();
+      });
+    }
     container.appendChild(row);
-  });
-  container.querySelectorAll(".scene-load").forEach(btn => {
-    btn.addEventListener("click", () => applyScene(loadScenes()[btn.dataset.i]));
-  });
-  container.querySelectorAll(".scene-del").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const scenes = loadScenes(); scenes.splice(btn.dataset.i, 1);
-      saveScenes(scenes); renderScenes();
-    });
   });
 }
 
@@ -1729,7 +1628,6 @@ document.getElementById("btn-save-scene").addEventListener("click", () => {
 initGroups(cfg.numGroups);
 renderAll();
 renderScenes();
-renderPresets();
 renderAlarms();
 syncAnimButtons();
 syncAnimSlider();
