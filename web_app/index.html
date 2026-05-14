@@ -690,9 +690,9 @@ let cfg = {
   numLeds:   parseInt(localStorage.getItem("ll_leds")   || "10"),
   numGroups: parseInt(localStorage.getItem("ll_groups") || "3"),
   boardIdA:  localStorage.getItem("ll_id_a")   || "board_a",
-  boardNameA:localStorage.getItem("ll_name_a") || "FF",
+  boardNameA:localStorage.getItem("ll_name_a") || "LS",
   boardIdB:  localStorage.getItem("ll_id_b")   || "board_b",
-  boardNameB:localStorage.getItem("ll_name_b") || "LS",
+  boardNameB:localStorage.getItem("ll_name_b") || "FF",
 };
 document.getElementById("cfg-broker").value  = cfg.broker;
 document.getElementById("cfg-prefix").value  = cfg.prefix;
@@ -794,6 +794,8 @@ function boardStateDesc(d) {
   return "updated";
 }
 
+const _pillOnline = {};  // last known online state per pill — avoid spurious DOM thrash
+
 function updatePills() {
   [
     ["pill-a", "pill-a-label", "pill-a-sub", cfg.boardIdA, cfg.boardNameA],
@@ -801,17 +803,21 @@ function updatePills() {
   ].forEach(([pillId, labelId, subId, boardId, name]) => {
     const pill = document.getElementById(pillId);
     if (!pill) return;
-    document.getElementById(labelId).textContent = name;
+    const labelEl = document.getElementById(labelId);
+    if (labelEl.textContent !== name) labelEl.textContent = name;
     const seen   = boardLastSeen[boardId];
-    const online = seen && (Date.now() - seen) < BOARD_TIMEOUT_MS;
-    pill.classList.toggle("online", online);
+    const online = !!(seen && (Date.now() - seen) < BOARD_TIMEOUT_MS);
+    // Only touch classes/text when state actually changed
+    if (_pillOnline[pillId] !== online) {
+      _pillOnline[pillId] = online;
+      pill.classList.toggle("online", online);
+    }
     const sub = document.getElementById(subId);
-    sub.textContent = online
-      ? (boardLastChange[boardId] || "online")
-      : "offline";
+    const subText = online ? (boardLastChange[boardId] || "online") : "offline";
+    if (sub.textContent !== subText) sub.textContent = subText;
   });
 }
-setInterval(updatePills, 3000);
+setInterval(updatePills, 60_000);
 
 function initGroups(n) {
   boundaries.clear();
@@ -903,7 +909,10 @@ function connect() {
         groupWLevels   = d.groups.map(x => x.w);
         boundaries.clear();
         let cursor = 0;
-        d.groups.slice(0,-1).forEach(g => { cursor += g.size; boundaries.add(cursor); });
+        d.groups.slice(0,-1).forEach(g => {
+          cursor += g.size;
+          if (cursor > 0 && cursor < cfg.numLeds) boundaries.add(cursor);
+        });
         renderAll();
       }
     } catch(e) {}
