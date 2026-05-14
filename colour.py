@@ -212,7 +212,7 @@ class ColourEngine:
             self._fade_steps_per = [self._fade_steps] * self._n
 
         if self._anim_mode:
-            self._anim_phase += 0.00015 * self._anim_speed * dt
+            self._anim_phase += 0.0015 * self._anim_speed * dt
 
         for i in range(self._n):
             fs = self._fade_steps_per[i]
@@ -266,7 +266,10 @@ class ColourEngine:
                 offset   = 0.0 if sync else (i / max(self._n - 1, 1)) * 0.6
                 t        = (math.sin(self._anim_phase + offset) + 1) * 0.5  # 0..1
                 if pattern == "sweep":
-                    pos = h0 + t * (h1 - h0)
+                    # sawtooth: hue travels h0→h1 then snaps back
+                    TWO_PI = 6.2832
+                    t_saw = ((self._anim_phase + offset * TWO_PI) % TWO_PI) / TWO_PI
+                    pos = h0 + t_saw * (h1 - h0)
                     r, g, b, w = _palette_colour(max(0.0, min(1.0, pos)))
                     w = int(w * self._w_level[i])
                 elif pattern == "pulse":

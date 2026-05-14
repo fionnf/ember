@@ -643,8 +643,14 @@ function connect() {
       if (d.fade_steps !== undefined) { fadeSteps = d.fade_steps;    syncFadeSlider(); }
       if (d.drift_enabled  !== undefined) { driftEnabled = d.drift_enabled;   updateDriftBtn(); }
       if (d.drift_interval !== undefined) { driftInterval = d.drift_interval; syncDriftIntervalSlider(); }
-      if (d.anim_mode !== undefined) { animMode = d.anim_mode || ""; syncAnimButtons(); }
+      if (d.anim_mode  !== undefined) { animMode  = d.anim_mode || ""; syncAnimButtons(); }
       if (d.anim_speed !== undefined) { animSpeed = d.anim_speed; syncAnimSlider(); }
+      if (d.anim_params && d.anim_mode === "custom") {
+        customPattern  = d.anim_params.pattern   || "sweep";
+        customHueStart = d.anim_params.hue_start ?? 0.0;
+        customHueEnd   = d.anim_params.hue_end   ?? 1.0;
+        customSync     = d.anim_params.sync      ?? false;
+      }
       if (d.groups) {
         groupPositions = d.groups.map(x => x.pos);
         groupWLevels   = d.groups.map(x => x.w);
@@ -672,9 +678,11 @@ function publishRetained(topicFn, payload) {
 }
 
 function publishState() {
-  publish({ groups: getGroups(), on: powered, brightness, fade_steps: fadeSteps,
-            drift_enabled: driftEnabled, drift_interval: driftInterval,
-            anim_mode: animMode || null, anim_speed: animSpeed });
+  const p = { groups: getGroups(), on: powered, brightness, fade_steps: fadeSteps,
+              drift_enabled: driftEnabled, drift_interval: driftInterval,
+              anim_mode: animMode || null, anim_speed: animSpeed };
+  if (animMode === "custom") p.anim_params = getCustomParams();
+  publish(p);
 }
 
 // ── Animation ─────────────────────────────────────────────────
@@ -1222,9 +1230,11 @@ function saveScenes(scenes) {
 
 // ── Preset scenes ─────────────────────────────────────────────
 const BUILTIN_PRESETS = [
-  { name: "🌈 Rainbow", anim_mode: "rainbow", anim_speed: 1.0 },
-  { name: "🕯 Candle",  anim_mode: "candle",  anim_speed: 1.5,
+  { name: "🌈 Rainbow",    anim_mode: "rainbow", anim_speed: 1.0 },
+  { name: "🕯 Candle",     anim_mode: "candle",  anim_speed: 1.5,
     groupPositions: [0.02, 0.05, 0.03], groupWLevels: [1, 0.9, 0.95] },
+  { name: "☀️ Warm White", anim_mode: null,
+    groupPositions: [0.0, 0.0, 0.0],   groupWLevels: [1, 1, 1], brightness: 0.8 },
 ];
 
 function loadUserPresets() {
@@ -1250,7 +1260,12 @@ function applyPreset(preset) {
   if (preset.groupPositions) groupPositions = [...preset.groupPositions];
   if (preset.groupWLevels)   groupWLevels   = [...preset.groupWLevels];
   if (preset.brightness !== undefined) { brightness = preset.brightness; syncBrightnessSlider(); }
-  if (preset.anim_params)    customParams   = { ...preset.anim_params };
+  if (preset.anim_params) {
+    customPattern  = preset.anim_params.pattern   || "sweep";
+    customHueStart = preset.anim_params.hue_start ?? 0.0;
+    customHueEnd   = preset.anim_params.hue_end   ?? 1.0;
+    customSync     = preset.anim_params.sync      ?? false;
+  }
   renderAll();
   const payload = { anim_mode: animMode || null, anim_speed: animSpeed,
     groups: getGroups(), brightness, fade_steps: fadeSteps,

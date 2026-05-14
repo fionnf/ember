@@ -146,7 +146,7 @@ def on_message(topic, msg):
         engine.set_drift_interval(int(drift_interval))
     if anim_mode != "__unset__":
         engine.set_animation(anim_mode, anim_speed if anim_speed is not None else 1.0, anim_params)
-    if groups is not None and on is not False and not engine._anim_mode:
+    if groups is not None and on is not False and (not engine._anim_mode or not data.get("sync")):
         fade_override = SYNC_FADE_STEPS if data.get("sync") else None
         engine.force_colour(groups, fade_steps_override=fade_override)
 
