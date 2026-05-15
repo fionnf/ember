@@ -913,6 +913,20 @@ function _flashDot() {
   _publishFlashTimer = setTimeout(() => { dot.style.opacity = ""; }, 200);
 }
 
+function showToast(msg) {
+  let t = document.getElementById("ll-toast");
+  if (!t) {
+    t = document.createElement("div");
+    t.id = "ll-toast";
+    t.style.cssText = "position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:rgba(30,30,40,0.95);color:#fff;padding:.5rem 1.2rem;border-radius:2rem;font-size:.85rem;z-index:9999;pointer-events:none;transition:opacity .3s";
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = "1";
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = "0"; }, 2500);
+}
+
 function publish(payload) {
   if (!client || !client.connected) return;
   payload.from = BOARD_ID;
@@ -1616,34 +1630,44 @@ function captureScene(name) {
 }
 
 
-function _applySceneOrBuiltin(item) {
-  if (item._staticRainbow) {
-    // One group per LED, each hue evenly spread — nearly-static rainbow
-    const n = cfg.numLeds;
-    boundaries.clear();
-    for (let i = 1; i < n; i++) boundaries.add(i);
-    groupPositions = Array.from({length: n}, (_, i) => i / n);
-    groupWLevels   = Array.from({length: n}, () => 0);
+function _applySceneOrBuiltin(item, btn) {
+  try {
+    if (item._staticRainbow) {
+      const n = cfg.numLeds;
+      boundaries.clear();
+      for (let i = 1; i < n; i++) boundaries.add(i);
+      groupPositions = Array.from({length: n}, (_, i) => i / n);
+      groupWLevels   = Array.from({length: n}, () => 0);
+    }
+    animMode  = item.anim_mode  || "";
+    animSpeed = item.anim_speed ?? 1.0;
+    if (item.groupPositions) groupPositions = [...item.groupPositions];
+    if (item.groupWLevels)   groupWLevels   = [...item.groupWLevels];
+    if (item.boundaries)     { boundaries.clear(); item.boundaries.forEach(b => boundaries.add(b)); }
+    if (item.brightness  !== undefined) brightness  = item.brightness;
+    if (item.fadeSteps   !== undefined) fadeSteps   = item.fadeSteps;
+    if (item.driftEnabled!== undefined) driftEnabled= item.driftEnabled;
+    if (item.driftInterval!==undefined) driftInterval=item.driftInterval;
+    // Loading a scene always turns the lights on unless the scene explicitly stores on:false
+    if (item.on === false) powered = false;
+    else powered = true;
+    if (item.anim_params) {
+      customPattern  = item.anim_params.pattern   || "sweep";
+      customHueStart = item.anim_params.hue_start ?? 0.0;
+      customHueEnd   = item.anim_params.hue_end   ?? 1.0;
+      customSync     = item.anim_params.sync      ?? false;
+    }
+    syncBrightnessSlider(); syncFadeSlider(); syncDriftIntervalSlider();
+    syncAnimButtons(); syncAnimSlider(); updatePowerBtn(); updateDriftBtn();
+    renderAll();
+    publishState();
+    // Visual confirmation on the button
+    if (btn) { const orig = btn.textContent; btn.textContent = "✓"; setTimeout(() => { btn.textContent = orig; }, 1000); }
+    if (!client || !client.connected) showToast("Loaded locally — not connected to MQTT");
+  } catch(e) {
+    showToast("Error loading scene: " + e.message);
+    console.error(e);
   }
-  animMode  = item.anim_mode  || "";
-  animSpeed = item.anim_speed ?? 1.0;
-  if (item.groupPositions) groupPositions = [...item.groupPositions];
-  if (item.groupWLevels)   groupWLevels   = [...item.groupWLevels];
-  if (item.boundaries)     { boundaries.clear(); item.boundaries.forEach(b => boundaries.add(b)); }
-  if (item.brightness  !== undefined) brightness  = item.brightness;
-  if (item.fadeSteps   !== undefined) fadeSteps   = item.fadeSteps;
-  if (item.driftEnabled!== undefined) driftEnabled= item.driftEnabled;
-  if (item.driftInterval!==undefined) driftInterval=item.driftInterval;
-  if (item.on          !== undefined) powered     = item.on;
-  if (item.anim_params) {
-    customPattern  = item.anim_params.pattern   || "sweep";
-    customHueStart = item.anim_params.hue_start ?? 0.0;
-    customHueEnd   = item.anim_params.hue_end   ?? 1.0;
-    customSync     = item.anim_params.sync      ?? false;
-  }
-  syncBrightnessSlider(); syncFadeSlider(); syncDriftIntervalSlider();
-  syncAnimButtons(); syncAnimSlider(); updatePowerBtn(); updateDriftBtn();
-  renderAll(); publishState();
 }
 
 function renderScenes() {
@@ -1663,7 +1687,7 @@ function renderScenes() {
       <span class="scene-name">${item.name}</span>
       <button class="scene-load">Load</button>
       ${builtin ? "" : `<button class="scene-del">✕</button>`}`;
-    row.querySelector(".scene-load").addEventListener("click", () => _applySceneOrBuiltin(item));
+    row.querySelector(".scene-load").addEventListener("click", e => _applySceneOrBuiltin(item, e.currentTarget));
     if (!builtin) {
       row.querySelector(".scene-del").addEventListener("click", () => {
         const s = loadScenes(); s.splice(idx, 1); saveScenes(s); renderScenes();
