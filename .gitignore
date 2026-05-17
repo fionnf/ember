@@ -1,4 +1,13 @@
+# Dev tooling
 .claude/
 .idea/
+.venv/
 __pycache__/
 *.pyc
+*.pyo
+
+# Board-generated runtime files (written by firmware, not source)
+state.json
+alarms.json
+animations.json
+networks.json
