@@ -480,7 +480,7 @@ def main():
             publish_event(engine.get_event_payload())
 
         # ── Render frame at target FPS ──
-        if uxxtime.ticks_diff(now, last_frame) >= FRAME_MS:
+        if utime.ticks_diff(now, last_frame) >= FRAME_MS:
             engine.tick(strip)
             last_frame = now
 
