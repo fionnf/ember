@@ -261,6 +261,7 @@
       color: var(--accent);
     }
     .anim-tile.active .tile-icon { filter: drop-shadow(0 0 4px rgba(240,160,48,0.6)); }
+    .anim-tile:disabled { opacity: 0.25; pointer-events: none; cursor: default; }
 
     /* Custom builder */
     #custom-anim-toggle {
@@ -533,15 +534,15 @@
     <button class="ctrl-pill" id="btn-reset" disabled>
       <span class="pill-icon">☀</span> Warm White
     </button>
-    <button class="ctrl-pill active" id="btn-drift" disabled>
-      <span class="pill-icon">〜</span> Drift: On
+    <button class="ctrl-pill" id="btn-drift" disabled>
+      <span class="pill-icon">〜</span> Drift: Off
     </button>
   </div>
-  <div class="ctrl-secondary" style="gap:0.35rem">
-    <span style="font-size:0.62rem;color:var(--muted);letter-spacing:0.07em;text-transform:uppercase;padding-right:0.2rem">Send to</span>
-    <button class="ctrl-pill active" id="btn-target-both">Both</button>
-    <button class="ctrl-pill" id="btn-target-a"></button>
-    <button class="ctrl-pill" id="btn-target-b"></button>
+  <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.85rem">
+    <span style="font-size:0.62rem;color:var(--muted);letter-spacing:0.07em;text-transform:uppercase;flex-shrink:0">Send to</span>
+    <button class="ctrl-pill active" id="btn-target-both" style="flex:1">Both</button>
+    <button class="ctrl-pill" id="btn-target-a" style="flex:1"></button>
+    <button class="ctrl-pill" id="btn-target-b" style="flex:1"></button>
   </div>
   <div class="sl-row">
     <span class="sl-label">Brightness</span>
@@ -797,7 +798,7 @@ let groupWLevels   = [];
 let powered        = true;
 let brightness     = 0.6;
 let fadeSteps      = 60;
-let driftEnabled   = true;
+let driftEnabled   = false;
 let driftInterval  = 45;
 const BOARD_ID     = "web_app";
 const boardLastSeen   = {};
@@ -879,9 +880,10 @@ function setStatus(cls, text) {
   document.getElementById("dot").className = cls;
   document.getElementById("status-text").textContent = text;
   const ok = cls === "connected";
-  ["btn-tap","btn-power","btn-reset","btn-drift"].forEach(id => {
+  ["btn-tap","btn-power","btn-reset","btn-drift","btn-save-board-lib","btn-apply-custom"].forEach(id => {
     document.getElementById(id).disabled = !ok;
   });
+  document.querySelectorAll(".anim-tile").forEach(btn => { btn.disabled = !ok; });
 }
 
 function connect() {
@@ -893,8 +895,6 @@ function connect() {
     client.subscribe(topic());
     client.subscribe(topicScenes());
     client.subscribe(topicAlarms());
-    // Push current UI state to boards immediately on (re)connect so they stay in sync
-    setTimeout(publishState, 800);
     // Request the board's saved animation library
     setTimeout(requestBoardLib, 1500);
   });
@@ -904,7 +904,7 @@ function connect() {
       const d = JSON.parse(msg.toString());
 
       if (topicStr === topicScenes()) {
-        if (d.scenes)  { saveScenes(d.scenes);  renderScenes(); }
+        if (d.scenes)  { localStorage.setItem("ll_scenes", JSON.stringify(d.scenes)); renderScenes(); }
         if (d.presets) { /* legacy — ignore */ }
         if (d.boardNameA) { cfg.boardNameA = d.boardNameA; localStorage.setItem("ll_name_a", d.boardNameA); }
         if (d.boardNameB) { cfg.boardNameB = d.boardNameB; localStorage.setItem("ll_name_b", d.boardNameB); }
@@ -1447,9 +1447,12 @@ function updatePowerBtn() {
 
 function updateDriftBtn() {
   const btn = document.getElementById("btn-drift");
-  btn.textContent = "";
   btn.innerHTML = `<span class="pill-icon">〜</span> Drift: ${driftEnabled ? "On" : "Off"}`;
   btn.classList.toggle("active", driftEnabled);
+  const sl = document.getElementById("sl-drift-interval");
+  sl.disabled = !driftEnabled;
+  const row = sl.closest(".sl-row");
+  if (row) row.style.opacity = driftEnabled ? "" : "0.35";
 }
 
 document.getElementById("btn-tap").addEventListener("click", () => {
@@ -1858,7 +1861,9 @@ document.getElementById("btn-save-board-lib").addEventListener("click", () => {
   boardLib[name] = entry;
   renderBoardLib();
   document.getElementById("board-lib-name").value = "";
-  showToast(`✓ "${name}" saved to board`);
+  showToast(client && client.connected
+    ? `✓ "${name}" saved to board`
+    : `"${name}" saved locally — connect to send to boards`);
 });
 
 // Request the board's current library when we connect
