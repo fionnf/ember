@@ -91,8 +91,8 @@ def _update():
                 updated.append(fname)
                 print(f"[ota] updated {fname}")
             else:
-                r.close()
                 print(f"[ota] {fname} — HTTP {r.status_code}, keeping existing")
+                r.close()
         except Exception as e:
             print(f"[ota] {fname} failed: {e}, keeping existing")
 

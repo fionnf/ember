@@ -911,6 +911,7 @@ function connect() {
         if (d.boardIdA)   { cfg.boardIdA   = d.boardIdA;   localStorage.setItem("ll_id_a",   d.boardIdA); }
         if (d.boardIdB)   { cfg.boardIdB   = d.boardIdB;   localStorage.setItem("ll_id_b",   d.boardIdB); }
         updatePills();
+        updateTargetBtns();
         return;
       }
 
@@ -1171,10 +1172,11 @@ document.querySelectorAll(".pattern-btn[data-pattern]").forEach(btn => {
   });
 });
 
-document.getElementById("btn-sync-groups").addEventListener("click", btn => {
+document.getElementById("btn-sync-groups").addEventListener("click", () => {
   customSync = !customSync;
-  btn.target.textContent = customSync ? "In Sync" : "Offset";
-  btn.target.classList.toggle("active", customSync);
+  const btn = document.getElementById("btn-sync-groups");
+  btn.textContent = customSync ? "In Sync" : "Offset";
+  btn.classList.toggle("active", customSync);
 });
 
 (function initHueRange() {
@@ -1608,17 +1610,15 @@ function renderAlarms() {
         publishAlarms();
       });
     });
-    el.querySelector(".alarm-type-btn").addEventListener("click", btn => {
+    el.querySelector(".alarm-type-btn").addEventListener("click", () => {
       const current = alarms[idx].type || "sunrise";
       alarms[idx].type = current === "sunrise" ? "sunset" : "sunrise";
-      const isSunrise = alarms[idx].type === "sunrise";
-      btn.target.textContent = isSunrise ? "🌅 Rise" : "🌙 Sleep";
-      btn.target.className = `alarm-type-btn ${isSunrise ? "sunrise" : "sunset"}`;
       publishAlarms();
+      renderAlarms(); // re-render so brightness slider shows/hides correctly
     });
-    el.querySelector(".alarm-toggle").addEventListener("click", btn => {
+    el.querySelector(".alarm-toggle").addEventListener("click", e => {
       alarms[idx].enabled = !alarms[idx].enabled;
-      btn.target.classList.toggle("on", alarms[idx].enabled);
+      e.currentTarget.classList.toggle("on", alarms[idx].enabled);
       publishAlarms();
     });
     el.querySelector(".alarm-time").addEventListener("change", e => {
