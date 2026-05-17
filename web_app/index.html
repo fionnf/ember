@@ -406,6 +406,13 @@
     }
     .day-btn:hover { border-color: var(--border2); color: var(--text2); }
     .day-btn.on { background: rgba(240,160,48,0.14); border-color: rgba(240,160,48,0.45); color: var(--accent); }
+    .alarm-type-btn {
+      font-size: 0.68rem; font-weight: 600; cursor: pointer; padding: 0.2rem 0.5rem;
+      border-radius: var(--r-xs); border: 1px solid var(--border); background: none;
+      color: var(--text2); transition: background 0.15s, border-color 0.15s; white-space: nowrap;
+    }
+    .alarm-type-btn.sunrise { border-color: rgba(240,160,48,0.4); color: var(--accent); }
+    .alarm-type-btn.sunset  { border-color: rgba(100,100,200,0.4); color: #9090e0; }
     .alarm-del {
       margin-left: auto; background: none; border: none; color: var(--muted);
       font-size: 0.95rem; cursor: pointer; padding: 0.2rem 0.4rem;
@@ -502,11 +509,17 @@
   </div>
   <div class="ctrl-secondary">
     <button class="ctrl-pill" id="btn-reset" disabled>
-      <span class="pill-icon">↺</span> Reset
+      <span class="pill-icon">☀</span> Warm White
     </button>
     <button class="ctrl-pill active" id="btn-drift" disabled>
       <span class="pill-icon">〜</span> Drift: On
     </button>
+  </div>
+  <div class="ctrl-secondary" style="gap:0.35rem">
+    <span style="font-size:0.62rem;color:var(--muted);letter-spacing:0.07em;text-transform:uppercase;padding-right:0.2rem">Send to</span>
+    <button class="ctrl-pill active" id="btn-target-both">Both</button>
+    <button class="ctrl-pill" id="btn-target-a"></button>
+    <button class="ctrl-pill" id="btn-target-b"></button>
   </div>
   <div class="sl-row">
     <span class="sl-label">Brightness</span>
@@ -761,6 +774,7 @@ const BOARD_TIMEOUT_MS = 90_000;
 let animMode  = "";
 let animSpeed = 3.0;
 let alarms    = [];
+let sendTarget = "both";  // "both" | cfg.boardIdA | cfg.boardIdB
 
 // Board pill "last known state" description
 function boardStateDesc(d) {
@@ -800,7 +814,7 @@ function updatePills() {
     if (sub.textContent !== subText) sub.textContent = subText;
   });
 }
-setInterval(updatePills, 60_000);
+setInterval(updatePills, 10_000);
 
 function initGroups(n) {
   boundaries.clear();
@@ -846,6 +860,8 @@ function connect() {
     client.subscribe(topic());
     client.subscribe(topicScenes());
     client.subscribe(topicAlarms());
+    // Push current UI state to boards immediately on (re)connect so they stay in sync
+    setTimeout(publishState, 800);
   });
   client.on("message", (t, msg) => {
     const topicStr = t.toString();
@@ -905,6 +921,12 @@ function connect() {
   client.on("reconnect", () => setStatus("connecting",   "reconnecting…"));
 }
 
+// ── Debounce helper ───────────────────────────────────────────
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
+
 let _publishFlashTimer = null;
 function _flashDot() {
   const dot = document.getElementById("dot");
@@ -930,9 +952,21 @@ function showToast(msg) {
 function publish(payload) {
   if (!client || !client.connected) return;
   payload.from = BOARD_ID;
+  if (sendTarget !== "both") payload.target = sendTarget;
   client.publish(topic(), JSON.stringify(payload));
   _flashDot();
 }
+
+function updateTargetBtns() {
+  document.getElementById("btn-target-both").classList.toggle("active", sendTarget === "both");
+  document.getElementById("btn-target-a").classList.toggle("active",    sendTarget === cfg.boardIdA);
+  document.getElementById("btn-target-b").classList.toggle("active",    sendTarget === cfg.boardIdB);
+  document.getElementById("btn-target-a").textContent = cfg.boardNameA;
+  document.getElementById("btn-target-b").textContent = cfg.boardNameB;
+}
+document.getElementById("btn-target-both").addEventListener("click", () => { sendTarget = "both";        updateTargetBtns(); });
+document.getElementById("btn-target-a").addEventListener("click",    () => { sendTarget = cfg.boardIdA;  updateTargetBtns(); });
+document.getElementById("btn-target-b").addEventListener("click",    () => { sendTarget = cfg.boardIdB;  updateTargetBtns(); });
 
 function publishRetained(topicFn, payload) {
   if (!client || !client.connected) return;
@@ -972,12 +1006,15 @@ document.querySelectorAll(".anim-tile").forEach(btn => {
     publish(payload);
   });
 });
-document.getElementById("sl-anim-speed").addEventListener("input", e => {
-  animSpeed = parseInt(e.target.value) / 10;
-  document.getElementById("val-anim-speed").textContent = animSpeed.toFixed(1) + "×";
+const _publishAnimSpeed = debounce(() => {
   const payload = { anim_mode: animMode || null, anim_speed: animSpeed };
   if (animMode === "custom") payload.anim_params = getCustomParams();
   publish(payload);
+}, 120);
+document.getElementById("sl-anim-speed").addEventListener("input", e => {
+  animSpeed = parseInt(e.target.value) / 10;
+  document.getElementById("val-anim-speed").textContent = animSpeed.toFixed(1) + "×";
+  _publishAnimSpeed();
 });
 
 // ── Strip animation preview loop ──────────────────────────────
@@ -1257,6 +1294,38 @@ function rebuildGroupData() {
   groupWLevels   = groupWLevels.slice(0, n);
 }
 
+// ── Palette drag — single document listener, no per-render leaks ──
+let _paletteDragging = -1;   // index of handle being dragged, -1 = none
+const _publishPalette = debounce(publishState, 120);
+
+function _palettePos(e, bar) {
+  const rect = bar.getBoundingClientRect();
+  return Math.max(0, Math.min(1, ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width));
+}
+(function _initPaletteListeners() {
+  function onMove(e) {
+    if (_paletteDragging < 0) return;
+    e.preventDefault();
+    const bar = document.getElementById("palette-bar");
+    const pos = _palettePos(e, bar);
+    const i   = _paletteDragging;
+    groupPositions[i] = pos;
+    const [r,gb,b] = paletteRGB(pos);
+    const handle = document.getElementById(`gh-${i}`);
+    if (handle) {
+      handle.style.background = `rgb(${r},${gb},${b})`;
+      handle.style.left = `calc(12px + ${pos} * (100% - 24px))`;
+    }
+    const sw = document.getElementById(`gsw-${i}`);
+    if (sw) sw.style.background = rgbStr(pos);
+    renderStrip(); _publishPalette();
+  }
+  document.addEventListener("mousemove",  onMove);
+  document.addEventListener("touchmove",  onMove, { passive: false });
+  document.addEventListener("mouseup",    () => { _paletteDragging = -1; });
+  document.addEventListener("touchend",   () => { _paletteDragging = -1; });
+})();
+
 function renderPaletteBar() {
   const wrap = document.getElementById("palette-bar-wrap");
   const bar  = document.getElementById("palette-bar");
@@ -1271,28 +1340,9 @@ function renderPaletteBar() {
     const [r,gb,b] = paletteRGB(g.pos);
     handle.style.background = `rgb(${r},${gb},${b})`;
     handle.style.left = `calc(12px + ${g.pos} * (100% - 24px))`;
+    handle.addEventListener("mousedown",  e => { _paletteDragging = i; e.preventDefault(); });
+    handle.addEventListener("touchstart", () => { _paletteDragging = i; }, { passive: true });
     wrap.appendChild(handle);
-    let dragging = false;
-    function posFromEvent(e) {
-      const rect = bar.getBoundingClientRect();
-      return Math.max(0, Math.min(1, ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width));
-    }
-    function onMove(e) {
-      if (!dragging) return; e.preventDefault();
-      const pos = posFromEvent(e);
-      groupPositions[i] = pos;
-      const [r,gb,b] = paletteRGB(pos);
-      handle.style.background = `rgb(${r},${gb},${b})`;
-      handle.style.left = `calc(12px + ${pos} * (100% - 24px))`;
-      document.getElementById(`gsw-${i}`).style.background = rgbStr(pos);
-      renderStrip(); publishState();
-    }
-    handle.addEventListener("mousedown",  e => { dragging = true; e.preventDefault(); });
-    handle.addEventListener("touchstart", () => { dragging = true; }, { passive: true });
-    document.addEventListener("mousemove",  onMove);
-    document.addEventListener("touchmove",  onMove, { passive: false });
-    document.addEventListener("mouseup",  () => { dragging = false; });
-    document.addEventListener("touchend", () => { dragging = false; });
   });
 }
 
@@ -1342,10 +1392,11 @@ function syncFadeSlider() {
 }
 
 // ── Group handlers ────────────────────────────────────────────
+const _publishStateDebounced = debounce(publishState, 120);
 function onGroupW(i, val) {
   groupWLevels[i] = val;
   document.getElementById(`gww-${i}`).textContent = Math.round(val*100)+"%";
-  publishState();
+  _publishStateDebounced();
 }
 
 // ── Global handlers ───────────────────────────────────────────
@@ -1372,10 +1423,10 @@ document.getElementById("btn-power").addEventListener("click", () => {
 });
 
 document.getElementById("btn-reset").addEventListener("click", () => {
+  // Reset colours only — leave brightness/speed/drift settings untouched
+  animMode = ""; syncAnimButtons();
   groupPositions = groupPositions.map(() => 0.0);
   groupWLevels   = groupWLevels.map(() => 1.0);
-  brightness = 0.6; fadeSteps = 60; driftInterval = 45;
-  syncBrightnessSlider(); syncFadeSlider(); syncDriftIntervalSlider();
   renderAll(); publishState();
 });
 
@@ -1386,19 +1437,19 @@ document.getElementById("btn-drift").addEventListener("click", () => {
 document.getElementById("sl-brightness").addEventListener("input", function() {
   brightness = this.value/100;
   document.getElementById("val-brightness").textContent = this.value+"%";
-  publishState();
+  _publishStateDebounced();
 });
 
 document.getElementById("sl-fade").addEventListener("input", function() {
   fadeSteps = parseInt(this.value);
   document.getElementById("val-fade").textContent = Math.round(fadeSteps*16/1000*10)/10+"s";
-  publishState();
+  _publishStateDebounced();
 });
 
 document.getElementById("sl-drift-interval").addEventListener("input", function() {
   driftInterval = parseInt(this.value);
   document.getElementById("val-drift-interval").textContent = driftInterval + "s";
-  publishState();
+  _publishStateDebounced();
 });
 
 document.getElementById("cfg-toggle").addEventListener("click", () => {
@@ -1412,7 +1463,7 @@ document.getElementById("btn-add-network").addEventListener("click", () => {
   publish({ add_network: { ssid, password } });
   document.getElementById("new-ssid").value     = "";
   document.getElementById("new-password").value = "";
-  alert(`Sent "${ssid}" to both boards.`);
+  showToast(`✓ "${ssid}" sent to both boards`);
 });
 
 document.getElementById("btn-reconnect").addEventListener("click", () => {
@@ -1451,7 +1502,7 @@ document.getElementById("btn-reboot").addEventListener("click", () => {
 const DAY_LABELS = ["Mo","Tu","We","Th","Fr","Sa","Su"];
 
 function defaultAlarm() {
-  return { enabled: true, hour: 7, minute: 0, duration_min: 30, brightness: 1.0, days: [0,1,2,3,4], boards: [cfg.boardIdA, cfg.boardIdB] };
+  return { enabled: true, type: "sunrise", hour: 7, minute: 0, duration_min: 30, brightness: 1.0, days: [0,1,2,3,4], boards: [cfg.boardIdA, cfg.boardIdB] };
 }
 
 function publishAlarms() {
@@ -1480,7 +1531,10 @@ function renderAlarms() {
     el.innerHTML = `
       <div class="alarm-header">
         <button class="alarm-toggle ${alarm.enabled?"on":""}" data-idx="${idx}"></button>
-        <input class="alarm-time" type="time" value="${hh}:${mm}" data-idx="${idx}">
+        <input class="alarm-time" type="time" value="${hh}:${mm}" title="Time is UTC — adjust for your timezone" data-idx="${idx}">
+        <span style="font-size:0.6rem;color:var(--muted);margin-left:0.2rem">UTC</span>
+        <button class="alarm-type-btn ${(alarm.type||'sunrise')==='sunrise'?'sunrise':'sunset'}" data-idx="${idx}"
+          title="Toggle sunrise / bedtime fade">${(alarm.type||'sunrise')==='sunrise'?'🌅 Rise':'🌙 Sleep'}</button>
         <button class="alarm-del" data-idx="${idx}">✕</button>
       </div>
       <div class="alarm-days">${dayBtns}</div>
@@ -1491,12 +1545,13 @@ function renderAlarms() {
           style="flex:1;background:linear-gradient(to right,rgba(240,160,48,0.15),rgba(240,160,48,0.65))" data-field="duration_min" data-idx="${idx}">
         <span class="sl-val dur-val">${alarm.duration_min} min</span>
       </div>
+      ${(alarm.type||'sunrise')==='sunrise' ? `
       <div class="sl-row" style="margin-bottom:0">
         <span class="sl-label">Target</span>
         <input type="range" min="10" max="100" value="${Math.round(alarm.brightness*100)}"
           style="flex:1;background:linear-gradient(to right,rgba(255,255,255,0.06),rgba(255,255,255,0.8))" data-field="brightness" data-idx="${idx}">
         <span class="sl-val br-val">${Math.round(alarm.brightness*100)}%</span>
-      </div>`;
+      </div>` : ''}`;
     el.querySelectorAll(".day-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const d = parseInt(btn.dataset.d);
@@ -1516,6 +1571,14 @@ function renderAlarms() {
         btn.classList.toggle("on", alarms[idx].boards.includes(bid));
         publishAlarms();
       });
+    });
+    el.querySelector(".alarm-type-btn").addEventListener("click", btn => {
+      const current = alarms[idx].type || "sunrise";
+      alarms[idx].type = current === "sunrise" ? "sunset" : "sunrise";
+      const isSunrise = alarms[idx].type === "sunrise";
+      btn.target.textContent = isSunrise ? "🌅 Rise" : "🌙 Sleep";
+      btn.target.className = `alarm-type-btn ${isSunrise ? "sunrise" : "sunset"}`;
+      publishAlarms();
     });
     el.querySelector(".alarm-toggle").addEventListener("click", btn => {
       alarms[idx].enabled = !alarms[idx].enabled;
@@ -1719,6 +1782,7 @@ renderAlarms();
 syncAnimButtons();
 syncAnimSlider();
 updatePills();
+updateTargetBtns();
 updatePowerBtn();
 updateDriftBtn();
 syncBrightnessSlider();

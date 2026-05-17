@@ -134,6 +134,7 @@ def on_message(topic, msg):
 
     if on is not None:
         engine.set_power(bool(on))
+        save_state()  # persist so board restores correct state after unexpected reboot
     if brightness is not None:
         engine.set_brightness(float(brightness))
     if reverse is not None:
@@ -368,6 +369,11 @@ def main():
         # ── Reconnect MQTT with exponential backoff ──
         if client is None and utime.ticks_diff(now, _reconnect_at) >= 0:
             try:
+                # Ensure WiFi is up before attempting MQTT
+                wlan = network.WLAN(network.STA_IF)
+                if not wlan.isconnected():
+                    print("[wifi] lost — reconnecting before MQTT retry")
+                    connect_wifi(tick=None)
                 client = connect_mqtt()
                 _backoff_ms = RECONNECT_DELAY_MS   # reset on success
                 _ping_at    = utime.ticks_add(now, 20_000)
@@ -436,27 +442,44 @@ def main():
                             and key not in _alarm_fired
                             and (not boards or BOARD_ID in boards)):
                         _alarm_fired.add(key)
-                        dur_ms = int(alarm.get("duration_min", 30)) * 60_000
-                        _sunrise["active"]    = True
-                        _sunrise["start_ms"]  = now
-                        _sunrise["dur_ms"]    = dur_ms
-                        _sunrise["target_br"] = float(alarm.get("brightness", 1.0))
-                        engine.set_power(True)
-                        engine.set_brightness(0.0)
-                        print(f"[alarm] sunrise! {key[0]:02d}:{key[1]:02d}")
+                        dur_ms  = int(alarm.get("duration_min", 30)) * 60_000
+                        alarm_type = alarm.get("type", "sunrise")
+                        if alarm_type == "sunset":
+                            _sunrise["active"]    = True
+                            _sunrise["start_ms"]  = now
+                            _sunrise["dur_ms"]    = dur_ms
+                            _sunrise["target_br"] = 0.0   # ramp down to off
+                            _sunrise["sunset"]    = True
+                            _sunrise["start_br"]  = engine._brightness
+                            print(f"[alarm] sunset! {key[0]:02d}:{key[1]:02d}")
+                        else:
+                            _sunrise["active"]    = True
+                            _sunrise["start_ms"]  = now
+                            _sunrise["dur_ms"]    = dur_ms
+                            _sunrise["target_br"] = float(alarm.get("brightness", 1.0))
+                            _sunrise["sunset"]    = False
+                            engine.set_power(True)
+                            engine.set_brightness(0.0)
+                            print(f"[alarm] sunrise! {key[0]:02d}:{key[1]:02d}")
                         publish_event(engine.get_event_payload())
                         break
 
-        # ── Sunrise ramp ──
+        # ── Sunrise / sunset ramp ──
         if _sunrise["active"]:
             elapsed = utime.ticks_diff(now, _sunrise["start_ms"])
             if elapsed >= _sunrise["dur_ms"]:
                 engine.set_brightness(_sunrise["target_br"])
+                if _sunrise.get("sunset"):
+                    engine.set_power(False)
                 _sunrise["active"] = False
                 publish_event(engine.get_event_payload())
             else:
                 progress = elapsed / _sunrise["dur_ms"]
-                engine.set_brightness(progress * _sunrise["target_br"])
+                if _sunrise.get("sunset"):
+                    start_br = _sunrise.get("start_br", engine._brightness)
+                    engine.set_brightness(start_br * (1.0 - progress))
+                else:
+                    engine.set_brightness(progress * _sunrise["target_br"])
 
         # ── Idle drift — subtle nudge with slow fade, synced to other board ──
         if engine.check_drift():

@@ -96,6 +96,8 @@ class ColourEngine:
         self._breathe_phase = [i * (6.28 / n) for i in range(n)]
         self._group_sizes   = _random_partition(NUM_LEDS, n, GROUP_MIN_LEDS, GROUP_MAX_LEDS)
 
+        self._fade_steps_per = [FADE_STEPS] * n   # per-group step target
+
         self._powered_on    = True
         self._power_level   = 1.0
         self._power_dir     = 0
@@ -103,6 +105,11 @@ class ColourEngine:
         self._reverse       = REVERSE_LEDS
         self._fade_steps    = FADE_STEPS      # runtime-adjustable
         self._drift_enabled  = True
+
+        # Candle: per-group smoothed flicker level
+        self._candle_level  = [1.0] * n
+        self._candle_target = [1.0] * n
+        self._candle_timer  = [0]   * n  # countdown frames to next target
         self._drift_interval = IDLE_DRIFT_INTERVAL_S
         self._last_drift     = utime.time()
         self._time_ms       = utime.ticks_ms()
@@ -149,9 +156,11 @@ class ColourEngine:
             _resize(self._w_target,      1.0)
             _resize(self._w_step,        0)
             _resize(self._w_fading,      False)
-            _resize(self._breathe_phase, 0.0)
-            if hasattr(self, '_fade_steps_per'):
-                _resize(self._fade_steps_per, self._fade_steps)
+            _resize(self._breathe_phase,  0.0)
+            _resize(self._fade_steps_per, self._fade_steps)
+            _resize(self._candle_level,   1.0)
+            _resize(self._candle_target,  1.0)
+            _resize(self._candle_timer,   0)
             self._n = n
         self._group_sizes = []
         for i, g in enumerate(groups):
@@ -244,8 +253,6 @@ class ColourEngine:
 
         strip.set_brightness(self._brightness)
         cursor = 0
-        if not hasattr(self, '_fade_steps_per'):
-            self._fade_steps_per = [self._fade_steps] * self._n
 
         if self._anim_mode:
             self._anim_phase += 0.0015 * self._anim_speed * dt
@@ -289,7 +296,19 @@ class ColourEngine:
                 w = int(w * self._w_level[i] * wave)
                 r = int(r * wave); g = int(g * wave); b = int(b * wave)
             elif self._anim_mode == "candle":
-                flicker = _rand_float(0.55, 1.0)
+                # Temporally-smoothed flicker: drift toward target, pick new target every ~8–20 frames
+                if self._candle_timer[i] <= 0:
+                    # Occasionally a sharp dip ("gust"), otherwise gentle drift
+                    if urandom.getrandbits(3) == 0:    # ~12% gust
+                        self._candle_target[i] = _rand_float(0.35, 0.6)
+                    else:
+                        self._candle_target[i] = _rand_float(0.75, 1.0)
+                    self._candle_timer[i] = int(_rand_float(6, 22))
+                self._candle_timer[i] -= 1
+                # Lerp toward target — fast attack on drops, slow recovery
+                spd = 0.18 if self._candle_level[i] > self._candle_target[i] else 0.07
+                self._candle_level[i] += (self._candle_target[i] - self._candle_level[i]) * spd
+                flicker = self._candle_level[i]
                 r, g, b, w = self._colour[i]
                 w = int(w * self._w_level[i] * flicker)
                 r = int(r * flicker); g = int(g * flicker); b = int(b * flicker)
@@ -367,9 +386,6 @@ class ColourEngine:
     def _start_fade(self, group, new_pos, steps=None):
         self._target_pos[group] = new_pos
         self._target_col[group] = _palette_colour(new_pos)
-        # Store per-group step target so sync can use a different speed
-        if not hasattr(self, '_fade_steps_per'):
-            self._fade_steps_per = [self._fade_steps] * self._n
         self._fade_steps_per[group] = steps if steps is not None else self._fade_steps
         self._fade_step[group]  = 0
         self._fading[group]     = True
