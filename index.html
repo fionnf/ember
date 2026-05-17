@@ -752,7 +752,7 @@ let groupWLevels   = [];
 let powered        = true;
 let brightness     = 0.6;
 let fadeSteps      = 60;
-let driftEnabled   = false;
+let driftEnabled   = true;
 let driftInterval  = 45;
 const BOARD_ID     = "web_app";
 const boardLastSeen   = {};
@@ -1571,9 +1571,9 @@ function saveScenes(scenes) {
 const BUILTIN_SCENES = [
   { name: "🌈 Rainbow",        anim_mode: "rainbow", anim_speed: 3.0 },
   { name: "🌈 Static Rainbow", anim_mode: null, _staticRainbow: true },
-  { name: "🕯 Candle",         anim_mode: "candle",  anim_speed: 3.0,
+  { name: "🕯 Candle",         anim_mode: "candle",  anim_speed: 3.0, _reset3Groups: true,
     groupPositions: [0.02, 0.05, 0.03], groupWLevels: [1, 0.9, 0.95] },
-  { name: "☀️ Warm White",     anim_mode: null,
+  { name: "☀️ Warm White",     anim_mode: null,      _reset3Groups: true,
     groupPositions: [0.0, 0.0, 0.0],   groupWLevels: [1, 1, 1], brightness: 0.8 },
 ];
 
@@ -1638,6 +1638,11 @@ function _applySceneOrBuiltin(item, btn) {
       for (let i = 1; i < n; i++) boundaries.add(i);
       groupPositions = Array.from({length: n}, (_, i) => i / n);
       groupWLevels   = Array.from({length: n}, () => 0);
+    } else if (item._reset3Groups) {
+      // Reset to 3 evenly-spaced groups matching the board's default NUM_GROUPS
+      boundaries.clear();
+      const step = Math.floor(cfg.numLeds / 3);
+      boundaries.add(step); boundaries.add(step * 2);
     }
     animMode  = item.anim_mode  || "";
     animSpeed = item.anim_speed ?? 1.0;

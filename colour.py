@@ -7,7 +7,7 @@ import utime
 from config import (
     BASE_WARM_WHITE, TINT_PALETTE,
     HUE_SHIFT_MIN, HUE_SHIFT_MAX,
-    FADE_STEPS, FADE_DELAY_MS,
+    FADE_STEPS,
     BREATHE_SPEED, BREATHE_DEPTH,
     IDLE_DRIFT_INTERVAL_S,
     NUM_LEDS, LED_BRIGHTNESS,
@@ -132,8 +132,30 @@ class ColourEngine:
         if not self._powered_on:
             return
         fs = fade_steps_override or self._fade_steps
-        for i, g in enumerate(groups[:self._n]):
-            self._group_sizes[i]  = g["size"]
+        n  = len(groups)
+        # Dynamically resize per-group arrays so any number of groups works
+        # (e.g. per-LED Static Rainbow sends NUM_LEDS groups)
+        if n != self._n:
+            def _resize(lst, default):
+                while len(lst) < n: lst.append(default)
+                del lst[n:]
+            _resize(self._pos,           0.0)
+            _resize(self._target_pos,    0.0)
+            _resize(self._colour,        BASE_WARM_WHITE)
+            _resize(self._target_col,    BASE_WARM_WHITE)
+            _resize(self._fade_step,     0)
+            _resize(self._fading,        False)
+            _resize(self._w_level,       1.0)
+            _resize(self._w_target,      1.0)
+            _resize(self._w_step,        0)
+            _resize(self._w_fading,      False)
+            _resize(self._breathe_phase, 0.0)
+            if hasattr(self, '_fade_steps_per'):
+                _resize(self._fade_steps_per, self._fade_steps)
+            self._n = n
+        self._group_sizes = []
+        for i, g in enumerate(groups):
+            self._group_sizes.append(g["size"])
             self._start_fade(i, g["pos"], fs)
             self._w_target[i] = g["w"]
             self._w_step[i]   = 0
