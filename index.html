@@ -814,12 +814,12 @@ let boardLib    = {};      // animations stored on board: {name: entry}
 function boardStateDesc(d) {
   if (d.heartbeat) return "online";
   if (d.on === false) return "lights off";
-  if (d.on === true)  return "lights on";
   if (d.anim_mode === "rainbow") return "rainbow";
   if (d.anim_mode === "candle")  return "candle";
   if (d.anim_mode === "wave")    return "wave";
   if (d.anim_mode === "custom")  return "custom anim";
   if (d.anim_mode === null || d.anim_mode === "")  return "static";
+  if (d.on === true) return "lights on";
   if (d.groups) return "colours changed";
   if (d.brightness !== undefined) return `${Math.round(d.brightness*100)}% bright`;
   return "updated";
@@ -871,6 +871,7 @@ function groupCount() { return boundaries.size + 1; }
 
 // ── MQTT ──────────────────────────────────────────────────────
 let client = null;
+let _syncAfterConnect = false;
 
 function topic()       { return cfg.prefix + "/events"; }
 function topicScenes() { return cfg.prefix + "/scenes"; }
@@ -880,7 +881,7 @@ function setStatus(cls, text) {
   document.getElementById("dot").className = cls;
   document.getElementById("status-text").textContent = text;
   const ok = cls === "connected";
-  ["btn-tap","btn-power","btn-reset","btn-drift","btn-save-board-lib","btn-apply-custom"].forEach(id => {
+  ["btn-tap","btn-power","btn-reset","btn-drift","btn-save-board-lib","btn-apply-custom","btn-reboot","btn-add-network"].forEach(id => {
     document.getElementById(id).disabled = !ok;
   });
   document.querySelectorAll(".anim-tile").forEach(btn => { btn.disabled = !ok; });
@@ -895,6 +896,15 @@ function connect() {
     client.subscribe(topic());
     client.subscribe(topicScenes());
     client.subscribe(topicAlarms());
+    // Push scenes metadata (board names/IDs) after a settings-change reconnect
+    if (_syncAfterConnect) {
+      _syncAfterConnect = false;
+      setTimeout(() => publishRetained(topicScenes, {
+        scenes: loadScenes(),
+        boardIdA: cfg.boardIdA, boardNameA: cfg.boardNameA,
+        boardIdB: cfg.boardIdB, boardNameB: cfg.boardNameB,
+      }), 400);
+    }
     // Request the board's saved animation library
     setTimeout(requestBoardLib, 1500);
   });
@@ -1413,7 +1423,6 @@ function renderGroupPanels() {
 function renderAll() {
   rebuildGroupData();
   renderStrip();
-  renderDividerBar();
   renderPaletteBar();
   renderGroupPanels();
 }
@@ -1504,7 +1513,9 @@ document.getElementById("btn-add-network").addEventListener("click", () => {
   publish({ add_network: { ssid, password } });
   document.getElementById("new-ssid").value     = "";
   document.getElementById("new-password").value = "";
-  showToast(`✓ "${ssid}" sent to both boards`);
+  showToast(client && client.connected
+    ? `✓ "${ssid}" sent to boards`
+    : `"${ssid}" not sent — not connected`);
 });
 
 document.getElementById("btn-reconnect").addEventListener("click", () => {
@@ -1526,11 +1537,7 @@ document.getElementById("btn-reconnect").addEventListener("click", () => {
   localStorage.setItem("ll_name_b", cfg.boardNameB);
   initGroups(cfg.numGroups);
   updatePills();
-  publishRetained(topicScenes, {
-    scenes: loadScenes(),
-    boardIdA: cfg.boardIdA, boardNameA: cfg.boardNameA,
-    boardIdB: cfg.boardIdB, boardNameB: cfg.boardNameB,
-  });
+  _syncAfterConnect = true;  // push scenes metadata once the new connection is live
   renderAll(); connect();
 });
 
@@ -1830,12 +1837,14 @@ function renderBoardLib() {
       <button class="board-lib-play">Play</button>
       <button class="board-lib-del">✕</button>`;
     row.querySelector(".board-lib-play").addEventListener("click", e => {
+      if (!client || !client.connected) { showToast("Not connected to boards"); return; }
       publish({ play_anim: name });
       const btn = e.currentTarget;
       const orig = btn.textContent;
       btn.textContent = "✓"; setTimeout(() => { btn.textContent = orig; }, 900);
     });
     row.querySelector(".board-lib-del").addEventListener("click", () => {
+      if (!client || !client.connected) { showToast("Not connected — can't delete from board"); return; }
       if (!confirm(`Delete "${name}" from board?`)) return;
       publish({ delete_anim: name });
       delete boardLib[name]; renderBoardLib();
