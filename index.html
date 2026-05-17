@@ -345,6 +345,28 @@
       transition: color 0.15s, border-color 0.15s;
     }
     .scene-del:hover { color: var(--red); border-color: rgba(224,72,72,0.3); }
+    .board-lib-row {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.45rem 0.6rem; border-radius: var(--r-xs);
+      border: 1px solid var(--border); background: var(--surface2);
+      transition: border-color 0.15s;
+    }
+    .board-lib-row:hover { border-color: var(--border2); }
+    .board-lib-name { flex: 1; font-size: 0.8rem; color: var(--text2); }
+    .board-lib-play {
+      padding: 0.28rem 0.65rem; font-size: 0.72rem; font-weight: 600;
+      border-radius: var(--r-xs); border: 1px solid rgba(240,160,48,0.35);
+      background: rgba(240,160,48,0.08); color: var(--accent); cursor: pointer;
+      font-family: inherit; transition: background 0.15s;
+    }
+    .board-lib-play:hover { background: rgba(240,160,48,0.18); }
+    .board-lib-del {
+      padding: 0.28rem 0.45rem; font-size: 0.72rem; border-radius: var(--r-xs);
+      border: 1px solid transparent; background: transparent; color: var(--muted);
+      cursor: pointer; font-family: inherit; transition: color 0.15s, border-color 0.15s;
+    }
+    .board-lib-del:hover { color: var(--red); border-color: rgba(224,72,72,0.3); }
+    .board-lib-empty { font-size:0.78rem; color:var(--muted); padding:0.3rem 0; }
     .save-row { display: flex; gap: 0.5rem; }
     .save-row input {
       flex: 1; background: rgba(0,0,0,0.25); border: 1px solid var(--border);
@@ -615,9 +637,19 @@
   </div>
 </div>
 
+<!-- Board animation library -->
+<div class="card">
+  <div class="card-title">Board Library <span id="board-lib-hint" style="font-size:0.6rem;color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none;margin-left:0.4rem">— animations stored on the lights, played with one short message</span></div>
+  <div id="board-lib-list" style="display:flex;flex-direction:column;gap:0.4rem"></div>
+  <div class="save-row" style="margin-top:0.5rem">
+    <input id="board-lib-name" placeholder="Save current scene to board…" maxlength="28">
+    <button id="btn-save-board-lib">Save to Board</button>
+  </div>
+</div>
+
 <!-- Sunrise -->
 <div class="card">
-  <div class="card-title">Sunrise Alarm</div>
+  <div class="card-title">Alarms</div>
   <div id="alarms-list"></div>
   <button class="add-alarm-btn" id="btn-add-alarm">+ Add Alarm</button>
 </div>
@@ -771,10 +803,11 @@ const BOARD_ID     = "web_app";
 const boardLastSeen   = {};
 const boardLastChange = {};
 const BOARD_TIMEOUT_MS = 90_000;
-let animMode  = "";
-let animSpeed = 3.0;
-let alarms    = [];
-let sendTarget = "both";  // "both" | cfg.boardIdA | cfg.boardIdB
+let animMode    = "";
+let animSpeed   = 3.0;
+let alarms      = [];
+let sendTarget  = "both";  // "both" | cfg.boardIdA | cfg.boardIdB
+let boardLib    = {};      // animations stored on board: {name: entry}
 
 // Board pill "last known state" description
 function boardStateDesc(d) {
@@ -862,6 +895,8 @@ function connect() {
     client.subscribe(topicAlarms());
     // Push current UI state to boards immediately on (re)connect so they stay in sync
     setTimeout(publishState, 800);
+    // Request the board's saved animation library
+    setTimeout(requestBoardLib, 1500);
   });
   client.on("message", (t, msg) => {
     const topicStr = t.toString();
@@ -889,6 +924,7 @@ function connect() {
         boardLastChange[d.from] = boardStateDesc(d);
         updatePills();
       }
+      if (d.anim_library) { boardLib = d.anim_library; renderBoardLib(); }
       if (d.from === BOARD_ID) return;
       if (d.on         !== undefined) { powered = d.on;              updatePowerBtn(); }
       if (d.brightness !== undefined) { brightness = d.brightness;   syncBrightnessSlider(); }
@@ -1774,10 +1810,65 @@ document.getElementById("btn-save-scene").addEventListener("click", () => {
   renderScenes();
 });
 
+// ── Board animation library ───────────────────────────────────
+function renderBoardLib() {
+  const container = document.getElementById("board-lib-list");
+  container.innerHTML = "";
+  const names = Object.keys(boardLib).sort();
+  if (!names.length) {
+    container.innerHTML = `<div class="board-lib-empty">No animations saved to board yet.</div>`;
+    return;
+  }
+  names.forEach(name => {
+    const row = document.createElement("div");
+    row.className = "board-lib-row";
+    row.innerHTML = `
+      <span class="board-lib-name">▶ ${name}</span>
+      <button class="board-lib-play">Play</button>
+      <button class="board-lib-del">✕</button>`;
+    row.querySelector(".board-lib-play").addEventListener("click", e => {
+      publish({ play_anim: name });
+      const btn = e.currentTarget;
+      const orig = btn.textContent;
+      btn.textContent = "✓"; setTimeout(() => { btn.textContent = orig; }, 900);
+    });
+    row.querySelector(".board-lib-del").addEventListener("click", () => {
+      if (!confirm(`Delete "${name}" from board?`)) return;
+      publish({ delete_anim: name });
+      delete boardLib[name]; renderBoardLib();
+    });
+    container.appendChild(row);
+  });
+}
+
+document.getElementById("btn-save-board-lib").addEventListener("click", () => {
+  const name = document.getElementById("board-lib-name").value.trim()
+    || "Anim " + (Object.keys(boardLib).length + 1);
+  const entry = {
+    name,
+    groups:      getGroups(),
+    anim_mode:   animMode || null,
+    anim_speed:  animSpeed,
+    brightness,
+    fade_steps:  fadeSteps,
+    on:          powered,
+  };
+  if (animMode === "custom") entry.anim_params = getCustomParams();
+  publish({ save_anim: entry });
+  boardLib[name] = entry;
+  renderBoardLib();
+  document.getElementById("board-lib-name").value = "";
+  showToast(`✓ "${name}" saved to board`);
+});
+
+// Request the board's current library when we connect
+function requestBoardLib() { publish({ list_anims: true }); }
+
 // ── Init ──────────────────────────────────────────────────────
 initGroups(cfg.numGroups);
 renderAll();
 renderScenes();
+renderBoardLib();
 renderAlarms();
 syncAnimButtons();
 syncAnimSlider();
