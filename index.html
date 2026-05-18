@@ -1729,13 +1729,15 @@ function _sceneSwatches(item) {
 
 
 function captureScene(name) {
-  return {
+  const scene = {
     name,
     groups: getGroups(), boundaries: Array.from(boundaries),
     groupPositions: [...groupPositions], groupWLevels: [...groupWLevels],
     brightness, fadeSteps, driftEnabled, driftInterval,
     on: powered, anim_mode: animMode || null, anim_speed: animSpeed,
   };
+  if (animMode === "custom") scene.anim_params = getCustomParams();
+  return scene;
 }
 
 
