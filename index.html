@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#060608">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Linked Lights">
   <title>Linked Lights</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
@@ -323,8 +327,7 @@
       color: var(--muted); font-family: inherit; font-size: 0.73rem; cursor: pointer;
       transition: all 0.18s; position: relative;
     }
-    .pattern-btn:hover { border-color: var(--border2); color: var(--text2); background: rgba(255,255,255,0.03); }
-    .pattern-btn:hover { border-color: var(--border2); color: var(--text2); }
+    .pattern-btn:hover { border-color: var(--border2); color: var(--text2); background: rgba(255,255,255,0.04); }
     .pattern-btn.active { background: rgba(240,160,48,0.1); border-color: rgba(240,160,48,0.4); color: var(--accent); }
     .hue-range-wrap { position: relative; height: 38px; }
     .hue-range-track {
@@ -340,9 +343,9 @@
       position: absolute; top: 50%; width: 24px; height: 24px;
       border-radius: 50%; transform: translate(-50%, -50%);
       border: 2px solid rgba(255,255,255,0.9); box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-      cursor: grab; z-index: 2; transition: all 0.12s;
+      cursor: grab; z-index: 2; transition: box-shadow 0.12s;
     }
-    .hue-handle:hover { transform: translate(-50%, -65%) scale(1.2); box-shadow: 0 4px 12px rgba(0,0,0,0.6), 0 0 10px rgba(255,255,255,0.2); }
+    .hue-handle:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.6); }
     .hue-handle:active { cursor: grabbing; z-index: 3; }
 
     /* ── Library (presets + scenes) ── */
@@ -361,9 +364,9 @@
       padding: 0.6rem 0.75rem;
       background: rgba(0,0,0,0.18); border: 1px solid var(--border);
       border-radius: var(--r-xs);
-      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); cursor: default;
+      transition: border-color 0.15s, background 0.15s; cursor: default;
     }
-    .scene-row:hover { border-color: var(--border2); background: var(--surface2); transform: translateX(3px); }
+    .scene-row:hover { border-color: var(--border2); background: var(--surface2); }
     .scene-swatches { display: flex; gap: 3px; flex-shrink: 0; }
     .scene-dot { width: 11px; height: 11px; border-radius: 50%; }
     .scene-anim-badge {
@@ -385,21 +388,20 @@
     .scene-load:hover { border-color: var(--border2); color: var(--text); background: rgba(255,255,255,0.04); transform: translateY(-1px); }
     .scene-load:active { transform: translateY(0); }
     .scene-del {
-      padding: 0.32rem 0.5rem; font-size: 0.72rem;
+      padding: 0.38rem 0.6rem; font-size: 0.72rem;
       border-radius: var(--r-xs); border: 1px solid transparent;
       background: transparent; color: var(--muted); cursor: pointer;
-      flex-shrink: 0; font-family: inherit;
-      transition: all 0.15s;
+      flex-shrink: 0; font-family: inherit; min-width: 32px;
+      transition: color 0.12s, border-color 0.12s, background 0.12s;
     }
-    .scene-del:hover { color: var(--red); border-color: rgba(224,72,72,0.3); background: rgba(224,72,72,0.05); transform: translateY(-1px); }
-    .scene-del:active { transform: translateY(0); }
+    .scene-del:hover { color: var(--red); border-color: rgba(224,72,72,0.3); background: rgba(224,72,72,0.05); }
     .board-lib-row {
       display: flex; align-items: center; gap: 0.5rem;
       padding: 0.45rem 0.6rem; border-radius: var(--r-xs);
       border: 1px solid var(--border); background: var(--surface2);
-      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: border-color 0.15s, background 0.15s;
     }
-    .board-lib-row:hover { border-color: var(--border2); background: var(--surface3); transform: translateX(3px); }
+    .board-lib-row:hover { border-color: var(--border2); background: var(--surface3); }
     .board-lib-name { flex: 1; font-size: 0.8rem; color: var(--text2); }
     .board-lib-play {
       padding: 0.28rem 0.65rem; font-size: 0.72rem; font-weight: 600;
@@ -438,7 +440,7 @@
       font-family: inherit; cursor: pointer; font-weight: 500;
       transition: all 0.15s;
     }
-    .save-row button:hover { border-color: var(--border2); color: var(--text); background: var(--surface3); transform: translateY(-1px); }
+    .save-row button:hover { border-color: var(--border2); color: var(--text); background: var(--surface3); }
     .no-scenes { font-size: 0.72rem; color: var(--muted); text-align: center; padding: 0.85rem 0; }
 
     /* ── Sunrise alarms ── */
@@ -961,6 +963,7 @@ function groupCount() { return boundaries.size + 1; }
 // ── MQTT ──────────────────────────────────────────────────────
 let client = null;
 let _syncAfterConnect = false;
+let _wasConnected = false;
 
 function topic()       { return cfg.prefix + "/events"; }
 function topicScenes() { return cfg.prefix + "/scenes"; }
@@ -981,6 +984,7 @@ function connect() {
   setStatus("connecting", "connecting…");
   client = mqtt.connect(cfg.broker, { clientId: "webui_"+Math.random().toString(16).slice(2), clean: true });
   client.on("connect", () => {
+    _wasConnected = true;
     setStatus("connected", cfg.broker.replace(/^wss?:\/\//,"").replace(/\/mqtt$/,""));
     client.subscribe(topic());
     client.subscribe(topicScenes());
@@ -1053,9 +1057,12 @@ function connect() {
       }
     } catch(e) {}
   });
-  client.on("error",     () => setStatus("disconnected", "error"));
-  client.on("close",     () => setStatus("disconnected", "disconnected"));
-  client.on("reconnect", () => setStatus("connecting",   "reconnecting…"));
+  client.on("error",     () => { setStatus("disconnected", "error"); });
+  client.on("close",     () => {
+    if (_wasConnected) { showToast("Connection lost — reconnecting…"); _wasConnected = false; }
+    setStatus("disconnected", "disconnected");
+  });
+  client.on("reconnect", () => setStatus("connecting", "reconnecting…"));
 }
 
 // ── Debounce helper ───────────────────────────────────────────
@@ -1363,7 +1370,7 @@ document.getElementById("btn-apply-custom").addEventListener("click", () => {
   publish({ anim_mode: "custom", anim_speed: animSpeed, anim_params: getCustomParams() });
 });
 
-document.getElementById("btn-save-custom").addEventListener("click", () => {
+function doSaveCustom() {
   const name = document.getElementById("custom-anim-name").value.trim()
     || `Custom ${loadScenes().length + 1}`;
   const scenes = loadScenes();
@@ -1377,7 +1384,9 @@ document.getElementById("btn-save-custom").addEventListener("click", () => {
   saveScenes(scenes);
   renderScenes();
   document.getElementById("custom-anim-name").value = "";
-});
+}
+document.getElementById("btn-save-custom").addEventListener("click", doSaveCustom);
+document.getElementById("custom-anim-name").addEventListener("keydown", e => { if (e.key === "Enter") doSaveCustom(); });
 
 function syncDriftIntervalSlider() {
   document.getElementById("sl-drift-interval").value = driftInterval;
@@ -1591,7 +1600,9 @@ document.getElementById("btn-tap").addEventListener("click", () => {
   let isHeld = false;
 
   function togglePower() {
-    powered = !powered; updatePowerBtn(); publishState();
+    powered = !powered;
+    if (navigator.vibrate) navigator.vibrate(20);
+    updatePowerBtn(); publishState();
   }
 
   btn.addEventListener("mousedown", () => {
@@ -1976,14 +1987,16 @@ function renderScenes() {
   });
 }
 
-document.getElementById("btn-save-scene").addEventListener("click", () => {
+function doSaveScene() {
   const name = document.getElementById("scene-name").value.trim() || "Scene " + (loadScenes().length + 1);
   const scenes = loadScenes();
   scenes.push(captureScene(name));
   saveScenes(scenes);
   document.getElementById("scene-name").value = "";
   renderScenes();
-});
+}
+document.getElementById("btn-save-scene").addEventListener("click", doSaveScene);
+document.getElementById("scene-name").addEventListener("keydown", e => { if (e.key === "Enter") doSaveScene(); });
 
 // ── Board animation library ───────────────────────────────────
 function renderBoardLib() {
@@ -2018,7 +2031,7 @@ function renderBoardLib() {
   });
 }
 
-document.getElementById("btn-save-board-lib").addEventListener("click", () => {
+function doSaveBoardLib() {
   const name = document.getElementById("board-lib-name").value.trim()
     || "Anim " + (Object.keys(boardLib).length + 1);
   const entry = {
@@ -2038,7 +2051,9 @@ document.getElementById("btn-save-board-lib").addEventListener("click", () => {
   showToast(client && client.connected
     ? `✓ "${name}" saved to board`
     : `"${name}" saved locally — connect to send to boards`);
-});
+}
+document.getElementById("btn-save-board-lib").addEventListener("click", doSaveBoardLib);
+document.getElementById("board-lib-name").addEventListener("keydown", e => { if (e.key === "Enter") doSaveBoardLib(); });
 
 // Request the board's current library when we connect
 function requestBoardLib() { publish({ list_anims: true }); }
