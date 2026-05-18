@@ -62,15 +62,30 @@
     @keyframes gentle-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
     @keyframes smooth-glow { 0%, 100% { box-shadow: 0 0 0 rgba(62,196,109,0); } 50% { box-shadow: 0 0 12px rgba(62,196,109,0.4); } }
 
+    @media (max-width: 800px) {
+      * { animation-duration: 2.5s !important; }
+      #dot.connected { animation: none; box-shadow: none; }
+      .board-pill.online .pill-dot { animation: none; box-shadow: none; }
+    }
+    @media (max-width: 640px) {
+      .led:hover { transform: scale(1.05); box-shadow: 0 1px 8px rgba(0,0,0,0.5); }
+      .anim-tile:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+      .power-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+      .tap-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 12px rgba(232,104,32,0.25); }
+      .ctrl-pill:hover { transform: none; }
+      .g-handle:hover { transform: translate(-50%, -50%) scale(1.1); box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+      .board-pill:hover { transform: none; }
+    }
+
     /* Board presence pills */
     #board-pills { display: flex; gap: 0.4rem; }
     .board-pill {
       display: flex; align-items: center; gap: 0.45rem;
       background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--r-sm); padding: 0.35rem 0.7rem;
-      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: background 0.2s, border-color 0.2s;
     }
-    .board-pill:hover { transform: translateY(-1px); }
+    .board-pill:hover { background: var(--surface2); }
     .board-pill .pill-dot {
       width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
       background: var(--muted); transition: background 0.5s, box-shadow 0.5s;
@@ -109,19 +124,20 @@
     #dividers-row::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
     .led {
       height: 50px; border-radius: 5px;
-      transition: background 0.5s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: background 0.5s ease, box-shadow 0.15s ease;
       cursor: pointer; position: relative;
     }
-    .led:hover { transform: scale(1.12); box-shadow: 0 3px 16px rgba(0,0,0,0.7); }
+    .led:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
     .led.boundary { box-shadow: inset -2px 0 0 rgba(255,255,255,0.12); }
     .led.boundary:hover { box-shadow: inset -2px 0 0 rgba(255,255,255,0.12), 0 2px 12px rgba(0,0,0,0.6); }
     .div-cell {
       height: 18px; border-radius: 4px; background: transparent; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       font-size: 0.5rem; color: transparent;
-      transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); border: 1px solid transparent;
+      transition: background 0.15s ease, border-color 0.15s ease;
+      border: 1px solid transparent;
     }
-    .div-cell:hover { background: rgba(255,255,255,0.05); border-color: var(--border2); transform: scaleY(1.35); }
+    .div-cell:hover { background: rgba(255,255,255,0.05); border-color: var(--border2); }
     .div-cell.split { background: rgba(240,160,48,0.1); border-color: rgba(240,160,48,0.4); color: var(--accent); }
     .div-cell.split:hover { background: rgba(240,160,48,0.2); box-shadow: 0 0 8px rgba(240,160,48,0.3); }
 
@@ -138,9 +154,9 @@
       border: 1px solid var(--border); border-radius: var(--r-sm);
       background: var(--surface2); color: var(--text2);
       font-family: inherit; cursor: pointer;
-      transition: all 0.2s; position: relative;
+      transition: box-shadow 0.15s, background 0.15s; position: relative;
     }
-    .power-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .power-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
     .power-btn.held { transform: scale(0.95); box-shadow: inset 0 2px 8px rgba(0,0,0,0.4); }
     .power-btn .power-ring {
       width: 36px; height: 36px; border-radius: 50%;
@@ -166,12 +182,13 @@
       border: none; border-radius: var(--r-sm);
       background: linear-gradient(135deg, var(--accent2), var(--accent));
       color: rgba(0,0,0,0.85); font-family: inherit; cursor: pointer;
-      transition: filter 0.15s, transform 0.1s; position: relative; overflow: hidden;
+      transition: filter 0.1s, box-shadow 0.1s;
+      position: relative; overflow: hidden;
     }
     .tap-btn .tap-icon { font-size: 1.4rem; line-height: 1; }
     .tap-btn .tap-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; }
-    .tap-btn:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(232,104,32,0.4); }
-    .tap-btn:active { transform: scale(0.96); }
+    .tap-btn:hover { filter: brightness(1.05); box-shadow: 0 2px 12px rgba(232,104,32,0.3); }
+    .tap-btn:active { opacity: 0.9; }
     .tap-btn::after {
       content: ""; position: absolute; inset: 0;
       background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.25) 0%, transparent 60%);
@@ -188,9 +205,9 @@
       border: 1px solid var(--border); border-radius: var(--r-sm);
       background: transparent; color: var(--text2);
       font-family: inherit; font-size: 0.78rem; font-weight: 500; cursor: pointer;
-      transition: all 0.18s;
+      transition: border-color 0.12s, color 0.12s, background 0.12s;
     }
-    .ctrl-pill:hover { border-color: var(--border2); color: var(--text); background: var(--surface2); transform: translateY(-1px); }
+    .ctrl-pill:hover { border-color: var(--border2); color: var(--text); background: var(--surface2); }
     .ctrl-pill .pill-icon { font-size: 0.9rem; }
     .ctrl-pill.active { background: rgba(240,160,48,0.1); border-color: rgba(240,160,48,0.4); color: var(--accent); }
     .ctrl-pill:disabled { opacity: 0.25; pointer-events: none; }
@@ -211,12 +228,11 @@
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none; width: 20px; height: 20px;
       border-radius: 50%; background: #fff;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.5);
-      cursor: pointer; transition: transform 0.1s, box-shadow 0.15s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      cursor: pointer; transition: box-shadow 0.1s;
     }
     input[type=range]::-webkit-slider-thumb:active {
-      transform: scale(1.25);
-      box-shadow: 0 2px 12px rgba(240,160,48,0.5), 0 0 0 3px rgba(240,160,48,0.15);
+      box-shadow: 0 1px 8px rgba(240,160,48,0.4);
     }
 
     /* ── Palette bar ── */
@@ -232,13 +248,14 @@
       position: absolute; top: 50%; width: 30px; height: 30px;
       border-radius: 50%; transform: translate(-50%, -50%);
       border: 2.5px solid rgba(255,255,255,0.85);
-      box-shadow: 0 3px 12px rgba(0,0,0,0.65);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
       cursor: grab; display: flex; align-items: center; justify-content: center;
       font-size: 0.58rem; font-weight: 700; color: rgba(0,0,0,0.6);
-      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); z-index: 2;
+      transition: box-shadow 0.15s, border-color 0.15s;
+      z-index: 2;
     }
-    .g-handle:hover { transform: translate(-50%, -62%) scale(1.2); box-shadow: 0 8px 22px rgba(0,0,0,0.8), 0 0 16px rgba(255,255,255,0.4); }
-    .g-handle:active { cursor: grabbing; z-index: 3; transform: translate(-50%, -50%) scale(1.2); }
+    .g-handle:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.6); }
+    .g-handle:active { cursor: grabbing; z-index: 3; }
 
     /* ── Group panels ── */
     #group-panels { display: flex; flex-direction: column; gap: 0.4rem; }
@@ -246,14 +263,15 @@
       background: rgba(0,0,0,0.18); border: 1px solid var(--border);
       border-radius: var(--r-sm); padding: 0.6rem 0.85rem;
       display: flex; align-items: center; gap: 0.75rem;
-      transition: all 0.18s;
+      transition: border-color 0.15s, background 0.15s;
     }
     .group-panel:hover { border-color: var(--border2); background: rgba(0,0,0,0.24); }
     .g-swatch {
       width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
-      transition: all 0.5s ease; border: 1px solid rgba(255,255,255,0.07);
+      transition: box-shadow 0.2s ease;
+      border: 1px solid rgba(255,255,255,0.07);
     }
-    .group-panel:hover .g-swatch { transform: scale(1.15); }
+    .group-panel:hover .g-swatch { box-shadow: 0 0 8px rgba(255,255,255,0.1); }
     .g-title { font-size: 0.73rem; font-weight: 600; color: var(--text); }
     .g-sub   { font-size: 0.6rem; color: var(--muted); }
 
@@ -270,9 +288,9 @@
       border: 1px solid var(--border); border-radius: var(--r-sm);
       background: transparent; color: var(--muted);
       font-family: inherit; cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
     }
-    .anim-tile:hover { border-color: var(--border2); color: var(--text2); background: var(--surface2); transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
+    .anim-tile:hover { border-color: var(--border2); color: var(--text2); background: var(--surface2); box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
     .anim-tile .tile-icon { font-size: 1.2rem; line-height: 1; }
     .anim-tile .tile-name { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.03em; }
     .anim-tile.active {
@@ -288,7 +306,8 @@
       width: 100%; background: transparent; border: 1px dashed var(--border);
       border-radius: var(--r-sm); color: var(--muted); font-family: inherit; font-size: 0.74rem;
       padding: 0.6rem; cursor: pointer; margin-top: 0.65rem;
-      transition: all 0.2s; text-align: center; letter-spacing: 0.04em;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      text-align: center; letter-spacing: 0.04em;
     }
     #custom-anim-toggle:hover { border-color: var(--accent); color: var(--accent); background: rgba(240,160,48,0.04); }
     #custom-anim-panel {
@@ -1139,8 +1158,9 @@ let _webPhase    = 0;
 let _webLastTs   = null;
 let _animFrameId = null;
 let _ledCache    = null;   // cached NodeList, cleared on renderStrip
-const _FRAME_MS  = 33;     // ~30 fps cap
-const _CANDLE_MS = 100;    // candle updates at 10 fps
+const _isMobile = window.matchMedia("(max-width: 640px)").matches;
+let _FRAME_MS  = _isMobile ? 50 : 33;     // mobile: ~20 fps, desktop: ~30 fps
+const _CANDLE_MS = _isMobile ? 150 : 100; // mobile: ~6.6 fps, desktop: ~10 fps
 let _candleLastTs = 0;
 
 function _invalidateLedCache() { _ledCache = null; }
