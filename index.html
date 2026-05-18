@@ -517,6 +517,40 @@
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+    /* ── Mobile responsiveness ── */
+    @media (max-width: 640px) {
+      body { padding: 1rem 0.7rem 4rem; gap: 0.5rem; }
+      .card { max-width: 100%; padding: 0.8rem; }
+      h1 { font-size: 0.85rem; }
+      .anim-grid { grid-template-columns: repeat(4, 1fr); gap: 0.35rem; }
+      .scene-grid { max-height: 250px; }
+      .ctrl-top, .ctrl-secondary { gap: 0.4rem; }
+      .power-btn, .tap-btn { padding: 0.9rem 0.4rem; }
+      .led { height: 40px; }
+      #leds-row { max-height: 50px; gap: 2px; }
+      .led:hover { transform: scale(1.08); }
+      .div-cell { height: 16px; }
+      #dividers-row { max-height: 20px; }
+      .sl-label { width: 70px; font-size: 0.65rem; }
+      .scene-row, .board-lib-row { padding: 0.5rem; }
+      .g-handle { width: 26px; height: 26px; border: 2px solid rgba(255,255,255,0.85); }
+      .hue-handle { width: 20px; height: 20px; border: 1.5px solid rgba(255,255,255,0.9); }
+      .anim-tile { padding: 0.6rem 0.2rem; gap: 0.2rem; }
+      .anim-tile .tile-icon { font-size: 1rem; }
+      .alarm-card { padding: 0.7rem 0.75rem; }
+      .day-btn { width: 28px; height: 28px; }
+    }
+    @media (max-width: 480px) {
+      body { padding: 0.8rem 0.6rem 3.5rem; }
+      .card { padding: 0.6rem; margin-bottom: 0.5rem; }
+      h1 { font-size: 0.75rem; }
+      .anim-grid { grid-template-columns: repeat(3, 1fr); }
+      .scene-grid { max-height: 200px; }
+      .led { height: 35px; }
+      .scene-row { padding: 0.4rem; gap: 0.3rem; }
+      .scene-load, .scene-del { font-size: 0.65rem; padding: 0.25rem 0.5rem; }
+    }
   </style>
 </head>
 <body>
