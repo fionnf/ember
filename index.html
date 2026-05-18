@@ -1038,6 +1038,7 @@ function connect() {
         customHueStart = d.anim_params.hue_start ?? 0.0;
         customHueEnd   = d.anim_params.hue_end   ?? 1.0;
         customSync     = d.anim_params.sync      ?? false;
+        syncCustomAnimUI();
       }
       if (d.groups) {
         groupPositions = d.groups.map(x => x.pos);
@@ -1247,6 +1248,11 @@ function stopAnimLoop() {
   if (_animFrameId !== null) { cancelAnimationFrame(_animFrameId); _animFrameId = null; _webLastTs = null; }
 }
 
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { stopAnimLoop(); }
+  else if (animMode) { startAnimLoop(); }
+});
+
 // ── Custom animation builder ──────────────────────────────────
 let customPattern  = "sweep";
 let customHueStart = 0.0;
@@ -1279,6 +1285,15 @@ document.getElementById("btn-sync-groups").addEventListener("click", () => {
   btn.classList.toggle("active", customSync);
 });
 
+function syncCustomAnimUI() {
+  document.querySelectorAll(".pattern-btn[data-pattern]").forEach(b =>
+    b.classList.toggle("active", b.dataset.pattern === customPattern));
+  const syncBtn = document.getElementById("btn-sync-groups");
+  syncBtn.textContent = customSync ? "In Sync" : "Offset";
+  syncBtn.classList.toggle("active", customSync);
+  if (window._syncHueHandles) window._syncHueHandles();
+}
+
 (function initHueRange() {
   const track = document.getElementById("hue-range-track");
   const fill  = document.getElementById("hue-range-fill");
@@ -1292,6 +1307,16 @@ document.getElementById("btn-sync-groups").addEventListener("click", () => {
     fill.style.left  = `calc(10px + ${lo} * (100% - 20px))`;
     fill.style.width = `calc(${hi - lo} * (100% - 20px))`;
   }
+
+  window._syncHueHandles = function() {
+    const [r0,g0,b0] = paletteRGB(customHueStart);
+    const [r1,g1,b1] = paletteRGB(customHueEnd);
+    hS.style.background = `rgb(${r0},${g0},${b0})`;
+    hE.style.background = `rgb(${r1},${g1},${b1})`;
+    hS.style.left = `calc(10px + ${customHueStart} * (100% - 20px))`;
+    hE.style.left = `calc(10px + ${customHueEnd}   * (100% - 20px))`;
+    updateFill();
+  };
   function posFromEvent(e) {
     const rect = track.getBoundingClientRect();
     return Math.max(0, Math.min(1, ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width));
@@ -1378,7 +1403,8 @@ function randomPartition(total, n, mn, mx) {
 
 function randomise() {
   const n = groupCount();
-  const sizes = randomPartition(cfg.numLeds, n, 1, 8);
+  const maxSize = Math.max(8, Math.ceil(cfg.numLeds / n) + 4);
+  const sizes = randomPartition(cfg.numLeds, n, 1, maxSize);
   boundaries.clear();
   let cursor = 0;
   sizes.slice(0,-1).forEach(s => { cursor += s; boundaries.add(cursor); });
@@ -1682,6 +1708,7 @@ document.getElementById("btn-reboot").addEventListener("click", () => {
 
 // ── Alarms ────────────────────────────────────────────────────
 const DAY_LABELS = ["Mo","Tu","We","Th","Fr","Sa","Su"];
+const _publishAlarmsDebounced = debounce(publishAlarms, 250);
 
 function defaultAlarm() {
   return { enabled: true, type: "sunrise", hour: 7, minute: 0, duration_min: 30, brightness: 1.0, days: [0,1,2,3,4], boards: [cfg.boardIdA, cfg.boardIdB] };
@@ -1784,7 +1811,7 @@ function renderAlarms() {
           alarms[idx].brightness = val / 100;
           sl.closest(".sl-row").querySelector(".br-val").textContent = val + "%";
         }
-        publishAlarms();
+        _publishAlarmsDebounced();
       });
     });
     container.appendChild(el);
@@ -1878,11 +1905,12 @@ function captureScene(name) {
 function _applySceneOrBuiltin(item, btn) {
   try {
     if (item._staticRainbow) {
-      const n = cfg.numLeds;
+      const maxGroups = Math.min(cfg.numLeds, 12);
+      const step = Math.floor(cfg.numLeds / maxGroups);
       boundaries.clear();
-      for (let i = 1; i < n; i++) boundaries.add(i);
-      groupPositions = Array.from({length: n}, (_, i) => i / n);
-      groupWLevels   = Array.from({length: n}, () => 0);
+      for (let i = 1; i < maxGroups; i++) boundaries.add(i * step);
+      groupPositions = Array.from({length: maxGroups}, (_, i) => i / maxGroups);
+      groupWLevels   = Array.from({length: maxGroups}, () => 0);
     } else if (item._reset3Groups) {
       // Reset to 3 evenly-spaced groups matching the board's default NUM_GROUPS
       boundaries.clear();
@@ -1906,6 +1934,7 @@ function _applySceneOrBuiltin(item, btn) {
       customHueStart = item.anim_params.hue_start ?? 0.0;
       customHueEnd   = item.anim_params.hue_end   ?? 1.0;
       customSync     = item.anim_params.sync      ?? false;
+      syncCustomAnimUI();
     }
     syncBrightnessSlider(); syncFadeSlider(); syncDriftIntervalSlider();
     syncAnimButtons(); syncAnimSlider(); updatePowerBtn(); updateDriftBtn();
