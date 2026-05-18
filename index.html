@@ -776,7 +776,7 @@
     <input id="cfg-prefix" value="picolight_lf26">
   </div>
   <div class="cfg-row">
-    <div class="cfg-field"><label>LEDs</label><input id="cfg-leds"   type="number" min="1" max="144" value="10"></div>
+    <div class="cfg-field"><label>LEDs</label><input id="cfg-leds"   type="number" min="1" max="10" value="10"></div>
     <div class="cfg-field"><label>Groups</label><input id="cfg-groups" type="number" min="1" max="10"  value="3"></div>
   </div>
   <div class="card-title" style="margin-top:0.5rem">Board Names</div>
@@ -805,7 +805,7 @@
 let cfg = {
   broker:    localStorage.getItem("ll_broker")    || "wss://broker.hivemq.com:8884/mqtt",
   prefix:    localStorage.getItem("ll_prefix")    || "picolight_lf26",
-  numLeds:   parseInt(localStorage.getItem("ll_leds")   || "10"),
+  numLeds:   Math.min(10, parseInt(localStorage.getItem("ll_leds")   || "10")),
   numGroups: parseInt(localStorage.getItem("ll_groups") || "3"),
   boardIdA:  localStorage.getItem("ll_id_a")   || "board_a",
   boardNameA:localStorage.getItem("ll_name_a") || "FF",
@@ -1681,7 +1681,7 @@ document.getElementById("btn-add-network").addEventListener("click", () => {
 document.getElementById("btn-reconnect").addEventListener("click", () => {
   cfg.broker     = document.getElementById("cfg-broker").value.trim();
   cfg.prefix     = document.getElementById("cfg-prefix").value.trim();
-  cfg.numLeds    = parseInt(document.getElementById("cfg-leds").value);
+  cfg.numLeds    = Math.min(10, parseInt(document.getElementById("cfg-leds").value));
   cfg.numGroups  = parseInt(document.getElementById("cfg-groups").value);
   cfg.boardIdA   = document.getElementById("cfg-id-a").value.trim()   || "board_a";
   cfg.boardNameA = document.getElementById("cfg-name-a").value.trim() || "A";
