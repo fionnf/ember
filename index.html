@@ -134,8 +134,9 @@
       border: 1px solid var(--border); border-radius: var(--r-sm);
       background: var(--surface2); color: var(--text2);
       font-family: inherit; cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.2s; position: relative;
     }
+    .power-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
     .power-btn .power-ring {
       width: 36px; height: 36px; border-radius: 50%;
       border: 2.5px solid var(--muted);
@@ -164,7 +165,7 @@
     }
     .tap-btn .tap-icon { font-size: 1.4rem; line-height: 1; }
     .tap-btn .tap-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; }
-    .tap-btn:hover { filter: brightness(1.08); }
+    .tap-btn:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(232,104,32,0.4); }
     .tap-btn:active { transform: scale(0.96); }
     .tap-btn::after {
       content: ""; position: absolute; inset: 0;
@@ -184,7 +185,7 @@
       font-family: inherit; font-size: 0.78rem; font-weight: 500; cursor: pointer;
       transition: all 0.18s;
     }
-    .ctrl-pill:hover { border-color: var(--border2); color: var(--text); background: var(--surface2); }
+    .ctrl-pill:hover { border-color: var(--border2); color: var(--text); background: var(--surface2); transform: translateY(-1px); }
     .ctrl-pill .pill-icon { font-size: 0.9rem; }
     .ctrl-pill.active { background: rgba(240,160,48,0.1); border-color: rgba(240,160,48,0.4); color: var(--accent); }
     .ctrl-pill:disabled { opacity: 0.25; pointer-events: none; }
@@ -240,11 +241,14 @@
       background: rgba(0,0,0,0.18); border: 1px solid var(--border);
       border-radius: var(--r-sm); padding: 0.6rem 0.85rem;
       display: flex; align-items: center; gap: 0.75rem;
+      transition: all 0.18s;
     }
+    .group-panel:hover { border-color: var(--border2); background: rgba(0,0,0,0.24); }
     .g-swatch {
       width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
-      transition: background 0.5s ease; border: 1px solid rgba(255,255,255,0.07);
+      transition: all 0.5s ease; border: 1px solid rgba(255,255,255,0.07);
     }
+    .group-panel:hover .g-swatch { transform: scale(1.15); }
     .g-title { font-size: 0.73rem; font-weight: 600; color: var(--text); }
     .g-sub   { font-size: 0.6rem; color: var(--muted); }
 
@@ -263,7 +267,7 @@
       font-family: inherit; cursor: pointer;
       transition: all 0.18s;
     }
-    .anim-tile:hover { border-color: var(--border2); color: var(--text2); background: var(--surface2); }
+    .anim-tile:hover { border-color: var(--border2); color: var(--text2); background: var(--surface2); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
     .anim-tile .tile-icon { font-size: 1.2rem; line-height: 1; }
     .anim-tile .tile-name { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.03em; }
     .anim-tile.active {
@@ -293,8 +297,9 @@
       flex: 1; padding: 0.55rem 0.2rem; border-radius: var(--r-xs);
       border: 1px solid var(--border); background: transparent;
       color: var(--muted); font-family: inherit; font-size: 0.73rem; cursor: pointer;
-      transition: all 0.18s;
+      transition: all 0.18s; position: relative;
     }
+    .pattern-btn:hover { border-color: var(--border2); color: var(--text2); background: rgba(255,255,255,0.03); }
     .pattern-btn:hover { border-color: var(--border2); color: var(--text2); }
     .pattern-btn.active { background: rgba(240,160,48,0.1); border-color: rgba(240,160,48,0.4); color: var(--accent); }
     .hue-range-wrap { position: relative; height: 38px; }
@@ -409,7 +414,7 @@
       font-family: inherit; cursor: pointer; font-weight: 500;
       transition: all 0.15s;
     }
-    .save-row button:hover { border-color: var(--border2); color: var(--text); }
+    .save-row button:hover { border-color: var(--border2); color: var(--text); background: var(--surface3); transform: translateY(-1px); }
     .no-scenes { font-size: 0.72rem; color: var(--muted); text-align: center; padding: 0.85rem 0; }
 
     /* ── Sunrise alarms ── */
@@ -475,7 +480,7 @@
       font-family: inherit; font-size: 0.78rem; cursor: pointer;
       transition: all 0.2s;
     }
-    .add-alarm-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(240,160,48,0.04); }
+    .add-alarm-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(240,160,48,0.04); transform: translateY(-1px); }
 
     /* ── Settings ── */
     #cfg-toggle {
