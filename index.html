@@ -970,8 +970,8 @@ function topicScenes() { return cfg.prefix + "/scenes"; }
 function topicAlarms() { return cfg.prefix + "/alarms"; }
 
 function setStatus(cls, text) {
-  document.getElementById("dot").className = cls;
-  document.getElementById("status-text").textContent = text;
+  _dotEl.className = cls;
+  _statusText.textContent = text;
   const ok = cls === "connected";
   ["btn-tap","btn-power","btn-reset","btn-drift","btn-save-board-lib","btn-apply-custom","btn-reboot","btn-add-network"].forEach(id => {
     document.getElementById(id).disabled = !ok;
@@ -1045,6 +1045,7 @@ function connect() {
         syncCustomAnimUI();
       }
       if (d.groups) {
+        const prevCount = groupCount();
         groupPositions = d.groups.map(x => x.pos);
         groupWLevels   = d.groups.map(x => x.w);
         boundaries.clear();
@@ -1053,7 +1054,20 @@ function connect() {
           cursor += g.size;
           if (cursor > 0 && cursor < cfg.numLeds) boundaries.add(cursor);
         });
-        renderAll();
+        if (groupCount() !== prevCount) {
+          renderAll();
+        } else {
+          renderPaletteBar();
+          _updateLedColorsInPlace();
+          d.groups.forEach((g, i) => {
+            const sw = document.getElementById(`gsw-${i}`);
+            if (sw) sw.style.background = rgbStr(g.pos);
+            const ww = document.getElementById(`gww-${i}`);
+            if (ww) ww.textContent = Math.round(g.w * 100) + "%";
+            const sl = document.getElementById(`sl-gww-${i}`);
+            if (sl) sl.value = Math.round(g.w * 1000);
+          });
+        }
       }
     } catch(e) {}
   });
@@ -1071,12 +1085,16 @@ function debounce(fn, ms) {
   return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
 }
 
+// ── Cached DOM refs (queried once) ───────────────────────────
+const _dotEl      = document.getElementById("dot");
+const _statusText = document.getElementById("status-text");
+const _powerBtn   = document.getElementById("btn-power");
+
 let _publishFlashTimer = null;
 function _flashDot() {
-  const dot = document.getElementById("dot");
-  dot.style.opacity = "0.3";
+  _dotEl.style.opacity = "0.3";
   clearTimeout(_publishFlashTimer);
-  _publishFlashTimer = setTimeout(() => { dot.style.opacity = ""; }, 200);
+  _publishFlashTimer = setTimeout(() => { _dotEl.style.opacity = ""; }, 200);
 }
 
 function showToast(msg) {
@@ -1173,7 +1191,20 @@ let _candleLastTs = 0;
 
 function _invalidateLedCache() { _ledCache = null; }
 
-function _ledColour(ledIdx, groups) {
+function _updateLedColorsInPlace() {
+  if (!_ledCache) _ledCache = document.querySelectorAll("#leds-row .led");
+  const groups = getGroups();
+  let ledIdx = 0;
+  for (let gi = 0; gi < groups.length; gi++) {
+    const color = powered ? rgbStr(groups[gi].pos) : "#111";
+    for (let j = 0; j < groups[gi].size; j++) {
+      if (_ledCache[ledIdx]) _ledCache[ledIdx].style.background = color;
+      ledIdx++;
+    }
+  }
+}
+
+function _ledColour(ledIdx, groups, customP) {
   let cursor = 0;
   for (let gi = 0; gi < groups.length; gi++) {
     const end = cursor + groups[gi].size;
@@ -1191,7 +1222,7 @@ function _ledColour(ledIdx, groups) {
         const [r, g, b] = paletteRGB(groups[gi].pos);
         return `rgb(${Math.round(r*flicker)},${Math.round(g*flicker)},${Math.round(b*flicker)})`;
       } else if (animMode === "custom") {
-        const p = getCustomParams();
+        const p = customP;
         const h0 = parseFloat(p.hue_start), h1 = parseFloat(p.hue_end);
         const offset = p.sync ? 0 : (gi / Math.max(groups.length - 1, 1)) * 0.6;
         const t = (Math.sin(_webPhase + offset) + 1) * 0.5;
@@ -1238,9 +1269,9 @@ function _animFrame(ts) {
 
   if (!_ledCache) _ledCache = document.querySelectorAll("#leds-row .led");
   const groups = getGroups();
-  const dark = "#111";
+  const customP = animMode === "custom" ? getCustomParams() : null;
   for (let i = 0; i < _ledCache.length; i++) {
-    _ledCache[i].style.background = powered ? _ledColour(i, groups) : dark;
+    _ledCache[i].style.background = _ledColour(i, groups, customP);
   }
   _animFrameId = requestAnimationFrame(_animFrame);
 }
@@ -1476,11 +1507,12 @@ function _palettePos(e, bar) {
   return Math.max(0, Math.min(1, ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width));
 }
 (function _initPaletteListeners() {
+  let _barCache = null;
   function onMove(e) {
     if (_paletteDragging < 0) return;
     e.preventDefault();
-    const bar = document.getElementById("palette-bar");
-    const pos = _palettePos(e, bar);
+    if (!_barCache) _barCache = document.getElementById("palette-bar");
+    const pos = _palettePos(e, _barCache);
     const i   = _paletteDragging;
     groupPositions[i] = pos;
     const [r,gb,b] = paletteRGB(pos);
@@ -1491,7 +1523,7 @@ function _palettePos(e, bar) {
     }
     const sw = document.getElementById(`gsw-${i}`);
     if (sw) sw.style.background = rgbStr(pos);
-    renderStrip(); _publishPalette();
+    _updateLedColorsInPlace(); _publishPalette();
   }
   document.addEventListener("mousemove",  onMove);
   document.addEventListener("touchmove",  onMove, { passive: false });
@@ -1536,6 +1568,7 @@ function renderGroupPanels() {
         <div class="sl-row" style="margin-bottom:0">
           <span class="sl-label" style="width:68px">Warm White</span>
           <input type="range" min="0" max="1000" value="${Math.round(g.w*1000)}"
+            id="sl-gww-${i}"
             style="background:linear-gradient(to right,rgba(0,0,0,0.3),rgba(255,228,160,0.7))"
             oninput="onGroupW(${i},this.value/1000)">
           <span class="sl-val" id="gww-${i}">${Math.round(g.w*100)}%</span>
@@ -1573,10 +1606,15 @@ function onGroupW(i, val) {
 
 // ── Global handlers ───────────────────────────────────────────
 function updatePowerBtn() {
-  const btn = document.getElementById("btn-power");
-  btn.className = powered ? "power-btn on" : "power-btn off";
-  btn.querySelector(".power-label").textContent = powered ? "On" : "Off";
-  renderStrip();
+  _powerBtn.className = powered ? "power-btn on" : "power-btn off";
+  _powerBtn.querySelector(".power-label").textContent = powered ? "On" : "Off";
+  if (!powered) {
+    stopAnimLoop();
+    if (_ledCache) { for (let i = 0; i < _ledCache.length; i++) _ledCache[i].style.background = "#111"; }
+    else renderStrip();
+  } else {
+    if (animMode) startAnimLoop(); else renderStrip();
+  }
 }
 
 function updateDriftBtn() {
