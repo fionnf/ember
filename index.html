@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#060608">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Linked Lights">
   <title>Linked Lights</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
@@ -323,8 +327,7 @@
       color: var(--muted); font-family: inherit; font-size: 0.73rem; cursor: pointer;
       transition: all 0.18s; position: relative;
     }
-    .pattern-btn:hover { border-color: var(--border2); color: var(--text2); background: rgba(255,255,255,0.03); }
-    .pattern-btn:hover { border-color: var(--border2); color: var(--text2); }
+    .pattern-btn:hover { border-color: var(--border2); color: var(--text2); background: rgba(255,255,255,0.04); }
     .pattern-btn.active { background: rgba(240,160,48,0.1); border-color: rgba(240,160,48,0.4); color: var(--accent); }
     .hue-range-wrap { position: relative; height: 38px; }
     .hue-range-track {
@@ -340,9 +343,9 @@
       position: absolute; top: 50%; width: 24px; height: 24px;
       border-radius: 50%; transform: translate(-50%, -50%);
       border: 2px solid rgba(255,255,255,0.9); box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-      cursor: grab; z-index: 2; transition: all 0.12s;
+      cursor: grab; z-index: 2; transition: box-shadow 0.12s;
     }
-    .hue-handle:hover { transform: translate(-50%, -65%) scale(1.2); box-shadow: 0 4px 12px rgba(0,0,0,0.6), 0 0 10px rgba(255,255,255,0.2); }
+    .hue-handle:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.6); }
     .hue-handle:active { cursor: grabbing; z-index: 3; }
 
     /* ── Library (presets + scenes) ── */
@@ -361,9 +364,9 @@
       padding: 0.6rem 0.75rem;
       background: rgba(0,0,0,0.18); border: 1px solid var(--border);
       border-radius: var(--r-xs);
-      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); cursor: default;
+      transition: border-color 0.15s, background 0.15s; cursor: default;
     }
-    .scene-row:hover { border-color: var(--border2); background: var(--surface2); transform: translateX(3px); }
+    .scene-row:hover { border-color: var(--border2); background: var(--surface2); }
     .scene-swatches { display: flex; gap: 3px; flex-shrink: 0; }
     .scene-dot { width: 11px; height: 11px; border-radius: 50%; }
     .scene-anim-badge {
@@ -385,21 +388,20 @@
     .scene-load:hover { border-color: var(--border2); color: var(--text); background: rgba(255,255,255,0.04); transform: translateY(-1px); }
     .scene-load:active { transform: translateY(0); }
     .scene-del {
-      padding: 0.32rem 0.5rem; font-size: 0.72rem;
+      padding: 0.38rem 0.6rem; font-size: 0.72rem;
       border-radius: var(--r-xs); border: 1px solid transparent;
       background: transparent; color: var(--muted); cursor: pointer;
-      flex-shrink: 0; font-family: inherit;
-      transition: all 0.15s;
+      flex-shrink: 0; font-family: inherit; min-width: 32px;
+      transition: color 0.12s, border-color 0.12s, background 0.12s;
     }
-    .scene-del:hover { color: var(--red); border-color: rgba(224,72,72,0.3); background: rgba(224,72,72,0.05); transform: translateY(-1px); }
-    .scene-del:active { transform: translateY(0); }
+    .scene-del:hover { color: var(--red); border-color: rgba(224,72,72,0.3); background: rgba(224,72,72,0.05); }
     .board-lib-row {
       display: flex; align-items: center; gap: 0.5rem;
       padding: 0.45rem 0.6rem; border-radius: var(--r-xs);
       border: 1px solid var(--border); background: var(--surface2);
-      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: border-color 0.15s, background 0.15s;
     }
-    .board-lib-row:hover { border-color: var(--border2); background: var(--surface3); transform: translateX(3px); }
+    .board-lib-row:hover { border-color: var(--border2); background: var(--surface3); }
     .board-lib-name { flex: 1; font-size: 0.8rem; color: var(--text2); }
     .board-lib-play {
       padding: 0.28rem 0.65rem; font-size: 0.72rem; font-weight: 600;
@@ -438,7 +440,7 @@
       font-family: inherit; cursor: pointer; font-weight: 500;
       transition: all 0.15s;
     }
-    .save-row button:hover { border-color: var(--border2); color: var(--text); background: var(--surface3); transform: translateY(-1px); }
+    .save-row button:hover { border-color: var(--border2); color: var(--text); background: var(--surface3); }
     .no-scenes { font-size: 0.72rem; color: var(--muted); text-align: center; padding: 0.85rem 0; }
 
     /* ── Sunrise alarms ── */
@@ -806,7 +808,7 @@ let cfg = {
   broker:    localStorage.getItem("ll_broker")    || "wss://broker.hivemq.com:8884/mqtt",
   prefix:    localStorage.getItem("ll_prefix")    || "picolight_lf26",
   numLeds:   Math.min(10, parseInt(localStorage.getItem("ll_leds")   || "10")),
-  numGroups: parseInt(localStorage.getItem("ll_groups") || "3"),
+  numGroups: Math.max(1, Math.min(10, parseInt(localStorage.getItem("ll_groups") || "3"))),
   boardIdA:  localStorage.getItem("ll_id_a")   || "board_a",
   boardNameA:localStorage.getItem("ll_name_a") || "FF",
   boardIdB:  localStorage.getItem("ll_id_b")   || "board_b",
@@ -961,14 +963,15 @@ function groupCount() { return boundaries.size + 1; }
 // ── MQTT ──────────────────────────────────────────────────────
 let client = null;
 let _syncAfterConnect = false;
+let _wasConnected = false;
 
 function topic()       { return cfg.prefix + "/events"; }
 function topicScenes() { return cfg.prefix + "/scenes"; }
 function topicAlarms() { return cfg.prefix + "/alarms"; }
 
 function setStatus(cls, text) {
-  document.getElementById("dot").className = cls;
-  document.getElementById("status-text").textContent = text;
+  _dotEl.className = cls;
+  _statusText.textContent = text;
   const ok = cls === "connected";
   ["btn-tap","btn-power","btn-reset","btn-drift","btn-save-board-lib","btn-apply-custom","btn-reboot","btn-add-network"].forEach(id => {
     document.getElementById(id).disabled = !ok;
@@ -981,6 +984,7 @@ function connect() {
   setStatus("connecting", "connecting…");
   client = mqtt.connect(cfg.broker, { clientId: "webui_"+Math.random().toString(16).slice(2), clean: true });
   client.on("connect", () => {
+    _wasConnected = true;
     setStatus("connected", cfg.broker.replace(/^wss?:\/\//,"").replace(/\/mqtt$/,""));
     client.subscribe(topic());
     client.subscribe(topicScenes());
@@ -1041,6 +1045,7 @@ function connect() {
         syncCustomAnimUI();
       }
       if (d.groups) {
+        const prevCount = groupCount();
         groupPositions = d.groups.map(x => x.pos);
         groupWLevels   = d.groups.map(x => x.w);
         boundaries.clear();
@@ -1049,13 +1054,29 @@ function connect() {
           cursor += g.size;
           if (cursor > 0 && cursor < cfg.numLeds) boundaries.add(cursor);
         });
-        renderAll();
+        if (groupCount() !== prevCount) {
+          renderAll();
+        } else {
+          renderPaletteBar();
+          _updateLedColorsInPlace();
+          d.groups.forEach((g, i) => {
+            const sw = document.getElementById(`gsw-${i}`);
+            if (sw) sw.style.background = rgbStr(g.pos);
+            const ww = document.getElementById(`gww-${i}`);
+            if (ww) ww.textContent = Math.round(g.w * 100) + "%";
+            const sl = document.getElementById(`sl-gww-${i}`);
+            if (sl) sl.value = Math.round(g.w * 1000);
+          });
+        }
       }
     } catch(e) {}
   });
-  client.on("error",     () => setStatus("disconnected", "error"));
-  client.on("close",     () => setStatus("disconnected", "disconnected"));
-  client.on("reconnect", () => setStatus("connecting",   "reconnecting…"));
+  client.on("error",     () => { setStatus("disconnected", "error"); });
+  client.on("close",     () => {
+    if (_wasConnected) { showToast("Connection lost — reconnecting…"); _wasConnected = false; }
+    setStatus("disconnected", "disconnected");
+  });
+  client.on("reconnect", () => setStatus("connecting", "reconnecting…"));
 }
 
 // ── Debounce helper ───────────────────────────────────────────
@@ -1064,12 +1085,16 @@ function debounce(fn, ms) {
   return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
 }
 
+// ── Cached DOM refs (queried once) ───────────────────────────
+const _dotEl      = document.getElementById("dot");
+const _statusText = document.getElementById("status-text");
+const _powerBtn   = document.getElementById("btn-power");
+
 let _publishFlashTimer = null;
 function _flashDot() {
-  const dot = document.getElementById("dot");
-  dot.style.opacity = "0.3";
+  _dotEl.style.opacity = "0.3";
   clearTimeout(_publishFlashTimer);
-  _publishFlashTimer = setTimeout(() => { dot.style.opacity = ""; }, 200);
+  _publishFlashTimer = setTimeout(() => { _dotEl.style.opacity = ""; }, 200);
 }
 
 function showToast(msg) {
@@ -1166,7 +1191,20 @@ let _candleLastTs = 0;
 
 function _invalidateLedCache() { _ledCache = null; }
 
-function _ledColour(ledIdx, groups) {
+function _updateLedColorsInPlace() {
+  if (!_ledCache) _ledCache = document.querySelectorAll("#leds-row .led");
+  const groups = getGroups();
+  let ledIdx = 0;
+  for (let gi = 0; gi < groups.length; gi++) {
+    const color = powered ? rgbStr(groups[gi].pos) : "#111";
+    for (let j = 0; j < groups[gi].size; j++) {
+      if (_ledCache[ledIdx]) _ledCache[ledIdx].style.background = color;
+      ledIdx++;
+    }
+  }
+}
+
+function _ledColour(ledIdx, groups, customP) {
   let cursor = 0;
   for (let gi = 0; gi < groups.length; gi++) {
     const end = cursor + groups[gi].size;
@@ -1184,7 +1222,7 @@ function _ledColour(ledIdx, groups) {
         const [r, g, b] = paletteRGB(groups[gi].pos);
         return `rgb(${Math.round(r*flicker)},${Math.round(g*flicker)},${Math.round(b*flicker)})`;
       } else if (animMode === "custom") {
-        const p = getCustomParams();
+        const p = customP;
         const h0 = parseFloat(p.hue_start), h1 = parseFloat(p.hue_end);
         const offset = p.sync ? 0 : (gi / Math.max(groups.length - 1, 1)) * 0.6;
         const t = (Math.sin(_webPhase + offset) + 1) * 0.5;
@@ -1231,9 +1269,9 @@ function _animFrame(ts) {
 
   if (!_ledCache) _ledCache = document.querySelectorAll("#leds-row .led");
   const groups = getGroups();
-  const dark = "#111";
+  const customP = animMode === "custom" ? getCustomParams() : null;
   for (let i = 0; i < _ledCache.length; i++) {
-    _ledCache[i].style.background = powered ? _ledColour(i, groups) : dark;
+    _ledCache[i].style.background = _ledColour(i, groups, customP);
   }
   _animFrameId = requestAnimationFrame(_animFrame);
 }
@@ -1324,7 +1362,7 @@ function syncCustomAnimUI() {
   function makeHandleDraggable(handle, isStart) {
     let dragging = false;
     handle.addEventListener("mousedown",  e => { dragging = true; e.preventDefault(); });
-    handle.addEventListener("touchstart", () => { dragging = true; }, { passive: true });
+    handle.addEventListener("touchstart", e => { e.preventDefault(); dragging = true; }, { passive: false });
     document.addEventListener("mousemove", e => {
       if (!dragging) return;
       const pos = posFromEvent(e);
@@ -1363,7 +1401,7 @@ document.getElementById("btn-apply-custom").addEventListener("click", () => {
   publish({ anim_mode: "custom", anim_speed: animSpeed, anim_params: getCustomParams() });
 });
 
-document.getElementById("btn-save-custom").addEventListener("click", () => {
+function doSaveCustom() {
   const name = document.getElementById("custom-anim-name").value.trim()
     || `Custom ${loadScenes().length + 1}`;
   const scenes = loadScenes();
@@ -1377,7 +1415,9 @@ document.getElementById("btn-save-custom").addEventListener("click", () => {
   saveScenes(scenes);
   renderScenes();
   document.getElementById("custom-anim-name").value = "";
-});
+}
+document.getElementById("btn-save-custom").addEventListener("click", doSaveCustom);
+document.getElementById("custom-anim-name").addEventListener("keydown", e => { if (e.key === "Enter") doSaveCustom(); });
 
 function syncDriftIntervalSlider() {
   document.getElementById("sl-drift-interval").value = driftInterval;
@@ -1467,11 +1507,12 @@ function _palettePos(e, bar) {
   return Math.max(0, Math.min(1, ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width));
 }
 (function _initPaletteListeners() {
+  let _barCache = null;
   function onMove(e) {
     if (_paletteDragging < 0) return;
     e.preventDefault();
-    const bar = document.getElementById("palette-bar");
-    const pos = _palettePos(e, bar);
+    if (!_barCache) _barCache = document.getElementById("palette-bar");
+    const pos = _palettePos(e, _barCache);
     const i   = _paletteDragging;
     groupPositions[i] = pos;
     const [r,gb,b] = paletteRGB(pos);
@@ -1482,7 +1523,8 @@ function _palettePos(e, bar) {
     }
     const sw = document.getElementById(`gsw-${i}`);
     if (sw) sw.style.background = rgbStr(pos);
-    renderStrip(); _publishPalette();
+    if (!animMode) _updateLedColorsInPlace();
+    _publishPalette();
   }
   document.addEventListener("mousemove",  onMove);
   document.addEventListener("touchmove",  onMove, { passive: false });
@@ -1527,6 +1569,7 @@ function renderGroupPanels() {
         <div class="sl-row" style="margin-bottom:0">
           <span class="sl-label" style="width:68px">Warm White</span>
           <input type="range" min="0" max="1000" value="${Math.round(g.w*1000)}"
+            id="sl-gww-${i}"
             style="background:linear-gradient(to right,rgba(0,0,0,0.3),rgba(255,228,160,0.7))"
             oninput="onGroupW(${i},this.value/1000)">
           <span class="sl-val" id="gww-${i}">${Math.round(g.w*100)}%</span>
@@ -1564,10 +1607,15 @@ function onGroupW(i, val) {
 
 // ── Global handlers ───────────────────────────────────────────
 function updatePowerBtn() {
-  const btn = document.getElementById("btn-power");
-  btn.className = powered ? "power-btn on" : "power-btn off";
-  btn.querySelector(".power-label").textContent = powered ? "On" : "Off";
-  renderStrip();
+  _powerBtn.className = powered ? "power-btn on" : "power-btn off";
+  _powerBtn.querySelector(".power-label").textContent = powered ? "On" : "Off";
+  if (!powered) {
+    stopAnimLoop();
+    if (_ledCache) { for (let i = 0; i < _ledCache.length; i++) _ledCache[i].style.background = "#111"; }
+    else renderStrip();
+  } else {
+    if (animMode) startAnimLoop(); else renderStrip();
+  }
 }
 
 function updateDriftBtn() {
@@ -1591,7 +1639,9 @@ document.getElementById("btn-tap").addEventListener("click", () => {
   let isHeld = false;
 
   function togglePower() {
-    powered = !powered; updatePowerBtn(); publishState();
+    powered = !powered;
+    if (navigator.vibrate) navigator.vibrate(20);
+    updatePowerBtn(); publishState();
   }
 
   btn.addEventListener("mousedown", () => {
@@ -1682,7 +1732,7 @@ document.getElementById("btn-reconnect").addEventListener("click", () => {
   cfg.broker     = document.getElementById("cfg-broker").value.trim();
   cfg.prefix     = document.getElementById("cfg-prefix").value.trim();
   cfg.numLeds    = Math.min(10, parseInt(document.getElementById("cfg-leds").value));
-  cfg.numGroups  = parseInt(document.getElementById("cfg-groups").value);
+  cfg.numGroups  = Math.max(1, Math.min(10, parseInt(document.getElementById("cfg-groups").value)));
   cfg.boardIdA   = document.getElementById("cfg-id-a").value.trim()   || "board_a";
   cfg.boardNameA = document.getElementById("cfg-name-a").value.trim() || "A";
   cfg.boardIdB   = document.getElementById("cfg-id-b").value.trim()   || "board_b";
@@ -1976,14 +2026,16 @@ function renderScenes() {
   });
 }
 
-document.getElementById("btn-save-scene").addEventListener("click", () => {
+function doSaveScene() {
   const name = document.getElementById("scene-name").value.trim() || "Scene " + (loadScenes().length + 1);
   const scenes = loadScenes();
   scenes.push(captureScene(name));
   saveScenes(scenes);
   document.getElementById("scene-name").value = "";
   renderScenes();
-});
+}
+document.getElementById("btn-save-scene").addEventListener("click", doSaveScene);
+document.getElementById("scene-name").addEventListener("keydown", e => { if (e.key === "Enter") doSaveScene(); });
 
 // ── Board animation library ───────────────────────────────────
 function renderBoardLib() {
@@ -2018,7 +2070,7 @@ function renderBoardLib() {
   });
 }
 
-document.getElementById("btn-save-board-lib").addEventListener("click", () => {
+function doSaveBoardLib() {
   const name = document.getElementById("board-lib-name").value.trim()
     || "Anim " + (Object.keys(boardLib).length + 1);
   const entry = {
@@ -2038,7 +2090,9 @@ document.getElementById("btn-save-board-lib").addEventListener("click", () => {
   showToast(client && client.connected
     ? `✓ "${name}" saved to board`
     : `"${name}" saved locally — connect to send to boards`);
-});
+}
+document.getElementById("btn-save-board-lib").addEventListener("click", doSaveBoardLib);
+document.getElementById("board-lib-name").addEventListener("keydown", e => { if (e.key === "Enter") doSaveBoardLib(); });
 
 // Request the board's current library when we connect
 function requestBoardLib() { publish({ list_anims: true }); }
