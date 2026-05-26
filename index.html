@@ -680,15 +680,6 @@
     <div class="cfg-field"><label>LEDs</label><input id="cfg-leds"   type="number" min="1" max="144" value="10"></div>
     <div class="cfg-field"><label>Groups</label><input id="cfg-groups" type="number" min="1" max="10"  value="3"></div>
   </div>
-  <div class="card-title" style="margin-top:0.5rem">Board Names</div>
-  <div class="cfg-row">
-    <div class="cfg-field"><label>Board A ID</label><input id="cfg-id-a" placeholder="board_a"></div>
-    <div class="cfg-field"><label>Board A Name</label><input id="cfg-name-a" placeholder="A"></div>
-  </div>
-  <div class="cfg-row">
-    <div class="cfg-field"><label>Board B ID</label><input id="cfg-id-b" placeholder="board_b"></div>
-    <div class="cfg-field"><label>Board B Name</label><input id="cfg-name-b" placeholder="B"></div>
-  </div>
   <button class="cfg-btn" id="btn-reconnect">Reconnect</button>
   <hr style="border:none;border-top:1px solid var(--border);margin:0.15rem 0">
   <div class="card-title" style="margin-top:0.3rem">Add WiFi Network</div>
@@ -708,19 +699,15 @@ let cfg = {
   prefix:    localStorage.getItem("ll_prefix")    || "picolight_lf26",
   numLeds:   parseInt(localStorage.getItem("ll_leds")   || "10"),
   numGroups: parseInt(localStorage.getItem("ll_groups") || "3"),
-  boardIdA:  localStorage.getItem("ll_id_a")   || "board_a",
-  boardNameA:(localStorage.getItem("ll_name_a") || "").replace(/^[AB]$/, "") || "FF",
-  boardIdB:  localStorage.getItem("ll_id_b")   || "board_b",
-  boardNameB:(localStorage.getItem("ll_name_b") || "").replace(/^[AB]$/, "") || "LS",
+  boardIdA:  "board_a",
+  boardNameA:"FF",
+  boardIdB:  "board_b",
+  boardNameB:"LS",
 };
 document.getElementById("cfg-broker").value  = cfg.broker;
 document.getElementById("cfg-prefix").value  = cfg.prefix;
 document.getElementById("cfg-leds").value    = cfg.numLeds;
 document.getElementById("cfg-groups").value  = cfg.numGroups;
-document.getElementById("cfg-id-a").value    = cfg.boardIdA;
-document.getElementById("cfg-name-a").value  = cfg.boardNameA;
-document.getElementById("cfg-id-b").value    = cfg.boardIdB;
-document.getElementById("cfg-name-b").value  = cfg.boardNameB;
 
 // ── Palette ───────────────────────────────────────────────────
 const PALETTE = [
@@ -899,10 +886,6 @@ function connect() {
       if (topicStr === topicScenes()) {
         if (d.scenes)  { saveScenes(d.scenes);  renderScenes(); }
         if (d.presets) { /* legacy — ignore */ }
-        if (d.boardNameA) { cfg.boardNameA = d.boardNameA; localStorage.setItem("ll_name_a", d.boardNameA); }
-        if (d.boardNameB) { cfg.boardNameB = d.boardNameB; localStorage.setItem("ll_name_b", d.boardNameB); }
-        if (d.boardIdA)   { cfg.boardIdA   = d.boardIdA;   localStorage.setItem("ll_id_a",   d.boardIdA); }
-        if (d.boardIdB)   { cfg.boardIdB   = d.boardIdB;   localStorage.setItem("ll_id_b",   d.boardIdB); }
         updatePills();
         updateTargetBtns();
         return;
@@ -1485,25 +1468,13 @@ document.getElementById("btn-reconnect").addEventListener("click", () => {
   cfg.prefix     = document.getElementById("cfg-prefix").value.trim();
   cfg.numLeds    = parseInt(document.getElementById("cfg-leds").value);
   cfg.numGroups  = parseInt(document.getElementById("cfg-groups").value);
-  cfg.boardIdA   = document.getElementById("cfg-id-a").value.trim()   || "board_a";
-  cfg.boardNameA = document.getElementById("cfg-name-a").value.trim() || "FF";
-  cfg.boardIdB   = document.getElementById("cfg-id-b").value.trim()   || "board_b";
-  cfg.boardNameB = document.getElementById("cfg-name-b").value.trim() || "LS";
   localStorage.setItem("ll_broker", cfg.broker);
   localStorage.setItem("ll_prefix", cfg.prefix);
   localStorage.setItem("ll_leds",   cfg.numLeds);
   localStorage.setItem("ll_groups", cfg.numGroups);
-  localStorage.setItem("ll_id_a",   cfg.boardIdA);
-  localStorage.setItem("ll_name_a", cfg.boardNameA);
-  localStorage.setItem("ll_id_b",   cfg.boardIdB);
-  localStorage.setItem("ll_name_b", cfg.boardNameB);
   initGroups(cfg.numGroups);
   updatePills();
-  publishRetained(topicScenes, {
-    scenes: loadScenes(),
-    boardIdA: cfg.boardIdA, boardNameA: cfg.boardNameA,
-    boardIdB: cfg.boardIdB, boardNameB: cfg.boardNameB,
-  });
+  publishRetained(topicScenes, { scenes: loadScenes() });
   renderAll(); connect();
 });
 
@@ -1635,11 +1606,7 @@ function loadScenes() {
 
 function saveScenes(scenes) {
   localStorage.setItem("ll_scenes", JSON.stringify(scenes));
-  publishRetained(topicScenes, {
-    scenes,
-    boardIdA: cfg.boardIdA, boardNameA: cfg.boardNameA,
-    boardIdB: cfg.boardIdB, boardNameB: cfg.boardNameB,
-  });
+  publishRetained(topicScenes, { scenes });
 }
 
 // ── Scenes (unified — built-ins + user-saved) ─────────────────
