@@ -718,9 +718,9 @@ let cfg = {
   numLeds:   parseInt(localStorage.getItem("ll_leds")   || "10"),
   numGroups: parseInt(localStorage.getItem("ll_groups") || "3"),
   boardIdA:  localStorage.getItem("ll_id_a")   || "board_a",
-  boardNameA:localStorage.getItem("ll_name_a") || "FF",
+  boardNameA:(localStorage.getItem("ll_name_a") || "").replace(/^[AB]$/, "") || "FF",
   boardIdB:  localStorage.getItem("ll_id_b")   || "board_b",
-  boardNameB:localStorage.getItem("ll_name_b") || "LS",
+  boardNameB:(localStorage.getItem("ll_name_b") || "").replace(/^[AB]$/, "") || "LS",
 };
 document.getElementById("cfg-broker").value  = cfg.broker;
 document.getElementById("cfg-prefix").value  = cfg.prefix;
@@ -1517,9 +1517,9 @@ document.getElementById("btn-reconnect").addEventListener("click", () => {
   cfg.numLeds    = parseInt(document.getElementById("cfg-leds").value);
   cfg.numGroups  = parseInt(document.getElementById("cfg-groups").value);
   cfg.boardIdA   = document.getElementById("cfg-id-a").value.trim()   || "board_a";
-  cfg.boardNameA = document.getElementById("cfg-name-a").value.trim() || "A";
+  cfg.boardNameA = document.getElementById("cfg-name-a").value.trim() || "FF";
   cfg.boardIdB   = document.getElementById("cfg-id-b").value.trim()   || "board_b";
-  cfg.boardNameB = document.getElementById("cfg-name-b").value.trim() || "B";
+  cfg.boardNameB = document.getElementById("cfg-name-b").value.trim() || "LS";
   localStorage.setItem("ll_broker", cfg.broker);
   localStorage.setItem("ll_prefix", cfg.prefix);
   localStorage.setItem("ll_leds",   cfg.numLeds);
