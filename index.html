@@ -533,9 +533,6 @@
     <button class="ctrl-pill" id="btn-reset" disabled>
       <span class="pill-icon">☀</span> Warm White
     </button>
-    <button class="ctrl-pill active" id="btn-drift" disabled>
-      <span class="pill-icon">〜</span> Drift: On
-    </button>
   </div>
   <div class="ctrl-secondary" style="gap:0.35rem">
     <span style="font-size:0.62rem;color:var(--muted);letter-spacing:0.07em;text-transform:uppercase;padding-right:0.2rem">Send to</span>
@@ -554,12 +551,6 @@
     <input type="range" id="sl-fade" min="20" max="600" value="60"
       style="background:linear-gradient(to right,rgba(240,160,48,0.15),rgba(240,160,48,0.7))">
     <span class="sl-val" id="val-fade">1s</span>
-  </div>
-  <div class="sl-row">
-    <span class="sl-label">Drift Every</span>
-    <input type="range" id="sl-drift-interval" min="5" max="300" value="45"
-      style="background:linear-gradient(to right,rgba(62,196,109,0.12),rgba(62,196,109,0.5))">
-    <span class="sl-val" id="val-drift-interval">45s</span>
   </div>
 </div>
 
@@ -797,8 +788,8 @@ let groupWLevels   = [];
 let powered        = true;
 let brightness     = 0.6;
 let fadeSteps      = 60;
-let driftEnabled   = true;
-let driftInterval  = 45;
+const driftEnabled   = false;
+const driftInterval  = 45;
 const BOARD_ID     = "web_app";
 const boardLastSeen   = {};
 const boardLastChange = {};
@@ -883,7 +874,7 @@ function setStatus(cls, text) {
   document.getElementById("dot").className = cls;
   document.getElementById("status-text").textContent = text;
   const ok = cls === "connected";
-  ["btn-tap","btn-power","btn-reset","btn-drift"].forEach(id => {
+  ["btn-power","btn-reset"].forEach(id => {
     document.getElementById(id).disabled = !ok;
   });
 }
@@ -937,8 +928,6 @@ function connect() {
       if (d.on         !== undefined) { powered = d.on;              updatePowerBtn(); }
       if (d.brightness !== undefined) { brightness = d.brightness;   syncBrightnessSlider(); }
       if (d.fade_steps !== undefined) { fadeSteps = d.fade_steps;    syncFadeSlider(); }
-      if (d.drift_enabled  !== undefined) { driftEnabled = d.drift_enabled;   updateDriftBtn(); }
-      if (d.drift_interval !== undefined) { driftInterval = d.drift_interval; syncDriftIntervalSlider(); }
       if (d.anim_mode  !== undefined) { animMode  = d.anim_mode || ""; syncAnimButtons(); }
       if (d.anim_speed !== undefined) { animSpeed = d.anim_speed; syncAnimSlider(); }
       if (d.anim_params && d.anim_mode === "custom") {
@@ -1253,7 +1242,7 @@ document.getElementById("btn-save-custom").addEventListener("click", () => {
     name,
     groups: getGroups(), boundaries: Array.from(boundaries),
     groupPositions: [...groupPositions], groupWLevels: [...groupWLevels],
-    brightness, fadeSteps, driftEnabled, driftInterval, on: powered,
+    brightness, fadeSteps, on: powered,
     anim_mode: "custom", anim_speed: animSpeed, anim_params: getCustomParams(),
   });
   saveScenes(scenes);
@@ -1261,10 +1250,6 @@ document.getElementById("btn-save-custom").addEventListener("click", () => {
   document.getElementById("custom-anim-name").value = "";
 });
 
-function syncDriftIntervalSlider() {
-  document.getElementById("sl-drift-interval").value = driftInterval;
-  document.getElementById("val-drift-interval").textContent = driftInterval + "s";
-}
 
 // ── Random ────────────────────────────────────────────────────
 function randFloat(lo,hi) { return lo + Math.random()*(hi-lo); }
@@ -1452,12 +1437,6 @@ function updatePowerBtn() {
   renderStrip();
 }
 
-function updateDriftBtn() {
-  const btn = document.getElementById("btn-drift");
-  btn.textContent = "";
-  btn.innerHTML = `<span class="pill-icon">〜</span> Drift: ${driftEnabled ? "On" : "Off"}`;
-  btn.classList.toggle("active", driftEnabled);
-}
 
 document.getElementById("btn-tap").addEventListener("click", () => {
   randomise(); renderAll(); publishState();
@@ -1475,9 +1454,6 @@ document.getElementById("btn-reset").addEventListener("click", () => {
   renderAll(); publishState();
 });
 
-document.getElementById("btn-drift").addEventListener("click", () => {
-  driftEnabled = !driftEnabled; updateDriftBtn(); publishState();
-});
 
 document.getElementById("sl-brightness").addEventListener("input", function() {
   brightness = this.value/100;
@@ -1491,11 +1467,6 @@ document.getElementById("sl-fade").addEventListener("input", function() {
   _publishStateDebounced();
 });
 
-document.getElementById("sl-drift-interval").addEventListener("input", function() {
-  driftInterval = parseInt(this.value);
-  document.getElementById("val-drift-interval").textContent = driftInterval + "s";
-  _publishStateDebounced();
-});
 
 document.getElementById("cfg-toggle").addEventListener("click", () => {
   document.getElementById("cfg-panel").classList.toggle("open");
@@ -1730,7 +1701,7 @@ function captureScene(name) {
     name,
     groups: getGroups(), boundaries: Array.from(boundaries),
     groupPositions: [...groupPositions], groupWLevels: [...groupWLevels],
-    brightness, fadeSteps, driftEnabled, driftInterval,
+    brightness, fadeSteps,
     on: powered, anim_mode: animMode || null, anim_speed: animSpeed,
   };
 }
@@ -1757,8 +1728,6 @@ function _applySceneOrBuiltin(item, btn) {
     if (item.boundaries)     { boundaries.clear(); item.boundaries.forEach(b => boundaries.add(b)); }
     if (item.brightness  !== undefined) brightness  = item.brightness;
     if (item.fadeSteps   !== undefined) fadeSteps   = item.fadeSteps;
-    if (item.driftEnabled!== undefined) driftEnabled= item.driftEnabled;
-    if (item.driftInterval!==undefined) driftInterval=item.driftInterval;
     // Loading a scene always turns the lights on unless the scene explicitly stores on:false
     if (item.on === false) powered = false;
     else powered = true;
@@ -1882,10 +1851,8 @@ syncAnimSlider();
 updatePills();
 updateTargetBtns();
 updatePowerBtn();
-updateDriftBtn();
 syncBrightnessSlider();
 syncFadeSlider();
-syncDriftIntervalSlider();
 connect();
 </script>
 
