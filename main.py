@@ -200,6 +200,12 @@ def on_message(topic, msg):
         import machine
         machine.reset()
 
+    # Echo current state back to web clients so the UI stays in sync.
+    # Only echo messages that didn't come from another board (avoids loops).
+    sender = data.get("from", "")
+    if sender and not sender.startswith("board_"):
+        publish_event(engine.get_event_payload())
+
 
 def connect_mqtt() -> MQTTClient:
     import ubinascii, machine
@@ -496,7 +502,8 @@ def main():
 
         # ── Heartbeat — announce presence every 30 s ──
         if client is not None and utime.ticks_diff(now, _heartbeat_at) >= 0:
-            publish_event({"heartbeat": True})
+            publish_event({"heartbeat": True, "fw": FIRMWARE_VERSION,
+                           "anim": engine._anim_mode})
             _heartbeat_at = utime.ticks_add(now, 30_000)
 
         # ── Daily OTA reboot at OTA_HOUR_UTC — save state first ──

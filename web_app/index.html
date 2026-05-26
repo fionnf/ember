@@ -802,6 +802,8 @@ let driftInterval  = 45;
 const BOARD_ID     = "web_app";
 const boardLastSeen   = {};
 const boardLastChange = {};
+const boardLastFw     = {};   // firmware version per board
+const boardLastAnim   = {};   // current anim mode per board
 const BOARD_TIMEOUT_MS = 90_000;
 let animMode    = "";
 let animSpeed   = 3.0;
@@ -843,7 +845,9 @@ function updatePills() {
       pill.classList.toggle("online", online);
     }
     const sub = document.getElementById(subId);
-    const subText = online ? (boardLastChange[boardId] || "online") : "offline";
+    const extra = boardLastFw[boardId] ? ` · fw ${boardLastFw[boardId]}` : "";
+    const animLabel = boardLastAnim[boardId] ? ` · ${boardLastAnim[boardId]}` : "";
+    const subText = online ? ((boardLastChange[boardId] || "online") + animLabel + extra) : "offline";
     if (sub.textContent !== subText) sub.textContent = subText;
   });
 }
@@ -923,6 +927,9 @@ function connect() {
       if (d.from) {
         boardLastSeen[d.from] = Date.now();
         boardLastChange[d.from] = boardStateDesc(d);
+        if (d.fw)   boardLastFw[d.from]   = d.fw;
+        if (d.anim !== undefined) boardLastAnim[d.from] = d.anim || "static";
+        else if (d.anim_mode !== undefined) boardLastAnim[d.from] = d.anim_mode || "static";
         updatePills();
       }
       if (d.anim_library) { boardLib = d.anim_library; renderBoardLib(); }
