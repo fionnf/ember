@@ -20,6 +20,7 @@ from config import (
     WEBREPL_PASSWORD,
 )
 
+FIRMWARE_VERSION = "2025-05-15"   # update when pushing a significant change
 FRAME_MS         = 16       # ~60 fps tick rate
 SYNC_INTERVAL_MS = 60_000   # boss resyncs follower every 60 s
 SYNC_FADE_STEPS  = 300      # ~5 s slow fade on follower when resyncing
@@ -375,6 +376,8 @@ class SetupPulser:
 def main():
     global client
 
+    print(f"[boot] firmware {FIRMWARE_VERSION} — board {BOARD_ID}")
+
     # Pulse the strip immediately — visible feedback while setup runs
     pulser = SetupPulser()
 
@@ -595,5 +598,19 @@ def main():
 
 
 # ── Run ──────────────────────────────────────────────────────
+# Top-level crash guard: any unhandled exception prints a traceback then
+# reboots after 5 s so the board never hangs permanently on a firmware bug.
+# boot.py runs on every reboot and pulls the latest code from GitHub, so
+# a pushed fix is automatically picked up on the next crash-reboot cycle.
 if __name__ == "__main__":
-    main()
+    import sys
+    while True:
+        try:
+            main()
+        except Exception as e:
+            sys.print_exception(e)
+            print("[FATAL] unhandled exception — rebooting in 5 s")
+            strip.off()
+            utime.sleep(5)
+            import machine
+            machine.reset()
