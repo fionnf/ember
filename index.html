@@ -524,7 +524,7 @@
       <div class="power-ring">⏻</div>
       <span class="power-label">Off</span>
     </button>
-    <button class="tap-btn" id="btn-tap" disabled>
+    <button class="tap-btn" id="btn-tap">
       <span class="tap-icon">✦</span>
       <span class="tap-label">Tap</span>
     </button>
@@ -888,8 +888,6 @@ function connect() {
     client.subscribe(topic());
     client.subscribe(topicScenes());
     client.subscribe(topicAlarms());
-    // Push current UI state to boards immediately on (re)connect so they stay in sync
-    setTimeout(publishState, 800);
     // Request the board's saved animation library
     setTimeout(requestBoardLib, 1500);
   });
