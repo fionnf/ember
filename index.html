@@ -1735,8 +1735,8 @@ function _applySceneOrBuiltin(item, btn) {
       customHueEnd   = item.anim_params.hue_end   ?? 1.0;
       customSync     = item.anim_params.sync      ?? false;
     }
-    syncBrightnessSlider(); syncFadeSlider(); syncDriftIntervalSlider();
-    syncAnimButtons(); syncAnimSlider(); updatePowerBtn(); updateDriftBtn();
+    syncBrightnessSlider(); syncFadeSlider();
+    syncAnimButtons(); syncAnimSlider(); updatePowerBtn();
     renderAll();
     publishState();
     // Visual confirmation on the button
