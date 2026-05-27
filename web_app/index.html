@@ -990,6 +990,14 @@ function publish(payload) {
   if (!client || !client.connected) return;
   payload.from = BOARD_ID;
   if (sendTarget !== "both") payload.target = sendTarget;
+  // Mirror on/off state immediately so pills update without waiting for echo
+  if (payload.on !== undefined) {
+    const targets = sendTarget === "both"
+      ? [cfg.boardIdA, cfg.boardIdB]
+      : [sendTarget];
+    targets.forEach(id => { boardLastPower[id] = payload.on; });
+    updatePills();
+  }
   client.publish(topic(), JSON.stringify(payload));
   _flashDot();
 }
