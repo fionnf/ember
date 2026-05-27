@@ -896,10 +896,10 @@ function connect() {
     client.subscribe(topic());
     client.subscribe(topicScenes());
     client.subscribe(topicAlarms());
-    // Push current UI state to boards immediately on (re)connect so they stay in sync
-    setTimeout(publishState, 800);
+    // Ping boards immediately so they echo their state back (pills update fast)
+    setTimeout(() => publish({ ping: true }), 300);
     // Request the board's saved animation library
-    setTimeout(requestBoardLib, 1500);
+    setTimeout(requestBoardLib, 600);
   });
   client.on("message", (t, msg) => {
     const topicStr = t.toString();
