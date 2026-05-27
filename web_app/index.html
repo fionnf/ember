@@ -81,6 +81,10 @@
     .board-pill.online .pill-dot  { background: var(--green); box-shadow: 0 0 6px var(--green); }
     .board-pill.online .pill-label { color: var(--text); }
     .board-pill.online .pill-sub  { color: var(--green); }
+    .board-pill.standby { border-color: rgba(240,160,48,0.22); background: rgba(240,160,48,0.04); }
+    .board-pill.standby .pill-dot  { background: var(--accent); opacity: 0.6; }
+    .board-pill.standby .pill-label { color: var(--text2); }
+    .board-pill.standby .pill-sub  { color: var(--accent); opacity: 0.7; }
 
     /* ── Cards ── */
     .card {
@@ -784,6 +788,7 @@ const boardLastSeen   = {};
 const boardLastChange = {};
 const boardLastFw     = {};   // firmware version per board
 const boardLastAnim   = {};   // current anim mode per board
+const boardLastPower  = {};   // last known on/off state per board
 const BOARD_TIMEOUT_MS = 65_000;  // 2 missed 30s heartbeats + 5s grace
 let animMode    = "";
 let animSpeed   = 3.0;
@@ -806,7 +811,7 @@ function boardStateDesc(d) {
   return "updated";
 }
 
-const _pillOnline  = {};   // last known online state — avoid spurious DOM thrash
+const _pillState   = {};   // last known state string per pill — avoid spurious DOM thrash
 const _boardTimers = {};   // per-board timeout handle for offline detection
 
 function updatePills() {
@@ -818,16 +823,24 @@ function updatePills() {
     if (!pill) return;
     const labelEl = document.getElementById(labelId);
     if (labelEl.textContent !== name) labelEl.textContent = name;
-    const seen   = boardLastSeen[boardId];
-    const online = !!(seen && (Date.now() - seen) < BOARD_TIMEOUT_MS);
-    if (_pillOnline[pillId] !== online) {
-      _pillOnline[pillId] = online;
-      pill.classList.toggle("online", online);
+
+    const seen    = boardLastSeen[boardId];
+    const reachable = !!(seen && (Date.now() - seen) < BOARD_TIMEOUT_MS);
+    const lightsOn  = boardLastPower[boardId] !== false; // default true if unknown
+    // three states: "online" (reachable + on), "standby" (reachable + off), "" (offline)
+    const state = reachable ? (lightsOn ? "online" : "standby") : "";
+
+    if (_pillState[pillId] !== state) {
+      _pillState[pillId] = state;
+      pill.classList.toggle("online",  state === "online");
+      pill.classList.toggle("standby", state === "standby");
     }
     const sub = document.getElementById(subId);
     const extra    = boardLastFw[boardId]   ? ` · fw ${boardLastFw[boardId]}`   : "";
     const animLabel= boardLastAnim[boardId] ? ` · ${boardLastAnim[boardId]}`    : "";
-    const subText  = online ? ((boardLastChange[boardId] || "online") + animLabel + extra) : "offline";
+    const subText  = reachable
+      ? ((boardLastChange[boardId] || "online") + animLabel + extra)
+      : "offline";
     if (sub.textContent !== subText) sub.textContent = subText;
   });
 }
@@ -907,7 +920,8 @@ function connect() {
       if (d.from) {
         boardLastSeen[d.from] = Date.now();
         boardLastChange[d.from] = boardStateDesc(d);
-        if (d.fw)   boardLastFw[d.from]   = d.fw;
+        if (d.fw)  boardLastFw[d.from]  = d.fw;
+        if (d.on !== undefined) boardLastPower[d.from] = d.on;
         if (d.anim !== undefined) boardLastAnim[d.from] = d.anim || "static";
         else if (d.anim_mode !== undefined) boardLastAnim[d.from] = d.anim_mode || "static";
         updatePills();
