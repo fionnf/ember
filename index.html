@@ -524,7 +524,7 @@
       <div class="power-ring">⏻</div>
       <span class="power-label">Off</span>
     </button>
-    <button class="tap-btn" id="btn-tap">
+    <button class="tap-btn" id="btn-tap" disabled>
       <span class="tap-icon">✦</span>
       <span class="tap-label">Tap</span>
     </button>
@@ -861,7 +861,7 @@ function setStatus(cls, text) {
   document.getElementById("dot").className = cls;
   document.getElementById("status-text").textContent = text;
   const ok = cls === "connected";
-  ["btn-power","btn-reset"].forEach(id => {
+  ["btn-tap","btn-power","btn-reset"].forEach(id => {
     document.getElementById(id).disabled = !ok;
   });
 }
@@ -875,6 +875,8 @@ function connect() {
     client.subscribe(topic());
     client.subscribe(topicScenes());
     client.subscribe(topicAlarms());
+    // Push current UI state to boards immediately on (re)connect so they stay in sync
+    setTimeout(publishState, 800);
     // Request the board's saved animation library
     setTimeout(requestBoardLib, 1500);
   });
@@ -1474,7 +1476,9 @@ document.getElementById("btn-reconnect").addEventListener("click", () => {
   localStorage.setItem("ll_groups", cfg.numGroups);
   initGroups(cfg.numGroups);
   updatePills();
-  publishRetained(topicScenes, { scenes: loadScenes() });
+  publishRetained(topicScenes, {
+    scenes: loadScenes(),
+  });
   renderAll(); connect();
 });
 
@@ -1606,7 +1610,9 @@ function loadScenes() {
 
 function saveScenes(scenes) {
   localStorage.setItem("ll_scenes", JSON.stringify(scenes));
-  publishRetained(topicScenes, { scenes });
+  publishRetained(topicScenes, {
+    scenes,
+  });
 }
 
 // ── Scenes (unified — built-ins + user-saved) ─────────────────
