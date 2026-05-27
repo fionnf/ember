@@ -784,7 +784,7 @@ const boardLastSeen   = {};
 const boardLastChange = {};
 const boardLastFw     = {};   // firmware version per board
 const boardLastAnim   = {};   // current anim mode per board
-const BOARD_TIMEOUT_MS = 90_000;
+const BOARD_TIMEOUT_MS = 65_000;  // 2 missed 30s heartbeats + 5s grace
 let animMode    = "";
 let animSpeed   = 3.0;
 let alarms      = [];
@@ -806,7 +806,8 @@ function boardStateDesc(d) {
   return "updated";
 }
 
-const _pillOnline = {};  // last known online state per pill — avoid spurious DOM thrash
+const _pillOnline  = {};   // last known online state — avoid spurious DOM thrash
+const _boardTimers = {};   // per-board timeout handle for offline detection
 
 function updatePills() {
   [
@@ -819,19 +820,24 @@ function updatePills() {
     if (labelEl.textContent !== name) labelEl.textContent = name;
     const seen   = boardLastSeen[boardId];
     const online = !!(seen && (Date.now() - seen) < BOARD_TIMEOUT_MS);
-    // Only touch classes/text when state actually changed
     if (_pillOnline[pillId] !== online) {
       _pillOnline[pillId] = online;
       pill.classList.toggle("online", online);
     }
     const sub = document.getElementById(subId);
-    const extra = boardLastFw[boardId] ? ` · fw ${boardLastFw[boardId]}` : "";
-    const animLabel = boardLastAnim[boardId] ? ` · ${boardLastAnim[boardId]}` : "";
-    const subText = online ? ((boardLastChange[boardId] || "online") + animLabel + extra) : "offline";
+    const extra    = boardLastFw[boardId]   ? ` · fw ${boardLastFw[boardId]}`   : "";
+    const animLabel= boardLastAnim[boardId] ? ` · ${boardLastAnim[boardId]}`    : "";
+    const subText  = online ? ((boardLastChange[boardId] || "online") + animLabel + extra) : "offline";
     if (sub.textContent !== subText) sub.textContent = subText;
   });
 }
-setInterval(updatePills, 10_000);
+
+// Schedule a one-shot pill refresh exactly when a board's timeout expires.
+// Cancels any previous timer for that board so we don't stack them.
+function _scheduleBoardTimeout(boardId) {
+  clearTimeout(_boardTimers[boardId]);
+  _boardTimers[boardId] = setTimeout(updatePills, BOARD_TIMEOUT_MS + 200);
+}
 
 function initGroups(n) {
   boundaries.clear();
@@ -905,6 +911,7 @@ function connect() {
         if (d.anim !== undefined) boardLastAnim[d.from] = d.anim || "static";
         else if (d.anim_mode !== undefined) boardLastAnim[d.from] = d.anim_mode || "static";
         updatePills();
+        _scheduleBoardTimeout(d.from);
       }
       if (d.anim_library) { boardLib = d.anim_library; renderBoardLib(); }
       if (d.from === BOARD_ID) return;
