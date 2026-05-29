@@ -1508,12 +1508,23 @@ document.getElementById("btn-reconnect").addEventListener("click", () => {
   renderAll(); connect();
 });
 
-document.getElementById("btn-reboot").addEventListener("click", () => {
-  if (!confirm("Reboot both boards? They will go offline for ~30 seconds while they update.")) return;
-  // Always reboot both boards regardless of current target selection
-  client.publish(topic(), JSON.stringify({ reboot: true, from: BOARD_ID }));
-  _flashDot();
-});
+(() => {
+  const btn = document.getElementById("btn-reboot");
+  if (!btn) {
+    console.error("[init] btn-reboot not found in DOM");
+    return;
+  }
+  btn.addEventListener("click", () => {
+    if (!confirm("Reboot both boards? They will go offline for ~30 seconds while they update.")) return;
+    // Always reboot both boards regardless of current target selection
+    if (!client || !client.connected) {
+      alert("Not connected to MQTT broker");
+      return;
+    }
+    client.publish(topic(), JSON.stringify({ reboot: true, from: BOARD_ID }));
+    _flashDot();
+  });
+})();
 
 // ── Alarms ────────────────────────────────────────────────────
 const DAY_LABELS = ["Mo","Tu","We","Th","Fr","Sa","Su"];
