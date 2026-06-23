@@ -20,10 +20,11 @@ from config import (
     WEBREPL_PASSWORD,
 )
 
-FIRMWARE_VERSION = "2025-05-15"   # update when pushing a significant change
-FRAME_MS         = 16       # ~60 fps tick rate
-SYNC_INTERVAL_MS = 60_000   # boss resyncs follower every 60 s
-SYNC_FADE_STEPS  = 300      # ~5 s slow fade on follower when resyncing
+FIRMWARE_VERSION       = "2026-06-23"
+FRAME_MS               = 16
+SYNC_INTERVAL_MS       = 60_000
+SYNC_FADE_STEPS        = 300
+WIFI_OFFLINE_REBOOT_MS = 10 * 60 * 1000   # reboot after 10 min offline
 from sk6812 import SK6812
 from touch   import TouchManager
 from colour  import ColourEngine
@@ -449,6 +450,7 @@ def main():
     _heartbeat_at   = utime.ticks_add(utime.ticks_ms(), 5_000)  # first beat soon after boot
     _backoff_ms     = RECONNECT_DELAY_MS
     _anim_announce  = True   # publish library once after first connect
+    _offline_since  = None   # when client first became None (WiFi watchdog)
 
     while True:
         now = utime.ticks_ms()
@@ -486,6 +488,18 @@ def main():
             except Exception as e:
                 print(f"[mqtt] check_msg error: {e}")
                 client = None
+
+        # ── WiFi watchdog — reboot if offline > 10 min ──
+        if client is None:
+            if _offline_since is None:
+                _offline_since = now
+            elif utime.ticks_diff(now, _offline_since) >= WIFI_OFFLINE_REBOOT_MS:
+                print("[wifi] offline > 10 min — rebooting to recover connection")
+                save_state()
+                import machine
+                machine.reset()
+        else:
+            _offline_since = None
 
         # ── Boss sync — publish current state every 60 s for follower to drift to ──
         if BOSS and client is not None and utime.ticks_diff(now, _sync_at) >= 0:

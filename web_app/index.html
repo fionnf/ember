@@ -246,7 +246,7 @@
     /* ── Animation card ── */
     .anim-grid {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 0.45rem;
       margin-bottom: 0.85rem;
     }
@@ -267,48 +267,6 @@
       color: var(--accent);
     }
     .anim-tile.active .tile-icon { filter: drop-shadow(0 0 4px rgba(240,160,48,0.6)); }
-
-    /* Custom builder */
-    #custom-anim-toggle {
-      width: 100%; background: transparent; border: 1px dashed var(--border);
-      border-radius: var(--r-sm); color: var(--muted); font-family: inherit; font-size: 0.74rem;
-      padding: 0.6rem; cursor: pointer; margin-top: 0.65rem;
-      transition: all 0.2s; text-align: center; letter-spacing: 0.04em;
-    }
-    #custom-anim-toggle:hover { border-color: var(--accent); color: var(--accent); background: rgba(240,160,48,0.04); }
-    #custom-anim-panel {
-      display: none; flex-direction: column; gap: 0.7rem;
-      margin-top: 0.7rem; padding-top: 0.7rem;
-      border-top: 1px solid var(--border);
-    }
-    #custom-anim-panel.open { display: flex; }
-    .pattern-btns { display: flex; gap: 0.4rem; }
-    .pattern-btn {
-      flex: 1; padding: 0.55rem 0.2rem; border-radius: var(--r-xs);
-      border: 1px solid var(--border); background: transparent;
-      color: var(--muted); font-family: inherit; font-size: 0.73rem; cursor: pointer;
-      transition: all 0.18s;
-    }
-    .pattern-btn:hover { border-color: var(--border2); color: var(--text2); }
-    .pattern-btn.active { background: rgba(240,160,48,0.1); border-color: rgba(240,160,48,0.4); color: var(--accent); }
-    .hue-range-wrap { position: relative; height: 38px; }
-    .hue-range-track {
-      position: absolute; left: 11px; right: 11px; top: 50%; height: 12px;
-      transform: translateY(-50%); border-radius: 6px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-    .hue-range-fill {
-      position: absolute; top: 0; height: 100%; border-radius: 6px;
-      background: rgba(255,255,255,0.18); pointer-events: none;
-    }
-    .hue-handle {
-      position: absolute; top: 50%; width: 24px; height: 24px;
-      border-radius: 50%; transform: translate(-50%, -50%);
-      border: 2px solid rgba(255,255,255,0.9); box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-      cursor: grab; z-index: 2; transition: transform 0.12s;
-    }
-    .hue-handle:hover { transform: translate(-50%, -65%); }
-    .hue-handle:active { cursor: grabbing; }
 
     /* ── Library (presets + scenes) ── */
 
@@ -580,10 +538,6 @@
       <span class="tile-icon">🕯</span>
       <span class="tile-name">Candle</span>
     </button>
-    <button class="anim-tile" data-mode="custom" id="btn-custom-anim">
-      <span class="tile-icon">✦</span>
-      <span class="tile-name">Custom</span>
-    </button>
   </div>
   <div class="sl-row">
     <span class="sl-label">Speed</span>
@@ -592,46 +546,6 @@
     <span class="sl-val" id="val-anim-speed">3.0×</span>
   </div>
 
-  <button id="custom-anim-toggle">+ Build Custom Animation</button>
-  <div id="custom-anim-panel">
-    <div>
-      <div class="card-title" style="margin-bottom:0.45rem">Pattern</div>
-      <div class="pattern-btns">
-        <button class="pattern-btn active" data-pattern="sweep">Sweep</button>
-        <button class="pattern-btn" data-pattern="bounce">Bounce</button>
-        <button class="pattern-btn" data-pattern="pulse">Pulse</button>
-        <button class="pattern-btn" data-pattern="strobe">Strobe</button>
-      </div>
-    </div>
-    <div>
-      <div class="card-title" style="margin-bottom:0.45rem">Colour Range</div>
-      <div class="hue-range-wrap" id="hue-range-wrap">
-        <div class="hue-range-track" id="hue-range-track"></div>
-        <div class="hue-range-fill" id="hue-range-fill"></div>
-        <div class="hue-handle" id="hue-handle-start"></div>
-        <div class="hue-handle" id="hue-handle-end"></div>
-      </div>
-    </div>
-    <div class="sl-row" style="margin-bottom:0">
-      <span class="sl-label">Groups</span>
-      <div style="flex:1;display:flex;gap:0.5rem;align-items:center">
-        <button class="pattern-btn" id="btn-sync-groups" style="flex:none;padding:0.42rem 0.85rem">Offset</button>
-        <span style="font-size:0.67rem;color:var(--muted)">out-of-phase with each other</span>
-      </div>
-    </div>
-    <div style="display:flex;gap:0.5rem;margin-top:0.1rem">
-      <button style="flex:1;padding:0.6rem;border:none;border-radius:var(--r-xs);
-        background:linear-gradient(135deg,var(--accent2),var(--accent));
-        color:rgba(0,0,0,0.85);font-family:inherit;font-size:0.8rem;font-weight:700;cursor:pointer"
-        id="btn-apply-custom">Apply</button>
-      <input id="custom-anim-name" placeholder="Name to save…" maxlength="28"
-        style="flex:1;background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:var(--r-xs);
-               color:var(--text);font-family:inherit;font-size:0.8rem;padding:0.55rem 0.7rem;outline:none">
-      <button id="btn-save-custom"
-        style="flex:none;padding:0.55rem 0.9rem;border:1px solid var(--border);border-radius:var(--r-xs);
-               background:transparent;color:var(--text2);font-family:inherit;font-size:0.8rem;cursor:pointer">Save</button>
-    </div>
-  </div>
 </div>
 
 <!-- Board animation library -->
@@ -934,12 +848,6 @@ function connect() {
       if (d.fade_steps !== undefined) { fadeSteps = d.fade_steps;    syncFadeSlider(); }
       if (d.anim_mode  !== undefined) { animMode  = d.anim_mode || ""; syncAnimButtons(); }
       if (d.anim_speed !== undefined) { animSpeed = d.anim_speed; syncAnimSlider(); }
-      if (d.anim_params && d.anim_mode === "custom") {
-        customPattern  = d.anim_params.pattern   || "sweep";
-        customHueStart = d.anim_params.hue_start ?? 0.0;
-        customHueEnd   = d.anim_params.hue_end   ?? 1.0;
-        customSync     = d.anim_params.sync      ?? false;
-      }
       if (d.groups) {
         groupPositions = d.groups.map(x => x.pos);
         groupWLevels   = d.groups.map(x => x.w);
@@ -1022,7 +930,6 @@ function publishState() {
   const p = { groups: getGroups(), on: powered, brightness, fade_steps: fadeSteps,
               drift_enabled: driftEnabled, drift_interval: driftInterval,
               anim_mode: animMode || null, anim_speed: animSpeed };
-  if (animMode === "custom") p.anim_params = getCustomParams();
   publish(p);
 }
 
@@ -1042,19 +949,12 @@ document.querySelectorAll(".anim-tile").forEach(btn => {
   btn.addEventListener("click", () => {
     animMode = btn.dataset.mode;
     syncAnimButtons();
-    if (animMode === "custom") {
-      document.getElementById("custom-anim-panel").classList.add("open");
-      document.getElementById("custom-anim-toggle").textContent = "− Custom Animation";
-    }
     const payload = { anim_mode: animMode || null, anim_speed: animSpeed };
-    if (animMode === "custom") payload.anim_params = getCustomParams();
     publish(payload);
   });
 });
 const _publishAnimSpeed = debounce(() => {
-  const payload = { anim_mode: animMode || null, anim_speed: animSpeed };
-  if (animMode === "custom") payload.anim_params = getCustomParams();
-  publish(payload);
+  publish({ anim_mode: animMode || null, anim_speed: animSpeed });
 }, 120);
 document.getElementById("sl-anim-speed").addEventListener("input", e => {
   animSpeed = parseInt(e.target.value) / 10;
@@ -1090,27 +990,6 @@ function _ledColour(ledIdx, groups) {
         const flicker = 0.55 + Math.random() * 0.45;
         const [r, g, b] = paletteRGB(groups[gi].pos);
         return `rgb(${Math.round(r*flicker)},${Math.round(g*flicker)},${Math.round(b*flicker)})`;
-      } else if (animMode === "custom") {
-        const p = getCustomParams();
-        const h0 = parseFloat(p.hue_start), h1 = parseFloat(p.hue_end);
-        const offset = p.sync ? 0 : (gi / Math.max(groups.length - 1, 1)) * 0.6;
-        const t = (Math.sin(_webPhase + offset) + 1) * 0.5;
-        let pos;
-        if (p.pattern === "sweep") {
-          const tSaw = ((_webPhase + offset * 6.2832) % 6.2832) / 6.2832;
-          pos = h0 + tSaw * (h1 - h0);
-        } else if (p.pattern === "pulse") {
-          pos = (h0 + h1) * 0.5;
-          const [r, g, b] = paletteRGB(Math.max(0, Math.min(1, pos)));
-          return `rgb(${Math.round(r*t)},${Math.round(g*t)},${Math.round(b*t)})`;
-        } else if (p.pattern === "strobe") {
-          if (Math.sin(_webPhase + offset * 2) <= 0.6) return "rgb(0,0,0)";
-          pos = h0;
-        } else {
-          pos = h0 + t * (h1 - h0);
-        }
-        const [r, g, b] = paletteRGB(Math.max(0, Math.min(1, pos)));
-        return `rgb(${r},${g},${b})`;
       }
       return powered ? rgbStr(groups[gi].pos) : "#111";
     }
@@ -1155,112 +1034,6 @@ function stopAnimLoop() {
   if (_animFrameId !== null) { cancelAnimationFrame(_animFrameId); _animFrameId = null; _webLastTs = null; }
 }
 
-// ── Custom animation builder ──────────────────────────────────
-let customPattern  = "sweep";
-let customHueStart = 0.0;
-let customHueEnd   = 1.0;
-let customSync     = false;
-
-function getCustomParams() {
-  return { pattern: customPattern, hue_start: customHueStart, hue_end: customHueEnd, sync: customSync };
-}
-
-document.getElementById("custom-anim-toggle").addEventListener("click", () => {
-  const panel = document.getElementById("custom-anim-panel");
-  const open  = panel.classList.toggle("open");
-  document.getElementById("custom-anim-toggle").textContent = open
-    ? "− Custom Animation" : "+ Build Custom Animation";
-});
-
-document.querySelectorAll(".pattern-btn[data-pattern]").forEach(btn => {
-  btn.addEventListener("click", () => {
-    customPattern = btn.dataset.pattern;
-    document.querySelectorAll(".pattern-btn[data-pattern]").forEach(b =>
-      b.classList.toggle("active", b.dataset.pattern === customPattern));
-  });
-});
-
-document.getElementById("btn-sync-groups").addEventListener("click", () => {
-  customSync = !customSync;
-  const btn = document.getElementById("btn-sync-groups");
-  btn.textContent = customSync ? "In Sync" : "Offset";
-  btn.classList.toggle("active", customSync);
-});
-
-(function initHueRange() {
-  const track = document.getElementById("hue-range-track");
-  const fill  = document.getElementById("hue-range-fill");
-  const hS    = document.getElementById("hue-handle-start");
-  const hE    = document.getElementById("hue-handle-end");
-  track.style.background = COLOUR_GRADIENT;
-
-  function updateFill() {
-    const lo = Math.min(customHueStart, customHueEnd);
-    const hi = Math.max(customHueStart, customHueEnd);
-    fill.style.left  = `calc(10px + ${lo} * (100% - 20px))`;
-    fill.style.width = `calc(${hi - lo} * (100% - 20px))`;
-  }
-  function posFromEvent(e) {
-    const rect = track.getBoundingClientRect();
-    return Math.max(0, Math.min(1, ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width));
-  }
-  function makeHandleDraggable(handle, isStart) {
-    let dragging = false;
-    handle.addEventListener("mousedown",  e => { dragging = true; e.preventDefault(); });
-    handle.addEventListener("touchstart", () => { dragging = true; }, { passive: true });
-    document.addEventListener("mousemove", e => {
-      if (!dragging) return;
-      const pos = posFromEvent(e);
-      if (isStart) customHueStart = pos; else customHueEnd = pos;
-      const [r,g,b] = paletteRGB(pos);
-      handle.style.background = `rgb(${r},${g},${b})`;
-      handle.style.left = `calc(10px + ${pos} * (100% - 20px))`;
-      updateFill();
-    });
-    document.addEventListener("touchmove", e => {
-      if (!dragging) return; e.preventDefault();
-      const pos = posFromEvent(e);
-      if (isStart) customHueStart = pos; else customHueEnd = pos;
-      const [r,g,b] = paletteRGB(pos);
-      handle.style.background = `rgb(${r},${g},${b})`;
-      handle.style.left = `calc(10px + ${pos} * (100% - 20px))`;
-      updateFill();
-    }, { passive: false });
-    document.addEventListener("mouseup",  () => { dragging = false; });
-    document.addEventListener("touchend", () => { dragging = false; });
-  }
-  makeHandleDraggable(hS, true);
-  makeHandleDraggable(hE, false);
-  const [r0,g0,b0] = paletteRGB(customHueStart);
-  const [r1,g1,b1] = paletteRGB(customHueEnd);
-  hS.style.background = `rgb(${r0},${g0},${b0})`;
-  hE.style.background = `rgb(${r1},${g1},${b1})`;
-  hS.style.left = `calc(10px + ${customHueStart} * (100% - 20px))`;
-  hE.style.left = `calc(10px + ${customHueEnd}   * (100% - 20px))`;
-  updateFill();
-})();
-
-document.getElementById("btn-apply-custom").addEventListener("click", () => {
-  animMode = "custom";
-  syncAnimButtons();
-  publish({ anim_mode: "custom", anim_speed: animSpeed, anim_params: getCustomParams() });
-});
-
-document.getElementById("btn-save-custom").addEventListener("click", () => {
-  const name = document.getElementById("custom-anim-name").value.trim()
-    || `Custom ${loadScenes().length + 1}`;
-  const scenes = loadScenes();
-  scenes.push({
-    name,
-    groups: getGroups(), boundaries: Array.from(boundaries),
-    groupPositions: [...groupPositions], groupWLevels: [...groupWLevels],
-    brightness, fadeSteps, on: powered,
-    anim_mode: "custom", anim_speed: animSpeed, anim_params: getCustomParams(),
-  });
-  saveScenes(scenes);
-  renderScenes();
-  document.getElementById("custom-anim-name").value = "";
-});
 
 
 // ── Random ────────────────────────────────────────────────────
@@ -1734,12 +1507,6 @@ function _applySceneOrBuiltin(item, btn) {
     // Loading a scene always turns the lights on unless the scene explicitly stores on:false
     if (item.on === false) powered = false;
     else powered = true;
-    if (item.anim_params) {
-      customPattern  = item.anim_params.pattern   || "sweep";
-      customHueStart = item.anim_params.hue_start ?? 0.0;
-      customHueEnd   = item.anim_params.hue_end   ?? 1.0;
-      customSync     = item.anim_params.sync      ?? false;
-    }
     syncBrightnessSlider(); syncFadeSlider();
     syncAnimButtons(); syncAnimSlider(); updatePowerBtn();
     renderAll();
@@ -1832,7 +1599,6 @@ document.getElementById("btn-save-board-lib").addEventListener("click", () => {
     fade_steps:  fadeSteps,
     on:          powered,
   };
-  if (animMode === "custom") entry.anim_params = getCustomParams();
   publish({ save_anim: entry });
   boardLib[name] = entry;
   renderBoardLib();
