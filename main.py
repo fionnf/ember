@@ -219,10 +219,11 @@ def load_alarms():
 
 def save_alarms(data):
     global _alarms
-    _alarms = data
+    alarms = data if isinstance(data, list) else []
     try:
         with open(ALARM_FILE, "w") as f:
-            ujson.dump(data, f)
+            ujson.dump(alarms, f)
+        _alarms = alarms
     except Exception as e:
         print(f"[alarm] save failed: {e}")
 
@@ -381,6 +382,7 @@ def main():
                 client = connect_mqtt()
                 _backoff_ms    = RECONNECT_DELAY_MS   # reset on success
                 _ping_at       = utime.ticks_add(now, 20_000)
+                publish_event(engine.get_event_payload())
             except Exception as e:
                 print(f"[mqtt] reconnect failed: {e}")
                 _backoff_ms = min(_backoff_ms * 2, 60_000)  # cap at 60 s

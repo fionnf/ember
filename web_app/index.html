@@ -591,8 +591,8 @@ let groupWLevels   = [];
 let powered        = true;
 let brightness     = 0.6;
 let fadeSteps      = 60;
-const driftEnabled   = false;
-const driftInterval  = 45;
+let driftEnabled   = false;
+let driftInterval  = 45;
 const BOARD_ID     = "web_app";
 const boardLastSeen   = {};
 const boardLastChange = {};
@@ -727,6 +727,8 @@ function connect() {
       if (d.on         !== undefined) { powered = d.on;              updatePowerBtn(); }
       if (d.brightness !== undefined) { brightness = d.brightness;   syncBrightnessSlider(); }
       if (d.fade_steps !== undefined) { fadeSteps = d.fade_steps;    syncFadeSlider(); }
+      if (d.drift_enabled  !== undefined) driftEnabled  = d.drift_enabled;
+      if (d.drift_interval !== undefined) driftInterval = d.drift_interval;
       if (d.groups) {
         groupPositions = d.groups.map(x => x.pos);
         groupWLevels   = d.groups.map(x => x.w);
@@ -1248,8 +1250,7 @@ function _applySceneOrBuiltin(item, btn) {
     if (item.boundaries)     { boundaries.clear(); item.boundaries.forEach(b => boundaries.add(b)); }
     if (item.brightness  !== undefined) brightness  = item.brightness;
     if (item.fadeSteps   !== undefined) fadeSteps   = item.fadeSteps;
-    if (item.on === false) powered = false;
-    else powered = true;
+    if (item.on !== undefined) powered = item.on;
     syncBrightnessSlider(); syncFadeSlider(); updatePowerBtn();
     renderAll();
     publishState();

@@ -112,8 +112,6 @@ class ColourEngine:
         self._power_dir  = 1 if self._powered_on else -1
 
     def force_colour(self, groups, fade_steps_override=None):
-        if not self._powered_on:
-            return
         fs = fade_steps_override if fade_steps_override is not None else self._fade_steps
         n  = len(groups)
         if n != self._n:
@@ -238,6 +236,8 @@ class ColourEngine:
 
             # Breathing
             self._breathe_phase[i] += BREATHE_SPEED * dt
+            if self._breathe_phase[i] > 6.283185:
+                self._breathe_phase[i] -= 6.283185
             breath = 1.0 + math.sin(self._breathe_phase[i]) * BREATHE_DEPTH
 
             scale = breath * self._power_level
