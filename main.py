@@ -20,10 +20,11 @@ from config import (
     WEBREPL_PASSWORD,
 )
 
-FIRMWARE_VERSION = "2025-05-15"   # update when pushing a significant change
-FRAME_MS         = 16       # ~60 fps tick rate
-SYNC_INTERVAL_MS = 60_000   # boss resyncs follower every 60 s
-SYNC_FADE_STEPS  = 300      # ~5 s slow fade on follower when resyncing
+FIRMWARE_VERSION       = "2026-06-23"
+FRAME_MS               = 16
+SYNC_INTERVAL_MS       = 60_000
+SYNC_FADE_STEPS        = 300
+WIFI_OFFLINE_REBOOT_MS = 10 * 60 * 1000   # reboot after 10 min offline
 from sk6812 import SK6812
 from touch   import TouchManager
 from colour  import ColourEngine
@@ -129,10 +130,6 @@ def on_message(topic, msg):
     fade_steps     = data.get("fade_steps")
     drift_enabled  = data.get("drift_enabled")
     drift_interval = data.get("drift_interval")
-    anim_mode      = data.get("anim_mode", "__unset__")
-    anim_speed     = data.get("anim_speed")
-    anim_params    = data.get("anim_params")
-
     if on is not None:
         engine.set_power(bool(on))
         save_state()  # persist so board restores correct state after unexpected reboot
@@ -146,9 +143,7 @@ def on_message(topic, msg):
         engine.set_drift_enabled(bool(drift_enabled))
     if drift_interval is not None:
         engine.set_drift_interval(int(drift_interval))
-    if anim_mode != "__unset__":
-        engine.set_animation(anim_mode, anim_speed if anim_speed is not None else 1.0, anim_params)
-    if groups is not None and on is not False and (not engine._anim_mode or not data.get("sync")):
+    if groups is not None and on is not False:
         fade_override = SYNC_FADE_STEPS if data.get("sync") else None
         engine.force_colour(groups, fade_steps_override=fade_override)
 
@@ -159,40 +154,6 @@ def on_message(topic, msg):
     if "set_alarms" in data:
         save_alarms(data["set_alarms"])
         print(f"[alarm] saved {len(_alarms)} alarms")
-
-    # ── On-board animation library commands ──
-    if "save_anim" in data:
-        entry = data["save_anim"]
-        name  = entry.get("name", "").strip()
-        if name:
-            _animations[name] = entry
-            save_animations()
-            print(f"[anim] saved '{name}'")
-            # Acknowledge: publish the current library back so the web app updates
-            if client:
-                publish_event({"anim_library": _animations, "from": BOARD_ID})
-
-    if "play_anim" in data:
-        name = data["play_anim"]
-        entry = _animations.get(name)
-        if entry:
-            apply_animation(entry)
-            print(f"[anim] playing '{name}'")
-        else:
-            print(f"[anim] unknown: '{name}'")
-
-    if "delete_anim" in data:
-        name = data["delete_anim"]
-        if name in _animations:
-            del _animations[name]
-            save_animations()
-            print(f"[anim] deleted '{name}'")
-            if client:
-                publish_event({"anim_library": _animations, "from": BOARD_ID})
-
-    if data.get("list_anims"):
-        if client:
-            publish_event({"anim_library": _animations, "from": BOARD_ID})
 
     if data.get("reboot"):
         print("[mqtt] reboot requested — saving state and rebooting")
@@ -243,7 +204,6 @@ OTA_HOUR_UTC = 17   # 5 pm UTC — daily reboot triggers boot.py OTA
 
 STATE_FILE  = "state.json"
 ALARM_FILE  = "alarms.json"
-ANIM_FILE   = "animations.json"
 
 # ── Alarms ───────────────────────────────────────────────────
 
@@ -259,53 +219,13 @@ def load_alarms():
 
 def save_alarms(data):
     global _alarms
-    _alarms = data
+    alarms = data if isinstance(data, list) else []
     try:
         with open(ALARM_FILE, "w") as f:
-            ujson.dump(data, f)
+            ujson.dump(alarms, f)
+        _alarms = alarms
     except Exception as e:
         print(f"[alarm] save failed: {e}")
-
-# ── On-board animation library ───────────────────────────────
-# Stored in animations.json as {name: {groups, anim_mode, anim_speed, ...}}
-# The web app writes entries once via save_anim; boards play them via play_anim.
-
-_animations = {}
-
-def load_animations():
-    global _animations
-    try:
-        with open(ANIM_FILE) as f:
-            _animations = ujson.load(f)
-        print(f"[anim] loaded {len(_animations)} saved animations")
-    except Exception:
-        _animations = {}
-
-def save_animations():
-    try:
-        with open(ANIM_FILE, "w") as f:
-            ujson.dump(_animations, f)
-    except Exception as e:
-        print(f"[anim] save failed: {e}")
-
-def apply_animation(entry):
-    """Apply a stored animation entry to the engine."""
-    anim_mode   = entry.get("anim_mode")
-    anim_speed  = entry.get("anim_speed", 1.0)
-    anim_params = entry.get("anim_params")
-    groups      = entry.get("groups")
-    on          = entry.get("on", True)
-    brightness  = entry.get("brightness")
-    fade_steps  = entry.get("fade_steps")
-    engine.set_animation(anim_mode, float(anim_speed) if anim_speed is not None else 1.0, anim_params)
-    if on is not None:
-        engine.set_power(bool(on))
-    if brightness is not None:
-        engine.set_brightness(float(brightness))
-    if fade_steps is not None:
-        engine.set_fade_steps(int(fade_steps))
-    if groups and on is not False and not anim_mode:
-        engine.force_colour(groups)
 
 def save_state():
     try:
@@ -431,9 +351,7 @@ def main():
     # Restore power state saved before the last OTA reboot
     restore_state()
 
-    # Load saved alarms and animation library
     load_alarms()
-    load_animations()
 
     # Setup complete — fade out the pulse and hand off to the engine
     pulser.stop()
@@ -448,7 +366,7 @@ def main():
     _sync_at        = utime.ticks_add(utime.ticks_ms(), SYNC_INTERVAL_MS)
     _heartbeat_at   = utime.ticks_add(utime.ticks_ms(), 5_000)  # first beat soon after boot
     _backoff_ms     = RECONNECT_DELAY_MS
-    _anim_announce  = True   # publish library once after first connect
+    _offline_since  = None   # when client first became None (WiFi watchdog)
 
     while True:
         now = utime.ticks_ms()
@@ -464,7 +382,7 @@ def main():
                 client = connect_mqtt()
                 _backoff_ms    = RECONNECT_DELAY_MS   # reset on success
                 _ping_at       = utime.ticks_add(now, 20_000)
-                _anim_announce = True  # publish library to any newly-connected web app
+                publish_event(engine.get_event_payload())
             except Exception as e:
                 print(f"[mqtt] reconnect failed: {e}")
                 _backoff_ms = min(_backoff_ms * 2, 60_000)  # cap at 60 s
@@ -487,6 +405,18 @@ def main():
                 print(f"[mqtt] check_msg error: {e}")
                 client = None
 
+        # ── WiFi watchdog — reboot if offline > 10 min ──
+        if client is None:
+            if _offline_since is None:
+                _offline_since = now
+            elif utime.ticks_diff(now, _offline_since) >= WIFI_OFFLINE_REBOOT_MS:
+                print("[wifi] offline > 10 min — rebooting to recover connection")
+                save_state()
+                import machine
+                machine.reset()
+        else:
+            _offline_since = None
+
         # ── Boss sync — publish current state every 60 s for follower to drift to ──
         if BOSS and client is not None and utime.ticks_diff(now, _sync_at) >= 0:
             payload = engine.get_event_payload()
@@ -495,15 +425,9 @@ def main():
             print("[sync] boss published state")
             _sync_at = utime.ticks_add(now, SYNC_INTERVAL_MS)
 
-        # ── Announce animation library once after (re)connect ──
-        if _anim_announce and client is not None and _animations:
-            publish_event({"anim_library": _animations})
-            _anim_announce = False
-
         # ── Heartbeat — announce presence every 30 s ──
         if client is not None and utime.ticks_diff(now, _heartbeat_at) >= 0:
-            publish_event({"heartbeat": True, "fw": FIRMWARE_VERSION,
-                           "anim": engine._anim_mode})
+            publish_event({"heartbeat": True, "fw": FIRMWARE_VERSION})
             _heartbeat_at = utime.ticks_add(now, 30_000)
 
         # ── Daily OTA reboot at OTA_HOUR_UTC — save state first ──
