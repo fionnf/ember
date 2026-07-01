@@ -243,6 +243,31 @@
     .g-title { font-size: 0.73rem; font-weight: 600; color: var(--text); }
     .g-sub   { font-size: 0.6rem; color: var(--muted); }
 
+    /* ── Animation card ── */
+    .anim-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.45rem;
+      margin-bottom: 0.85rem;
+    }
+    .anim-tile {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.3rem; padding: 0.7rem 0.3rem 0.65rem;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      background: transparent; color: var(--muted);
+      font-family: inherit; cursor: pointer;
+      transition: all 0.18s;
+    }
+    .anim-tile:hover { border-color: var(--border2); color: var(--text2); background: var(--surface2); }
+    .anim-tile .tile-icon { font-size: 1.2rem; line-height: 1; }
+    .anim-tile .tile-name { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.03em; }
+    .anim-tile.active {
+      background: rgba(240,160,48,0.1);
+      border-color: rgba(240,160,48,0.45);
+      color: var(--accent);
+    }
+    .anim-tile.active .tile-icon { filter: drop-shadow(0 0 4px rgba(240,160,48,0.6)); }
+
     /* ── Library (presets + scenes) ── */
 
     /* Scene / preset rows */
@@ -259,6 +284,11 @@
     .scene-row:hover { border-color: var(--border2); background: var(--surface2); }
     .scene-swatches { display: flex; gap: 3px; flex-shrink: 0; }
     .scene-dot { width: 11px; height: 11px; border-radius: 50%; }
+    .scene-anim-badge {
+      font-size: 0.58rem; color: var(--muted); background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 4px;
+      padding: 0.1rem 0.38rem; flex-shrink: 0; letter-spacing: 0.04em;
+    }
     .scene-name {
       flex: 1; font-size: 0.8rem; font-weight: 500; color: var(--text);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -279,6 +309,28 @@
       transition: color 0.15s, border-color 0.15s;
     }
     .scene-del:hover { color: var(--red); border-color: rgba(224,72,72,0.3); }
+    .board-lib-row {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.45rem 0.6rem; border-radius: var(--r-xs);
+      border: 1px solid var(--border); background: var(--surface2);
+      transition: border-color 0.15s;
+    }
+    .board-lib-row:hover { border-color: var(--border2); }
+    .board-lib-name { flex: 1; font-size: 0.8rem; color: var(--text2); }
+    .board-lib-play {
+      padding: 0.28rem 0.65rem; font-size: 0.72rem; font-weight: 600;
+      border-radius: var(--r-xs); border: 1px solid rgba(240,160,48,0.35);
+      background: rgba(240,160,48,0.08); color: var(--accent); cursor: pointer;
+      font-family: inherit; transition: background 0.15s;
+    }
+    .board-lib-play:hover { background: rgba(240,160,48,0.18); }
+    .board-lib-del {
+      padding: 0.28rem 0.45rem; font-size: 0.72rem; border-radius: var(--r-xs);
+      border: 1px solid transparent; background: transparent; color: var(--muted);
+      cursor: pointer; font-family: inherit; transition: color 0.15s, border-color 0.15s;
+    }
+    .board-lib-del:hover { color: var(--red); border-color: rgba(224,72,72,0.3); }
+    .board-lib-empty { font-size:0.78rem; color:var(--muted); padding:0.3rem 0; }
     .save-row { display: flex; gap: 0.5rem; }
     .save-row input {
       flex: 1; background: rgba(0,0,0,0.25); border: 1px solid var(--border);
@@ -466,6 +518,46 @@
   </div>
 </div>
 
+<!-- Animation -->
+<div class="card">
+  <div class="card-title">Animation</div>
+  <div class="anim-grid">
+    <button class="anim-tile active" data-mode="">
+      <span class="tile-icon">◎</span>
+      <span class="tile-name">Off</span>
+    </button>
+    <button class="anim-tile" data-mode="rainbow">
+      <span class="tile-icon">🌈</span>
+      <span class="tile-name">Rainbow</span>
+    </button>
+    <button class="anim-tile" data-mode="wave">
+      <span class="tile-icon">〰</span>
+      <span class="tile-name">Wave</span>
+    </button>
+    <button class="anim-tile" data-mode="candle">
+      <span class="tile-icon">🕯</span>
+      <span class="tile-name">Candle</span>
+    </button>
+  </div>
+  <div class="sl-row">
+    <span class="sl-label">Speed</span>
+    <input type="range" id="sl-anim-speed" min="5" max="100" value="30"
+      style="background:linear-gradient(to right,rgba(62,196,109,0.2),rgba(224,104,32,0.7))">
+    <span class="sl-val" id="val-anim-speed">3.0×</span>
+  </div>
+
+</div>
+
+<!-- Board animation library -->
+<div class="card">
+  <div class="card-title">Board Library <span id="board-lib-hint" style="font-size:0.6rem;color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none;margin-left:0.4rem">— animations stored on the lights, played with one short message</span></div>
+  <div id="board-lib-list" style="display:flex;flex-direction:column;gap:0.4rem"></div>
+  <div class="save-row" style="margin-top:0.5rem">
+    <input id="board-lib-name" placeholder="Save current scene to board…" maxlength="28">
+    <button id="btn-save-board-lib">Save to Board</button>
+  </div>
+</div>
+
 <!-- Sunrise -->
 <div class="card">
   <div class="card-title">Alarms</div>
@@ -521,7 +613,7 @@
 </div>
 
 <script>
-// ── Config ────────────────────────────────────────────────────
+// ── Config ────────────────────────────────────────────────
 let cfg = {
   broker:    localStorage.getItem("ll_broker")    || "wss://broker.hivemq.com:8884/mqtt",
   prefix:    localStorage.getItem("ll_prefix")    || "picolight_lf26",
@@ -537,7 +629,7 @@ document.getElementById("cfg-prefix").value  = cfg.prefix;
 document.getElementById("cfg-leds").value    = cfg.numLeds;
 document.getElementById("cfg-groups").value  = cfg.numGroups;
 
-// ── Palette ───────────────────────────────────────────────────
+// ── Palette ─────────────────────────────────────────────────
 const PALETTE = [
   [255,200,80],[255,160,0],[255,120,0],[255,60,0],
   [255,0,0],[255,0,60],[255,0,140],[200,0,200],
@@ -572,6 +664,18 @@ function rgbStr(pos) {
   return `rgb(${r},${g},${b})`;
 }
 
+function hsvRainbow(h) {
+  const h6 = ((h % 1) + 1) % 1 * 6;
+  const i  = Math.floor(h6), f = h6 - i;
+  const t  = Math.round(f * 255), q = Math.round((1 - f) * 255), v = 255;
+  if (i === 0) return [v, t, 0];
+  if (i === 1) return [q, v, 0];
+  if (i === 2) return [0, v, t];
+  if (i === 3) return [0, q, v];
+  if (i === 4) return [t, 0, v];
+  return [v, 0, q];
+}
+
 function paletteGradient() {
   const stops = [];
   const steps = 24;
@@ -584,29 +688,38 @@ function paletteGradient() {
 }
 const COLOUR_GRADIENT = paletteGradient();
 
-// ── State ─────────────────────────────────────────────────────
+// ── State ───────────────────────────────────────────────────
 let boundaries     = new Set();
 let groupPositions = [];
 let groupWLevels   = [];
 let powered        = true;
 let brightness     = 0.6;
 let fadeSteps      = 60;
-let driftEnabled   = false;
-let driftInterval  = 45;
+const driftEnabled   = false;
+const driftInterval  = 45;
 const BOARD_ID     = "web_app";
 const boardLastSeen   = {};
 const boardLastChange = {};
 const boardLastFw     = {};   // firmware version per board
+const boardLastAnim   = {};   // current anim mode per board
 const boardLastPower  = {};   // last known on/off state per board
 const BOARD_TIMEOUT_MS = 65_000;  // 2 missed 30s heartbeats + 5s grace
+let animMode    = "";
+let animSpeed   = 3.0;
 let alarms      = [];
 let sendTarget  = "both";  // "both" | cfg.boardIdA | cfg.boardIdB
+let boardLib    = {};      // animations stored on board: {name: entry}
 
 // Board pill "last known state" description
 function boardStateDesc(d) {
   if (d.heartbeat) return "online";
   if (d.on === false) return "lights off";
   if (d.on === true)  return "lights on";
+  if (d.anim_mode === "rainbow") return "rainbow";
+  if (d.anim_mode === "candle")  return "candle";
+  if (d.anim_mode === "wave")    return "wave";
+  if (d.anim_mode === "custom")  return "custom anim";
+  if (d.anim_mode === null || d.anim_mode === "")  return "static";
   if (d.groups) return "colours changed";
   if (d.brightness !== undefined) return `${Math.round(d.brightness*100)}% bright`;
   return "updated";
@@ -638,8 +751,9 @@ function updatePills() {
     }
     const sub = document.getElementById(subId);
     const extra    = boardLastFw[boardId]   ? ` · fw ${boardLastFw[boardId]}`   : "";
+    const animLabel= boardLastAnim[boardId] ? ` · ${boardLastAnim[boardId]}`    : "";
     const subText  = reachable
-      ? ((boardLastChange[boardId] || "online") + extra)
+      ? ((boardLastChange[boardId] || "online") + animLabel + extra)
       : "offline";
     if (sub.textContent !== subText) sub.textContent = subText;
   });
@@ -698,6 +812,8 @@ function connect() {
     client.subscribe(topicAlarms());
     // Ping boards immediately so they echo their state back (pills update fast)
     setTimeout(() => publish({ ping: true }), 300);
+    // Request the board's saved animation library
+    setTimeout(requestBoardLib, 600);
   });
   client.on("message", (t, msg) => {
     const topicStr = t.toString();
@@ -720,15 +836,18 @@ function connect() {
         boardLastChange[d.from] = boardStateDesc(d);
         if (d.fw)  boardLastFw[d.from]  = d.fw;
         if (d.on !== undefined) boardLastPower[d.from] = d.on;
+        if (d.anim !== undefined) boardLastAnim[d.from] = d.anim || "static";
+        else if (d.anim_mode !== undefined) boardLastAnim[d.from] = d.anim_mode || "static";
         updatePills();
         _scheduleBoardTimeout(d.from);
       }
+      if (d.anim_library) { boardLib = d.anim_library; renderBoardLib(); }
       if (d.from === BOARD_ID) return;
       if (d.on         !== undefined) { powered = d.on;              updatePowerBtn(); }
       if (d.brightness !== undefined) { brightness = d.brightness;   syncBrightnessSlider(); }
       if (d.fade_steps !== undefined) { fadeSteps = d.fade_steps;    syncFadeSlider(); }
-      if (d.drift_enabled  !== undefined) driftEnabled  = d.drift_enabled;
-      if (d.drift_interval !== undefined) driftInterval = d.drift_interval;
+      if (d.anim_mode  !== undefined) { animMode  = d.anim_mode || ""; syncAnimButtons(); }
+      if (d.anim_speed !== undefined) { animSpeed = d.anim_speed; syncAnimSlider(); }
       if (d.groups) {
         groupPositions = d.groups.map(x => x.pos);
         groupWLevels   = d.groups.map(x => x.w);
@@ -747,7 +866,7 @@ function connect() {
   client.on("reconnect", () => setStatus("connecting",   "reconnecting…"));
 }
 
-// ── Debounce helper ───────────────────────────────────────────
+// ── Debounce helper ────────────────────────────────────────────
 function debounce(fn, ms) {
   let timer;
   return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
@@ -809,9 +928,113 @@ function publishRetained(topicFn, payload) {
 
 function publishState() {
   const p = { groups: getGroups(), on: powered, brightness, fade_steps: fadeSteps,
-              drift_enabled: driftEnabled, drift_interval: driftInterval };
+              drift_enabled: driftEnabled, drift_interval: driftInterval,
+              anim_mode: animMode || null, anim_speed: animSpeed };
   publish(p);
 }
+
+
+// ── Animation ───────────────────────────────────────────────
+function syncAnimButtons() {
+  document.querySelectorAll(".anim-tile").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.mode === animMode);
+  });
+  if (animMode) startAnimLoop(); else { stopAnimLoop(); renderStrip(); }
+}
+function syncAnimSlider() {
+  document.getElementById("sl-anim-speed").value = Math.round(animSpeed * 10);
+  document.getElementById("val-anim-speed").textContent = animSpeed.toFixed(1) + "×";
+}
+document.querySelectorAll(".anim-tile").forEach(btn => {
+  btn.addEventListener("click", () => {
+    animMode = btn.dataset.mode;
+    syncAnimButtons();
+    const payload = { anim_mode: animMode || null, anim_speed: animSpeed };
+    publish(payload);
+  });
+});
+const _publishAnimSpeed = debounce(() => {
+  publish({ anim_mode: animMode || null, anim_speed: animSpeed });
+}, 120);
+document.getElementById("sl-anim-speed").addEventListener("input", e => {
+  animSpeed = parseInt(e.target.value) / 10;
+  document.getElementById("val-anim-speed").textContent = animSpeed.toFixed(1) + "×";
+  _publishAnimSpeed();
+});
+
+// ── Strip animation preview loop ────────────────────────────────────
+let _webPhase    = 0;
+let _webLastTs   = null;
+let _animFrameId = null;
+let _ledCache    = null;   // cached NodeList, cleared on renderStrip
+const _FRAME_MS  = 33;     // ~30 fps cap
+const _CANDLE_MS = 100;    // candle updates at 10 fps
+let _candleLastTs = 0;
+
+function _invalidateLedCache() { _ledCache = null; }
+
+function _ledColour(ledIdx, groups) {
+  let cursor = 0;
+  for (let gi = 0; gi < groups.length; gi++) {
+    const end = cursor + groups[gi].size;
+    if (ledIdx < end) {
+      if (animMode === "rainbow") {
+        const hue = ((_webPhase / 6.2832) + gi / Math.max(groups.length, 1)) % 1;
+        const [r, g, b] = hsvRainbow(hue);
+        return `rgb(${r},${g},${b})`;
+      } else if (animMode === "wave") {
+        const wave = 0.5 + 0.5 * Math.sin(_webPhase * 3.0 + gi * 1.5);
+        const [r, g, b] = paletteRGB(groups[gi].pos);
+        return `rgb(${Math.round(r*wave)},${Math.round(g*wave)},${Math.round(b*wave)})`;
+      } else if (animMode === "candle") {
+        const flicker = 0.55 + Math.random() * 0.45;
+        const [r, g, b] = paletteRGB(groups[gi].pos);
+        return `rgb(${Math.round(r*flicker)},${Math.round(g*flicker)},${Math.round(b*flicker)})`;
+      }
+      return powered ? rgbStr(groups[gi].pos) : "#111";
+    }
+    cursor = end;
+  }
+  return "#111";
+}
+
+function _animFrame(ts) {
+  // Throttle to ~30fps
+  if (_webLastTs !== null && ts - _webLastTs < _FRAME_MS) {
+    _animFrameId = requestAnimationFrame(_animFrame);
+    return;
+  }
+  // Skip candle DOM update if it fired too recently
+  if (animMode === "candle" && ts - _candleLastTs < _CANDLE_MS) {
+    if (_webLastTs !== null) _webPhase += 0.0015 * animSpeed * (ts - _webLastTs);
+    _webLastTs = ts;
+    _animFrameId = requestAnimationFrame(_animFrame);
+    return;
+  }
+  if (_webLastTs !== null) _webPhase += 0.0015 * animSpeed * (ts - _webLastTs);
+  _webLastTs = ts;
+  if (animMode === "candle") _candleLastTs = ts;
+
+  if (!_ledCache) _ledCache = document.querySelectorAll("#leds-row .led");
+  const groups = getGroups();
+  const dark = "#111";
+  for (let i = 0; i < _ledCache.length; i++) {
+    _ledCache[i].style.background = powered ? _ledColour(i, groups) : dark;
+  }
+  _animFrameId = requestAnimationFrame(_animFrame);
+}
+
+function startAnimLoop() {
+  if (_animFrameId !== null) return;
+  _webPhase = 0; _webLastTs = null; _candleLastTs = 0;
+  _animFrameId = requestAnimationFrame(_animFrame);
+}
+
+function stopAnimLoop() {
+  if (_animFrameId !== null) { cancelAnimationFrame(_animFrameId); _animFrameId = null; _webLastTs = null; }
+}
+
+
 
 // ── Random ────────────────────────────────────────────────────
 function randFloat(lo,hi) { return lo + Math.random()*(hi-lo); }
@@ -840,8 +1063,9 @@ function randomise() {
   groupWLevels   = Array.from({length: n}, () => randFloat(0.6,1.0));
 }
 
-// ── Rendering ─────────────────────────────────────────────────
+// ── Rendering ───────────────────────────────────────────────────
 function renderStrip() {
+  _invalidateLedCache();
   const cols = `repeat(${cfg.numLeds}, 1fr)`;
   const ledsRow = document.getElementById("leds-row");
   const divRow  = document.getElementById("dividers-row");
@@ -982,7 +1206,7 @@ function syncFadeSlider() {
   document.getElementById("val-fade").textContent = Math.round(fadeSteps*16/1000*10)/10+"s";
 }
 
-// ── Group handlers ────────────────────────────────────────────
+// ── Group handlers ─────────────────────────────────────────────
 const _publishStateDebounced = debounce(publishState, 120);
 function onGroupW(i, val) {
   groupWLevels[i] = val;
@@ -990,7 +1214,7 @@ function onGroupW(i, val) {
   _publishStateDebounced();
 }
 
-// ── Global handlers ───────────────────────────────────────────
+// ── Global handlers ─────────────────────────────────────────────
 function updatePowerBtn() {
   const btn = document.getElementById("btn-power");
   btn.className = powered ? "power-btn on" : "power-btn off";
@@ -1008,6 +1232,8 @@ document.getElementById("btn-power").addEventListener("click", () => {
 });
 
 document.getElementById("btn-reset").addEventListener("click", () => {
+  // Reset colours only — leave brightness/speed/drift settings untouched
+  animMode = ""; syncAnimButtons();
   groupPositions = groupPositions.map(() => 0.0);
   groupWLevels   = groupWLevels.map(() => 1.0);
   renderAll(); publishState();
@@ -1073,7 +1299,7 @@ document.getElementById("btn-reconnect").addEventListener("click", () => {
   });
 })();
 
-// ── Alarms ────────────────────────────────────────────────────
+// ── Alarms ──────────────────────────────────────────────────────
 const DAY_LABELS = ["Mo","Tu","We","Th","Fr","Sa","Su"];
 
 function defaultAlarm() {
@@ -1188,7 +1414,7 @@ document.getElementById("btn-add-alarm").addEventListener("click", () => {
   alarms.push(defaultAlarm()); renderAlarms(); publishAlarms();
 });
 
-// ── Scenes ────────────────────────────────────────────────────
+// ── Scenes ──────────────────────────────────────────────────────
 function loadScenes() {
   try { return JSON.parse(localStorage.getItem("ll_scenes") || "[]"); }
   catch(e) { return []; }
@@ -1198,8 +1424,11 @@ function saveScenes(scenes) {
   localStorage.setItem("ll_scenes", JSON.stringify(scenes));
 }
 
-// ── Scenes (unified — built-ins + user-saved) ─────────────────
-const BUILTIN_SCENES = [];
+// ── Scenes (unified — built-ins + user-saved) ─────────────────────────
+const BUILTIN_SCENES = [
+  { name: "🌈 Rainbow",        anim_mode: "rainbow", anim_speed: 3.0 },
+  { name: "🌈 Static Rainbow", anim_mode: null, _staticRainbow: true },
+];
 
 // Migrate legacy ll_presets into ll_scenes once
 (function migrateLegacyPresets() {
@@ -1223,7 +1452,17 @@ function swatchRGB(pos) {
   return [0,1,2].map(i => Math.round(lerp(c1[i], c2[i], frac)));
 }
 
+function _animBadge(item) {
+  if (!item.anim_mode) return "";
+  const icons = { rainbow:"🌈", candle:"🕯", wave:"〰️", custom:"✦" };
+  return `<span class="scene-anim-badge">${icons[item.anim_mode] || item.anim_mode}</span>`;
+}
+
 function _sceneSwatches(item) {
+  if (item.anim_mode === "rainbow") {
+    // Show a mini rainbow gradient instead of blank dots
+    return `<div style="width:36px;height:11px;border-radius:6px;background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);flex-shrink:0"></div>`;
+  }
   const positions = item.groupPositions || (item.groups ? item.groups.map(g => g.pos) : []);
   if (!positions.length) return "";
   return `<div class="scene-swatches">${positions.map(pos => {
@@ -1238,22 +1477,41 @@ function captureScene(name) {
     name,
     groups: getGroups(), boundaries: Array.from(boundaries),
     groupPositions: [...groupPositions], groupWLevels: [...groupWLevels],
-    brightness, fadeSteps, on: powered,
+    brightness, fadeSteps,
+    on: powered, anim_mode: animMode || null, anim_speed: animSpeed,
   };
 }
 
 
 function _applySceneOrBuiltin(item, btn) {
   try {
+    if (item._staticRainbow) {
+      const n = cfg.numLeds;
+      boundaries.clear();
+      for (let i = 1; i < n; i++) boundaries.add(i);
+      groupPositions = Array.from({length: n}, (_, i) => i / n);
+      groupWLevels   = Array.from({length: n}, () => 0);
+    } else if (item._reset3Groups) {
+      // Reset to 3 evenly-spaced groups matching the board's default NUM_GROUPS
+      boundaries.clear();
+      const step = Math.floor(cfg.numLeds / 3);
+      boundaries.add(step); boundaries.add(step * 2);
+    }
+    animMode  = item.anim_mode  || "";
+    animSpeed = item.anim_speed ?? 1.0;
     if (item.groupPositions) groupPositions = [...item.groupPositions];
     if (item.groupWLevels)   groupWLevels   = [...item.groupWLevels];
     if (item.boundaries)     { boundaries.clear(); item.boundaries.forEach(b => boundaries.add(b)); }
     if (item.brightness  !== undefined) brightness  = item.brightness;
     if (item.fadeSteps   !== undefined) fadeSteps   = item.fadeSteps;
-    if (item.on !== undefined) powered = item.on;
-    syncBrightnessSlider(); syncFadeSlider(); updatePowerBtn();
+    // Loading a scene always turns the lights on unless the scene explicitly stores on:false
+    if (item.on === false) powered = false;
+    else powered = true;
+    syncBrightnessSlider(); syncFadeSlider();
+    syncAnimButtons(); syncAnimSlider(); updatePowerBtn();
     renderAll();
     publishState();
+    // Visual confirmation on the button
     if (btn) { const orig = btn.textContent; btn.textContent = "✓"; setTimeout(() => { btn.textContent = orig; }, 1000); }
     if (!client || !client.connected) showToast("Loaded locally — not connected to MQTT");
   } catch(e) {
@@ -1275,6 +1533,7 @@ function renderScenes() {
     row.className = "scene-row";
     row.innerHTML = `
       ${_sceneSwatches(item)}
+      ${_animBadge(item)}
       <span class="scene-name">${item.name}</span>
       <button class="scene-load">Load</button>
       ${builtin ? "" : `<button class="scene-del">✕</button>`}`;
@@ -1297,11 +1556,67 @@ document.getElementById("btn-save-scene").addEventListener("click", () => {
   renderScenes();
 });
 
-// ── Init ──────────────────────────────────────────────────────
-initGroups(cfg.numGroups);
+// ── Board animation library ────────────────────────────────────────────
+function renderBoardLib() {
+  const container = document.getElementById("board-lib-list");
+  container.innerHTML = "";
+  const names = Object.keys(boardLib).sort();
+  if (!names.length) {
+    container.innerHTML = `<div class="board-lib-empty">No animations saved to board yet.</div>`;
+    return;
+  }
+  names.forEach(name => {
+    const row = document.createElement("div");
+    row.className = "board-lib-row";
+    row.innerHTML = `
+      <span class="board-lib-name">▶ ${name}</span>
+      <button class="board-lib-play">Play</button>
+      <button class="board-lib-del">✕</button>`;
+    row.querySelector(".board-lib-play").addEventListener("click", e => {
+      publish({ play_anim: name });
+      const btn = e.currentTarget;
+      const orig = btn.textContent;
+      btn.textContent = "✓"; setTimeout(() => { btn.textContent = orig; }, 900);
+    });
+    row.querySelector(".board-lib-del").addEventListener("click", () => {
+      if (!confirm(`Delete "${name}" from board?`)) return;
+      publish({ delete_anim: name });
+      delete boardLib[name]; renderBoardLib();
+    });
+    container.appendChild(row);
+  });
+}
+
+document.getElementById("btn-save-board-lib").addEventListener("click", () => {
+  const name = document.getElementById("board-lib-name").value.trim()
+    || "Anim " + (Object.keys(boardLib).length + 1);
+  const entry = {
+    name,
+    groups:      getGroups(),
+    anim_mode:   animMode || null,
+    anim_speed:  animSpeed,
+    brightness,
+    fade_steps:  fadeSteps,
+    on:          powered,
+  };
+  publish({ save_anim: entry });
+  boardLib[name] = entry;
+  renderBoardLib();
+  document.getElementById("board-lib-name").value = "";
+  showToast(`✓ "${name}" saved to board`);
+});
+
+// Request the board's current library when we connect
+function requestBoardLib() { publish({ list_anims: true }); }
+
+// ── Init ────────────────────────────────────────────────────────
+initiGroups(cfg.numGroups);
 renderAll();
 renderScenes();
+renderBoardLib();
 renderAlarms();
+syncAnimButtons();
+syncAnimSlider();
 updatePills();
 updateTargetBtns();
 updatePowerBtn();
