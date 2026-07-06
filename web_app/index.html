@@ -1229,9 +1229,7 @@ function saveScenes(scenes) {
 }
 
 // ── Scenes (unified — built-ins + user-saved) ─────────────────────────
-const BUILTIN_SCENES = [
-  { name: "🌈 Static Rainbow", _staticRainbow: true },
-];
+const BUILTIN_SCENES = [];
 
 // Migrate legacy ll_presets into ll_scenes once
 (function migrateLegacyPresets() {
@@ -1278,18 +1276,6 @@ function captureScene(name) {
 
 function _applySceneOrBuiltin(item, btn) {
   try {
-    if (item._staticRainbow) {
-      const n = cfg.numLeds;
-      boundaries.clear();
-      for (let i = 1; i < n; i++) boundaries.add(i);
-      groupPositions = Array.from({length: n}, (_, i) => i / n);
-      groupWLevels   = Array.from({length: n}, () => 0);
-    } else if (item._reset3Groups) {
-      // Reset to 3 evenly-spaced groups matching the board's default NUM_GROUPS
-      boundaries.clear();
-      const step = Math.floor(cfg.numLeds / 3);
-      boundaries.add(step); boundaries.add(step * 2);
-    }
     if (item.groupPositions) groupPositions = [...item.groupPositions];
     if (item.groupWLevels)   groupWLevels   = [...item.groupWLevels];
     if (item.boundaries)     { boundaries.clear(); item.boundaries.forEach(b => boundaries.add(b)); }
