@@ -620,7 +620,8 @@ const boardLastSeen   = {};
 const boardLastChange = {};
 const boardLastFw     = {};   // firmware version per board
 const boardLastPower  = {};   // last known on/off state per board
-const BOARD_TIMEOUT_MS = 65_000;  // 2 missed 30s heartbeats + 5s grace
+const PING_INTERVAL_MS  = 120_000; // active presence poll every 2 min
+const BOARD_TIMEOUT_MS  = 150_000; // 2.5× ping interval before marking offline
 let alarms      = [];
 let sendTarget  = "both";  // "both" | cfg.boardIdA | cfg.boardIdB
 
@@ -695,6 +696,7 @@ function groupCount() { return boundaries.size + 1; }
 
 // ── MQTT ──────────────────────────────────────────────────────
 let client = null;
+let _pingIntervalId = null;
 
 function topic()       { return cfg.prefix + "/events"; }
 function topicScenes() { return cfg.prefix + "/scenes"; }
@@ -710,6 +712,7 @@ function setStatus(cls, text) {
 }
 
 function connect() {
+  if (_pingIntervalId) { clearInterval(_pingIntervalId); _pingIntervalId = null; }
   if (client) { try { client.end(true); } catch(e) {} }
   setStatus("connecting", "connecting…");
   client = mqtt.connect(cfg.broker, { clientId: "webui_"+Math.random().toString(16).slice(2), clean: true });
@@ -720,6 +723,8 @@ function connect() {
     client.subscribe(topicAlarms());
     // Ping boards immediately so they echo their state back (pills update fast)
     setTimeout(() => publish({ ping: true }), 300);
+    // Then keep polling every 2 min so pills stay current without relying on board heartbeats
+    _pingIntervalId = setInterval(() => publish({ ping: true }), PING_INTERVAL_MS);
   });
   client.on("message", (t, msg) => {
     const topicStr = t.toString();
@@ -763,7 +768,10 @@ function connect() {
     } catch(e) {}
   });
   client.on("error",     () => setStatus("disconnected", "error"));
-  client.on("close",     () => setStatus("disconnected", "disconnected"));
+  client.on("close",     () => {
+    setStatus("disconnected", "disconnected");
+    if (_pingIntervalId) { clearInterval(_pingIntervalId); _pingIntervalId = null; }
+  });
   client.on("reconnect", () => setStatus("connecting",   "reconnecting…"));
 }
 
@@ -1221,9 +1229,7 @@ function saveScenes(scenes) {
 }
 
 // ── Scenes (unified — built-ins + user-saved) ─────────────────────────
-const BUILTIN_SCENES = [
-  { name: "🌈 Static Rainbow", _staticRainbow: true },
-];
+const BUILTIN_SCENES = [];
 
 // Migrate legacy ll_presets into ll_scenes once
 (function migrateLegacyPresets() {
@@ -1270,18 +1276,6 @@ function captureScene(name) {
 
 function _applySceneOrBuiltin(item, btn) {
   try {
-    if (item._staticRainbow) {
-      const n = cfg.numLeds;
-      boundaries.clear();
-      for (let i = 1; i < n; i++) boundaries.add(i);
-      groupPositions = Array.from({length: n}, (_, i) => i / n);
-      groupWLevels   = Array.from({length: n}, () => 0);
-    } else if (item._reset3Groups) {
-      // Reset to 3 evenly-spaced groups matching the board's default NUM_GROUPS
-      boundaries.clear();
-      const step = Math.floor(cfg.numLeds / 3);
-      boundaries.add(step); boundaries.add(step * 2);
-    }
     if (item.groupPositions) groupPositions = [...item.groupPositions];
     if (item.groupWLevels)   groupWLevels   = [...item.groupWLevels];
     if (item.boundaries)     { boundaries.clear(); item.boundaries.forEach(b => boundaries.add(b)); }
