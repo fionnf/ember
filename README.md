@@ -136,6 +136,24 @@ On/off state and brightness are written to `state.json` (on power toggles and be
 
 Each board reboots once a day at **04:00 UTC** (`OTA_HOUR_UTC` in `main.py`) to pull the latest firmware — a quiet-hours maintenance window so the ~30 s restart is never visible.
 
+### Resilience layers
+
+The firmware is designed to recover from anything without human intervention:
+
+| Layer | Failure it handles |
+|-------|--------------------|
+| Hardware watchdog (8 s) | Firmware *hangs* — stuck DNS, dead socket, lockup → automatic reboot |
+| Crash guard | Any unhandled exception → reboot in 5 s, OTA pulls a fix on the way up |
+| OTA compile check | A broken push to master, truncated download, or HTML error page is **refused** — boards keep running the last good firmware |
+| Atomic file writes | Power cut mid-write can't corrupt firmware or state/alarm/network files |
+| MQTT input validation | The events topic is on a public broker — every field is validated and clamped before touching the engine or flash; malformed messages are logged and dropped |
+| MQTT watchdog | Broker unreachable > 10 min → reboot to re-establish everything |
+| NTP retry | Failed clock sync at boot retries hourly (otherwise alarms would silently stay dead until the next reboot) |
+| State persistence | On/off + brightness restored after any reboot |
+| Periodic GC | Heap stays defragmented over weeks of uptime; free memory is reported in every heartbeat |
+
+The watchdog can be disabled per board (`WATCHDOG_ENABLED = False` in `config.py`) while debugging over WebREPL.
+
 ---
 
 ## Web UI

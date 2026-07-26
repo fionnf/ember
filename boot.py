@@ -79,6 +79,15 @@ def _update():
             if r.status_code == 200:
                 content = r.text
                 r.close()
+                # Refuse to install anything that doesn't compile — a bad
+                # push to master (or a truncated download / HTML error
+                # page) must never brick the boards. They just keep
+                # running the last known-good firmware.
+                try:
+                    compile(content, fname, "exec")
+                except Exception as e:
+                    print(f"[ota] {fname} failed syntax check — keeping existing ({e})")
+                    continue
                 # Compare with existing file to avoid unnecessary writes
                 try:
                     with open(fname, "r") as f:

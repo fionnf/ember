@@ -3,9 +3,13 @@
 #  Only config.py differs between boards.
 # ============================================================
 
+import gc
 import math
+import sys
+import os
 import utime
 import ujson
+import machine
 import network
 from umqtt.simple import MQTTClient
 
@@ -20,11 +24,29 @@ from config import (
     WEBREPL_PASSWORD,
 )
 
-FIRMWARE_VERSION       = "2026-07-26.3"
+FIRMWARE_VERSION       = "2026-07-26.4"
 FRAME_MS               = 16
 SYNC_INTERVAL_MS       = 60_000
 SYNC_FADE_STEPS        = 300
 WIFI_OFFLINE_REBOOT_MS = 10 * 60 * 1000   # reboot after 10 min offline
+
+# Boards keep their own (never-OTA'd) config.py, so new config flags must
+# be imported with a fallback or older boards would ImportError on boot.
+try:
+    from config import WATCHDOG_ENABLED
+except ImportError:
+    WATCHDOG_ENABLED = True
+
+# ── Hardware watchdog ────────────────────────────────────────
+# The crash guard catches exceptions, but not HANGS (stuck DNS lookup,
+# dead socket, PIO lockup). The RP2040 watchdog reboots the board if the
+# main loop stops feeding it for 8 s — a hang becomes a 1-off restart
+# instead of a dead lamp.
+wdt = None
+
+def feed_wdt():
+    if wdt:
+        wdt.feed()
 from sk6812 import SK6812
 from touch   import TouchManager
 from colour  import ColourEngine
@@ -48,11 +70,22 @@ client = None   # MQTTClient, initialised after WiFi
 
 NETWORKS_FILE = "networks.json"
 
+def _write_json(fname, obj):
+    """Atomic JSON write: temp file + rename, so a power cut mid-write
+    can never leave a truncated/corrupt file on flash."""
+    tmp = fname + ".tmp"
+    with open(tmp, "w") as f:
+        ujson.dump(obj, f)
+    os.rename(tmp, fname)
+
 def load_extra_networks():
-    """Load user-added networks from networks.json."""
+    """Load user-added networks from networks.json (junk entries dropped)."""
     try:
         with open(NETWORKS_FILE) as f:
-            return ujson.load(f)
+            nets = ujson.load(f)
+        return [n for n in nets
+                if isinstance(n, (list, tuple)) and len(n) == 2
+                and isinstance(n[0], str) and isinstance(n[1], str)]
     except Exception:
         return []
 
@@ -63,8 +96,7 @@ def save_network(ssid, password):
         print(f"[wifi] {ssid} already saved")
         return
     nets.append([ssid, password])
-    with open(NETWORKS_FILE, "w") as f:
-        ujson.dump(nets, f)
+    _write_json(NETWORKS_FILE, nets)
     print(f"[wifi] saved new network: {ssid}")
 
 def all_networks():
@@ -110,13 +142,82 @@ def connect_wifi(tick=None):
 
 # ── MQTT ─────────────────────────────────────────────────────
 
+# ── Input validation ─────────────────────────────────────────
+# The events topic lives on a PUBLIC broker — anything can be published to
+# it. Every field is validated/clamped before it touches the engine or,
+# worse, gets persisted to flash. (Before this, one malformed set_alarms
+# message would be saved to alarms.json and crash the main loop on every
+# boot — a permanent remote boot-loop.)
+
+def _num(v, lo, hi, default=None):
+    """Coerce to float and clamp to [lo, hi]; default if not a number."""
+    try:
+        f = float(v)
+    except Exception:
+        return default
+    return max(lo, min(hi, f))
+
+def _sanitise_groups(groups):
+    """Validated copy of a groups list, or None if unusable."""
+    if not isinstance(groups, list) or not groups:
+        return None
+    if len(groups) > NUM_LEDS:          # cap — huge lists would exhaust RAM
+        groups = groups[:NUM_LEDS]
+    clean = []
+    for g in groups:
+        if not isinstance(g, dict):
+            return None
+        pos = _num(g.get("pos"), 0.0, 1.0)
+        w   = _num(g.get("w"),   0.0, 1.0)
+        size = g.get("size")
+        if pos is None or w is None or not isinstance(size, (int, float)) or size < 1:
+            return None
+        clean.append({"pos": pos, "w": w, "size": int(size)})
+    return clean
+
+def _sanitise_alarms(data):
+    """Validated copy of an alarm list, or None if not a list."""
+    if not isinstance(data, list):
+        return None
+    clean = []
+    for a in data[:20]:                 # cap alarm count
+        if not isinstance(a, dict):
+            continue
+        try:
+            clean.append({
+                "enabled":      bool(a.get("enabled", True)),
+                "type":         "sunset" if a.get("type") == "sunset" else "sunrise",
+                "hour":         max(0, min(23, int(a.get("hour", 0)))),
+                "minute":       max(0, min(59, int(a.get("minute", 0)))),
+                "duration_min": max(1, min(180, int(a.get("duration_min", 30)))),
+                "brightness":   _num(a.get("brightness", 1.0), 0.0, 1.0, 1.0),
+                "days":   [d for d in a["days"] if isinstance(d, int) and 0 <= d <= 6]
+                          if isinstance(a.get("days"), list) else list(range(7)),
+                "boards": [b for b in a.get("boards", []) if isinstance(b, str)],
+            })
+        except Exception:
+            continue                    # skip one bad alarm, keep the rest
+    return clean
+
+
 def on_message(topic, msg):
-    """Called by the MQTT library when a message arrives."""
+    """Called by the MQTT library when a message arrives.
+    Must NEVER raise — an exception here tears down the MQTT connection,
+    so a single bad message could trigger a reconnect storm."""
     try:
         data = ujson.loads(msg)
     except Exception:
         return
+    if not isinstance(data, dict):
+        return
+    try:
+        _handle_message(data)
+    except Exception as e:
+        sys.print_exception(e)
+        print("[mqtt] bad message ignored")
 
+
+def _handle_message(data):
     # Ignore our own echoed messages
     if data.get("from") == BOARD_ID:
         return
@@ -133,13 +234,13 @@ def on_message(topic, msg):
         return
 
     print(f"[mqtt] recv: {data}")
-    groups        = data.get("groups")
-    on            = data.get("on")
-    brightness    = data.get("brightness")
-    reverse       = data.get("reverse")
-    fade_steps     = data.get("fade_steps")
+    groups         = _sanitise_groups(data.get("groups"))
+    on             = data.get("on")
+    brightness     = _num(data.get("brightness"), 0.0, 1.0)
+    reverse        = data.get("reverse")
+    fade_steps     = _num(data.get("fade_steps"), 1, 2000)
     drift_enabled  = data.get("drift_enabled")
-    drift_interval = data.get("drift_interval")
+    drift_interval = _num(data.get("drift_interval"), 5, 86400)
 
     if on is not None:
         engine.set_power(bool(on))
@@ -159,12 +260,18 @@ def on_message(topic, msg):
         engine.force_colour(groups, fade_steps_override=fade_override)
 
     add_net = data.get("add_network")
-    if add_net:
+    if (isinstance(add_net, dict)
+            and isinstance(add_net.get("ssid"), str)
+            and 0 < len(add_net["ssid"]) <= 32
+            and isinstance(add_net.get("password"), str)
+            and len(add_net["password"]) <= 64):
         save_network(add_net["ssid"], add_net["password"])
 
     if "set_alarms" in data:
-        save_alarms(data["set_alarms"])
-        print(f"[alarm] saved {len(_alarms)} alarms")
+        alarms_clean = _sanitise_alarms(data["set_alarms"])
+        if alarms_clean is not None:
+            save_alarms(alarms_clean)
+            print(f"[alarm] saved {len(_alarms)} alarms")
 
     if data.get("reboot"):
         print("[mqtt] reboot requested — saving state and rebooting")
@@ -232,7 +339,8 @@ def load_alarms():
     global _alarms
     try:
         with open(ALARM_FILE) as f:
-            _alarms = ujson.load(f)
+            # Re-sanitise on load — protects against legacy junk on flash
+            _alarms = _sanitise_alarms(ujson.load(f)) or []
     except Exception:
         _alarms = []
 
@@ -240,16 +348,14 @@ def save_alarms(data):
     global _alarms
     _alarms = data
     try:
-        with open(ALARM_FILE, "w") as f:
-            ujson.dump(data, f)
+        _write_json(ALARM_FILE, data)
     except Exception as e:
         print(f"[alarm] save failed: {e}")
 
 def save_state():
     try:
-        with open(STATE_FILE, "w") as f:
-            ujson.dump({"on": engine._powered_on,
-                        "brightness": round(engine._brightness, 3)}, f)
+        _write_json(STATE_FILE, {"on": engine._powered_on,
+                                 "brightness": round(engine._brightness, 3)})
     except Exception as e:
         print(f"[state] save failed: {e}")
 
@@ -297,6 +403,7 @@ class SetupPulser:
         self.active    = True
 
     def tick(self):
+        feed_wdt()   # setup's blocking waits call tick — keep the WDT fed
         if not self.active:
             return
         now = utime.ticks_ms()
@@ -322,9 +429,13 @@ class SetupPulser:
 # ── Main loop ────────────────────────────────────────────────
 
 def main():
-    global client
+    global client, wdt
 
     print(f"[boot] firmware {FIRMWARE_VERSION} — board {BOARD_ID}")
+
+    if WATCHDOG_ENABLED and wdt is None:
+        wdt = machine.WDT(timeout=8000)
+        print("[wdt] hardware watchdog armed (8 s)")
 
     # Pulse the strip immediately — visible feedback while setup runs
     pulser = SetupPulser()
@@ -381,6 +492,7 @@ def main():
 
     _ota_check_min  = -1
     _alarm_checked_min = -1
+    _alarm_day      = -1
     _sunrise = {"active": False, "start_ms": 0, "dur_ms": 0, "target_br": 1.0}
     _alarm_fired = set()  # (hour, minute) pairs fired this calendar day
     last_frame      = utime.ticks_ms()
@@ -388,11 +500,14 @@ def main():
     _ping_at        = utime.ticks_add(utime.ticks_ms(), 20_000)
     _sync_at        = utime.ticks_add(utime.ticks_ms(), SYNC_INTERVAL_MS)
     _heartbeat_at   = utime.ticks_add(utime.ticks_ms(), 5_000)  # first beat soon after boot
+    _status_at      = utime.ticks_add(utime.ticks_ms(), 300_000)
+    _ntp_retry_at   = utime.ticks_add(utime.ticks_ms(), 60_000)
     _backoff_ms     = RECONNECT_DELAY_MS
     _offline_since  = None   # when client first became None (WiFi watchdog)
 
     while True:
         now = utime.ticks_ms()
+        feed_wdt()
 
         # ── Reconnect MQTT with exponential backoff ──
         if client is None and utime.ticks_diff(now, _reconnect_at) >= 0:
@@ -401,9 +516,10 @@ def main():
                 wlan = network.WLAN(network.STA_IF)
                 if not wlan.isconnected():
                     print("[wifi] lost — reconnecting before MQTT retry")
-                    # Keep rendering while the blocking reconnect runs —
-                    # otherwise the lamps freeze mid-breath for up to ~12 s
-                    connect_wifi(tick=lambda: engine.tick(strip))
+                    # Keep rendering (and the watchdog fed) while the
+                    # blocking reconnect runs — otherwise the lamps freeze
+                    # mid-breath for up to ~12 s
+                    connect_wifi(tick=lambda: (feed_wdt(), engine.tick(strip)))
                 client = connect_mqtt()
                 _backoff_ms    = RECONNECT_DELAY_MS   # reset on success
                 _ping_at       = utime.ticks_add(now, 20_000)
@@ -451,8 +567,30 @@ def main():
 
         # ── Heartbeat — announce presence every 30 s ──
         if client is not None and utime.ticks_diff(now, _heartbeat_at) >= 0:
-            publish_event({"heartbeat": True, "fw": FIRMWARE_VERSION})
+            # Periodic GC keeps the heap defragmented over weeks of uptime;
+            # mem in the heartbeat gives free observability of leaks
+            gc.collect()
+            publish_event({"heartbeat": True, "fw": FIRMWARE_VERSION,
+                           "mem": gc.mem_free()})
             _heartbeat_at = utime.ticks_add(now, 30_000)
+
+        # ── Refresh retained presence every 5 min ──
+        # Insurance against the public broker dropping retained state
+        if client is not None and utime.ticks_diff(now, _status_at) >= 0:
+            try:
+                client.publish(TOPIC_STATUS,
+                               ujson.dumps({"online": True, "fw": FIRMWARE_VERSION}),
+                               retain=True)
+            except Exception as e:
+                print(f"[mqtt] status publish error: {e}")
+                client = None
+            _status_at = utime.ticks_add(now, 300_000)
+
+        # ── NTP retry — a board that booted without NTP has no clock,
+        #    which would silently disable alarms + daily OTA forever ──
+        if not ntp_ok and client is not None and utime.ticks_diff(now, _ntp_retry_at) >= 0:
+            ntp_ok = sync_ntp()
+            _ntp_retry_at = utime.ticks_add(now, 3_600_000)
 
         # ── Daily OTA reboot at OTA_HOUR_UTC — save state first ──
         if ntp_ok:
@@ -472,8 +610,11 @@ def main():
             cur_min = t[4]
             if cur_min != _alarm_checked_min:
                 _alarm_checked_min = cur_min
-                # Reset fired set at midnight
-                if t[3] == 0 and cur_min == 0:
+                # New day → clear the fired set. Day-of-year compare is
+                # robust even if the exact midnight minute is missed
+                # (the old ==00:00 check could block alarms forever).
+                if t[7] != _alarm_day:
+                    _alarm_day = t[7]
                     _alarm_fired.clear()
                 for alarm in _alarms:
                     key = (alarm.get("hour", 0), alarm.get("minute", 0))
@@ -570,14 +711,17 @@ def main():
 # boot.py runs on every reboot and pulls the latest code from GitHub, so
 # a pushed fix is automatically picked up on the next crash-reboot cycle.
 if __name__ == "__main__":
-    import sys
     while True:
         try:
             main()
         except Exception as e:
             sys.print_exception(e)
             print("[FATAL] unhandled exception — rebooting in 5 s")
-            strip.off()
-            utime.sleep(5)
-            import machine
+            try:
+                strip.off()
+            except Exception:
+                pass   # even the cleanup must not block the recovery reboot
+            for _ in range(5):
+                feed_wdt()
+                utime.sleep(1)
             machine.reset()

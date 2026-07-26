@@ -108,3 +108,8 @@ WEBREPL_PASSWORD = "changeme"  # 4–9 characters — set per board, don't commi
 
 # ── Reconnect behaviour ─────────────────────────────────────
 RECONNECT_DELAY_MS = 5000      # ms to wait before retrying WiFi / MQTT
+
+# ── Hardware watchdog ───────────────────────────────────────
+# Reboots the board if the firmware hangs for 8 s. Set False only while
+# debugging over WebREPL (a paused REPL would otherwise trigger reboots).
+WATCHDOG_ENABLED = True
