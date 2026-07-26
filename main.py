@@ -24,7 +24,7 @@ from config import (
     WEBREPL_PASSWORD,
 )
 
-FIRMWARE_VERSION       = "2026-07-26.4"
+FIRMWARE_VERSION       = "2026-07-26.5"
 FRAME_MS               = 16
 SYNC_INTERVAL_MS       = 60_000
 SYNC_FADE_STEPS        = 300
@@ -59,6 +59,13 @@ TOPIC_EVENTS = (MQTT_TOPIC_PREFIX + "/events").encode()
 # to offline if the board dies silently; retained delivery means a web
 # client knows each board's state the instant it subscribes.
 TOPIC_STATUS = (MQTT_TOPIC_PREFIX + "/status/" + BOARD_ID).encode()
+# Retained alarm schedule, shared by all clients and boards. Subscribing to
+# it is what makes alarms durable: a board that was offline (or rebooting)
+# when the schedule changed still receives it the moment it reconnects.
+TOPIC_ALARMS = (MQTT_TOPIC_PREFIX + "/alarms").encode()
+
+ntp_ok = False        # module-level so status/heartbeat can report clock health
+_test_alarm = None    # set by MQTT test_alarm, consumed by the main loop
 
 # ── Module-level objects ─────────────────────────────────────
 strip  = SK6812(pin=LED_PIN, num_leds=NUM_LEDS, brightness=LED_BRIGHTNESS)
@@ -208,13 +215,30 @@ def on_message(topic, msg):
         data = ujson.loads(msg)
     except Exception:
         return
-    if not isinstance(data, dict):
-        return
     try:
+        # The alarms topic carries a bare JSON array (retained schedule)
+        if topic == TOPIC_ALARMS:
+            _apply_alarms(data)
+            return
+        if not isinstance(data, dict):
+            return
         _handle_message(data)
     except Exception as e:
         sys.print_exception(e)
         print("[mqtt] bad message ignored")
+
+
+def _apply_alarms(data):
+    """Install a new alarm schedule from either transport."""
+    clean = _sanitise_alarms(data)
+    if clean is None:
+        return
+    save_alarms(clean)
+    print(f"[alarm] schedule updated — {len(clean)} alarm(s)")
+    for a in clean:
+        if a["enabled"] and (not a["boards"] or BOARD_ID in a["boards"]):
+            print("[alarm]   {:02d}:{:02d} UTC {} days={}".format(
+                a["hour"], a["minute"], a["type"], a["days"]))
 
 
 def _handle_message(data):
@@ -268,10 +292,17 @@ def _handle_message(data):
         save_network(add_net["ssid"], add_net["password"])
 
     if "set_alarms" in data:
-        alarms_clean = _sanitise_alarms(data["set_alarms"])
-        if alarms_clean is not None:
-            save_alarms(alarms_clean)
-            print(f"[alarm] saved {len(_alarms)} alarms")
+        _apply_alarms(data["set_alarms"])
+
+    # Run an alarm ramp immediately, so the schedule can be verified
+    # without waiting for the wall clock. Value: "sunrise" | "sunset".
+    ta = data.get("test_alarm")
+    if ta in ("sunrise", "sunset") or ta is True:
+        global _test_alarm
+        secs = _num(data.get("test_seconds"), 2, 600, 20)
+        _test_alarm = {"type": "sunset" if ta == "sunset" else "sunrise",
+                       "dur_ms": int(secs * 1000)}
+        print(f"[alarm] test requested — {_test_alarm['type']} over {secs:.0f}s")
 
     if data.get("reboot"):
         print("[mqtt] reboot requested — saving state and rebooting")
@@ -304,8 +335,10 @@ def connect_mqtt() -> MQTTClient:
     c.set_last_will(TOPIC_STATUS, b'{"online": false}', retain=True)
     c.connect()
     c.subscribe(TOPIC_EVENTS)
+    c.subscribe(TOPIC_ALARMS)   # retained → schedule redelivered on every connect
     c.publish(TOPIC_STATUS,
-              ujson.dumps({"online": True, "fw": FIRMWARE_VERSION}),
+              ujson.dumps({"online": True, "fw": FIRMWARE_VERSION,
+                           "ntp": ntp_ok}),
               retain=True)
     print(f"[mqtt] connected — client_id={client_id}, topic={TOPIC_EVENTS}")
     return c
@@ -427,7 +460,7 @@ class SetupPulser:
 # ── Main loop ────────────────────────────────────────────────
 
 def main():
-    global client, wdt
+    global client, wdt, ntp_ok, _test_alarm
 
     print(f"[boot] firmware {FIRMWARE_VERSION} — board {BOARD_ID}")
 
@@ -568,8 +601,11 @@ def main():
             # Periodic GC keeps the heap defragmented over weeks of uptime;
             # mem in the heartbeat gives free observability of leaks
             gc.collect()
+            # ntp/alarms let a client warn "alarms can't fire" instead of
+            # the schedule failing silently when the clock never synced
             publish_event({"heartbeat": True, "fw": FIRMWARE_VERSION,
-                           "mem": gc.mem_free()})
+                           "mem": gc.mem_free(),
+                           "ntp": ntp_ok, "alarms": len(_alarms)})
             _heartbeat_at = utime.ticks_add(now, 30_000)
 
         # ── Refresh retained presence every 5 min ──
@@ -577,7 +613,8 @@ def main():
         if client is not None and utime.ticks_diff(now, _status_at) >= 0:
             try:
                 client.publish(TOPIC_STATUS,
-                               ujson.dumps({"online": True, "fw": FIRMWARE_VERSION}),
+                               ujson.dumps({"online": True, "fw": FIRMWARE_VERSION,
+                                            "ntp": ntp_ok}),
                                retain=True)
             except Exception as e:
                 print(f"[mqtt] status publish error: {e}")
@@ -615,7 +652,10 @@ def main():
                     _alarm_day = t[7]
                     _alarm_fired.clear()
                 for alarm in _alarms:
-                    key = (alarm.get("hour", 0), alarm.get("minute", 0))
+                    # Type is part of the key so a sunrise and a sunset
+                    # scheduled at the same HH:MM don't mask each other
+                    key = (alarm.get("hour", 0), alarm.get("minute", 0),
+                           alarm.get("type", "sunrise"))
                     boards = alarm.get("boards", [])
                     if (alarm.get("enabled", True)
                             and t[3] == key[0] and cur_min == key[1]
@@ -649,6 +689,26 @@ def main():
                         payload["echo"] = True
                         publish_event(payload)
                         break
+
+        # ── Manual alarm test — same code path as a real alarm ──
+        if _test_alarm is not None:
+            _sunrise["active"]   = True
+            _sunrise["start_ms"] = now
+            _sunrise["dur_ms"]   = _test_alarm["dur_ms"]
+            if _test_alarm["type"] == "sunset":
+                _sunrise["target_br"] = 0.0
+                _sunrise["sunset"]    = True
+                _sunrise["start_br"]  = engine._brightness
+            else:
+                _sunrise["target_br"] = 1.0
+                _sunrise["sunset"]    = False
+                engine.set_power(True)
+                engine.set_brightness(0.0)
+            print(f"[alarm] test {_test_alarm['type']} started")
+            _test_alarm = None
+            payload = engine.get_event_payload()
+            payload["echo"] = True
+            publish_event(payload)
 
         # ── Sunrise / sunset ramp ──
         if _sunrise["active"]:

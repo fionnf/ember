@@ -95,10 +95,11 @@ WIFI_NETWORKS = [
 
 - **Broker:** `broker.hivemq.com:1883` (TCP on device) / `:8884` WSS (web)
 - **Events topic:** `picolight_lf26/events`
-- **Scenes topic:** `picolight_lf26/scenes` (retained)
-- **Alarms topic:** `picolight_lf26/alarms` (retained)
+- **Alarms topic:** `picolight_lf26/alarms` (retained, subscribed by boards)
+- **Status topic:** `picolight_lf26/status/<board_id>` (retained, Last-Will)
+- **Scenes topic:** `picolight_lf26/scenes` (retained, clients only)
 
-All messages are JSON with a `from` field for echo suppression.
+All messages are JSON with a `from` field for echo suppression. The full contract is documented in [MQTT Protocol Specification](#mqtt-protocol-specification) — that section is the reference for writing an additional client.
 
 ### Colour Engine (`colour.py`)
 
@@ -119,10 +120,14 @@ Every 60 s the BOSS publishes its state with `"sync": true` as a drift-correctio
 
 ### Alarms
 
-Alarms are stored as JSON in `alarms.json` on each board's flash and also kept in a retained MQTT message. On each main-loop tick the board checks the current UTC time against active alarms and executes:
+Each board holds the whole schedule on its own flash (`alarms.json`) and evaluates it against its own clock, so **alarms fire with no client connected**. On each main-loop tick the board compares the current UTC time against enabled alarms and runs:
 
-- **Sunrise** (`type: "sunrise"`): ramps brightness from 0 to `alarm.brightness` over `duration_min` minutes.
-- **Bedtime** (`type: "sunset"`): fades brightness to 0 over `duration_min` minutes.
+- **Sunrise** (`type: "sunrise"`): switches on and ramps brightness from 0 to `alarm.brightness` over `duration_min` minutes.
+- **Bedtime** (`type: "sunset"`): fades brightness to 0 over `duration_min` minutes, then switches off (and restores the previous brightness so the next power-on isn't dark).
+
+The schedule reaches boards two ways: the **retained** `P/alarms` topic, which boards subscribe to so an offline or rebooting board picks it up on reconnect, and a `set_alarms` message on `P/events` for boards that are already online. Alarms are compared in **UTC**; clients convert local time. See the [protocol spec](#alarms-1) for the exact format.
+
+Two requirements: the board needs a **synced clock** (NTP at boot, retried hourly — the heartbeat's `ntp` field reports this, and the web UI warns when it's false), and it needs to have **received the schedule** (the heartbeat's `alarms` count confirms it). Use the **▶ Test** button on any alarm to run its fade immediately and verify the whole path.
 
 ### WiFi Watchdog
 
@@ -181,7 +186,11 @@ Each group gets a numbered handle on the palette bar — drag it along the hue g
 
 ### Alarms
 
-Create sunrise/bedtime alarms per board with day-of-week selection, duration, and target brightness. Alarms are published to a retained MQTT topic so boards receive them after a reboot even if the web app is not open.
+Create sunrise/bedtime alarms per lamp with day-of-week selection, duration, and target brightness.
+
+Times are entered in **your local time**; the small `HH:MM UTC` hint beside each one shows what the lamps actually compare against. Because the firmware only knows UTC, the app stores your intended local time and recomputes the UTC value when needed, so an alarm set for 07:00 stays at 07:00 after a daylight-saving change.
+
+Each alarm has a **▶ Test** button that runs its fade on both lamps immediately (20 s) — the quickest way to confirm the whole path works. A warning banner appears if a lamp's clock hasn't synced, since alarms can't fire without it.
 
 ### Scenes
 
@@ -208,13 +217,87 @@ The two pills (FF / LS) at the top right show each board's status. Presence uses
 
 ---
 
-## MQTT Message Reference
+## MQTT Protocol Specification
 
-### State update (web → boards)
+This is the complete contract. Any client (this web app, another web app,
+Home Assistant, a script) only needs these topics — there is no other API.
+
+### Topics
+
+With `MQTT_TOPIC_PREFIX = "picolight_lf26"` (call it `P`):
+
+| Topic | Direction | Retained | Payload |
+|-------|-----------|----------|---------|
+| `P/events` | client ⇄ board | no | Command / state object (below) |
+| `P/alarms` | client → board | **yes, QoS 1** | Bare JSON **array** of alarm objects |
+| `P/status/<board_id>` | board → client | **yes** | `{"online": bool, "fw": str, "ntp": bool}` |
+| `P/scenes` | client ⇄ client | yes | Free-form; boards ignore it |
+
+Board IDs are `board_a` (BOSS, display name FF) and `board_b` (follower, LS).
+
+A client should subscribe to `P/events`, `P/alarms`, and `P/status/+`.
+
+### Message envelope (`P/events`)
+
+Every message on `P/events` is a JSON **object**. Non-objects are dropped.
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `from` | string | **Required.** Sender ID. A board ignores messages where `from` equals its own ID. IDs starting with `board_` mark board-to-board traffic |
+| `target` | string | Optional. If present, only the board with this `board_id` acts on the message |
+| `echo` | bool | Optional. Marks an informational state report. **Boards ignore echo-flagged messages** — see below |
+| `sync` | bool | Optional. Board-to-board: apply colours with a slow 300-step fade |
+
+> **The `echo` rule matters.** When a board answers a client, it replies with
+> its full state plus `"echo": true`. Without that flag the *other* board
+> would treat the reply as a real colour change and restart its fade — which
+> caused a visible flash on every interaction. If you write a client, never
+> set `echo` on commands you send; treat incoming `echo` messages as
+> read-only state.
+
+### Commands (client → board, on `P/events`)
+
+All fields are optional; send only what you want to change. Every value is
+validated and clamped by the firmware — out-of-range or wrong-typed fields
+are ignored, never fatal.
+
+| Field | Type | Range | Effect |
+|-------|------|-------|--------|
+| `groups` | array | 1…`NUM_LEDS` entries | Per-group colour, below |
+| `on` | bool | | Power, with an ~800 ms soft fade |
+| `brightness` | number | 0.0–1.0 | Global brightness |
+| `fade_steps` | number | 1–2000 | Crossfade length in ~16 ms ticks (60 ≈ 1 s) |
+| `drift_enabled` | bool | | Autonomous idle colour drift |
+| `drift_interval` | number | 5–86400 | Seconds between drift events |
+| `reverse` | bool | | Flip LED order |
+| `ping` | any | | Ask boards to reply with their state (`echo: true`) |
+| `set_alarms` | array | ≤20 alarms | Install a schedule (see Alarms) |
+| `test_alarm` | `"sunrise"` \| `"sunset"` | | Run that fade **immediately** |
+| `test_seconds` | number | 2–600 | Duration for `test_alarm` (default 20) |
+| `add_network` | object | | `{"ssid": str≤32, "password": str≤64}` — saved to the board's flash |
+| `reboot` | truthy | | Save state and restart (triggers an OTA check) |
+
+A `groups` entry:
+
+```json
+{"pos": 0.35, "w": 0.8, "size": 3}
+```
+
+| Field | Type | Range | Meaning |
+|-------|------|-------|---------|
+| `pos` | number | 0.0–1.0 | Position in the hue palette. `0.0` = pure warm white (W channel only); higher = saturated tint with W fading out |
+| `w` | number | 0.0–1.0 | Warm-white level for this group |
+| `size` | integer | ≥1 | How many consecutive LEDs this group covers |
+
+`size` values should sum to `NUM_LEDS`. The firmware resizes its internal
+group arrays to match the array length, so a per-LED gradient is simply
+`NUM_LEDS` groups of `size: 1`.
+
+Example — set three groups and full brightness:
 
 ```json
 {
-  "from": "web_app",
+  "from": "my_app",
   "groups": [
     {"pos": 0.0,  "w": 1.0, "size": 4},
     {"pos": 0.35, "w": 0.8, "size": 3},
@@ -222,53 +305,75 @@ The two pills (FF / LS) at the top right show each board's status. Presence uses
   ],
   "on": true,
   "brightness": 0.6,
-  "fade_steps": 60,
-  "drift_enabled": false,
-  "drift_interval": 45
+  "fade_steps": 60
 }
 ```
 
-### Heartbeat (board → all)
+### Reports (board → client, on `P/events`)
 
-```json
-{"from": "board_a", "heartbeat": true, "fw": "2026-07-26.2"}
-```
-
-### Presence (retained, per board, on `prefix/status/<board_id>`)
-
-```json
-{"online": true, "fw": "2026-07-26.2"}
-```
-
-Set as the board's MQTT Last-Will (`{"online": false}`), so the broker publishes the offline state automatically if a board dies.
-
-### State echo (board → web clients)
-
-When a board answers a web command or ping, its state reply carries `"echo": true`. Boards **ignore** echo-flagged messages — only genuine touch impulses and boss syncs (no flag) make the other board re-apply colours. This prevents the fade-restart flicker that occurred when each board re-applied the other's echo.
-
-### Impulse / sync (board → board)
+**State echo** — sent whenever a board acts on a client message (including `ping`):
 
 ```json
 {
-  "from": "board_a",
-  "groups": [...],
-  "on": true,
-  "brightness": 0.6,
-  "fade_steps": 60,
-  "drift_enabled": false,
-  "drift_interval": 45,
-  "sync": true
+  "from": "board_a", "echo": true,
+  "groups": [{"pos": 0.0, "w": 1.0, "size": 10}],
+  "on": true, "brightness": 0.6, "fade_steps": 60,
+  "drift_enabled": false, "drift_interval": 45
 }
 ```
 
-### Alarms (retained on `/alarms`)
+**Heartbeat** — every 30 s:
+
+```json
+{"from": "board_a", "heartbeat": true, "fw": "2026-07-26.5",
+ "mem": 102400, "ntp": true, "alarms": 2}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `fw` | Firmware version |
+| `mem` | Free heap bytes — watch for leaks |
+| `ntp` | **Clock synced?** If `false`, alarms cannot fire — surface this to the user |
+| `alarms` | How many alarms the board currently holds — confirms delivery |
+
+**Impulse / boss sync** — a physical touch, or the BOSS's 60 s sync. Same
+shape as a state echo but **without** `echo`, so the other board applies it.
+Boss syncs carry `"sync": true`.
+
+### Presence (`P/status/<board_id>`, retained)
+
+```json
+{"online": true, "fw": "2026-07-26.5", "ntp": true}
+```
+
+Registered as the board's MQTT **Last-Will** with payload `{"online": false}`,
+so the *broker* publishes the offline state if a board dies silently
+(~90 s, from the 60 s keepalive). Because it is retained, a client knows both
+boards' state the instant it subscribes — no waiting for a heartbeat.
+
+Recommended client logic: treat `online: false` as authoritative offline;
+otherwise consider a board present if `online: true` or a message arrived
+within ~150 s. Show offline if your own broker connection is down.
+
+### Alarms
+
+Two transports, both needed:
+
+1. **`P/alarms`, retained, QoS 1** — the durable schedule. Boards subscribe
+   to it, so one that was offline or rebooting when the schedule changed
+   receives it on reconnect. Payload is a bare JSON **array**.
+2. **`{"set_alarms": [...]}` on `P/events`** — the instant path for boards
+   that are already online.
+
+Publish **both** on every change, and **never** set `target` on an alarm
+update: which lamp acts is decided by the alarm's own `boards` field.
 
 ```json
 [
   {
     "enabled": true,
     "type": "sunrise",
-    "hour": 7,
+    "hour": 5,
     "minute": 0,
     "duration_min": 30,
     "brightness": 1.0,
@@ -278,7 +383,46 @@ When a board answers a web command or ping, its state reply carries `"echo": tru
 ]
 ```
 
-`days`: 0=Monday … 6=Sunday. All times are **UTC**.
+| Field | Type | Range | Meaning |
+|-------|------|-------|---------|
+| `enabled` | bool | | Skipped when false |
+| `type` | string | `sunrise` \| `sunset` | Fade up, or fade down and switch off |
+| `hour` | int | 0–23 | **UTC** — see below |
+| `minute` | int | 0–59 | **UTC** |
+| `duration_min` | int | 1–180 | Ramp length in minutes |
+| `brightness` | number | 0.0–1.0 | Sunrise target (ignored for sunset) |
+| `days` | int array | 0=Mon … 6=Sun | Omit or send a non-array for *every day* |
+| `boards` | string array | board IDs | Which lamps act. Empty/omitted = all |
+
+Each board evaluates the schedule against **its own** UTC clock and runs its
+own ramp, so alarms work even with no client connected. At most one alarm
+fires per minute per board; a fired alarm is remembered until the next day
+(keyed on hour+minute+type, so a sunrise and a sunset at the same time both
+fire).
+
+> **Timezone.** The Pico has no timezone database, so the firmware only
+> understands UTC. Clients are responsible for converting. This web app edits
+> in local time and stores the user's intent in two extra fields, `lh`/`lm`
+> (local hour/minute), recomputing `hour`/`minute` on load so alarms keep
+> their wall-clock time across a DST change. The firmware ignores `lh`/`lm`.
+> **If you write another client, either use the same convention or send UTC
+> directly** — and be aware this app will rewrite `hour`/`minute` from
+> `lh`/`lm` if both are present.
+
+To verify a schedule without waiting for the clock, send
+`{"from": "my_app", "test_alarm": "sunrise", "test_seconds": 20}` — the
+board runs the real alarm code path immediately.
+
+### Guarantees for client authors
+
+- Malformed messages are logged and dropped; they never crash a board or
+  drop its MQTT connection.
+- Unknown fields are ignored, so the protocol can be extended safely.
+- Boards persist power state, brightness, and alarms to flash and restore
+  them after any reboot.
+- The events topic is on a **public broker**. Anyone who knows your prefix
+  can control your lamps — pick an unguessable `MQTT_TOPIC_PREFIX`, or run
+  your own broker with authentication.
 
 ---
 
@@ -319,7 +463,10 @@ When a board answers a web command or ping, its state reply carries `"echo": tru
 | Touch fires constantly | Missing pull-down | 1 MΩ between GPIO and GND |
 | Boards not syncing | Different topic prefix | `MQTT_TOPIC_PREFIX` must match on both |
 | Board reboots after ~10 min offline | WiFi watchdog | Expected; board reconnects and checks OTA |
-| Sunrise alarm not firing | NTP not synced | Board needs WiFi at boot; check `[ntp]` log |
+| **Alarm fires at the wrong time** | Alarm times are UTC; older clients sent local time as UTC | Times are now edited in local time and converted. Check the small `HH:MM UTC` hint next to each alarm |
+| **Alarm never fires** | Board has no clock (NTP failed) | The web UI shows a warning banner; heartbeat `ntp` is false. Retries hourly, or reboot the board |
+| **Alarm never fires**, clock is fine | Board never received the schedule | Heartbeat `alarms` count shows 0. Fixed by the retained `P/alarms` topic; press **▶ Test** to confirm the path |
+| Alarm only fires on one lamp | Alarm's `boards` list, or a client sending `target` with the update | Enable both lamps on the alarm; never set `target` on alarm updates |
 | OTA not updating | `boot.py` not on board | Flash `boot.py` manually once via USB |
 
 ---

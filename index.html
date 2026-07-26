@@ -365,6 +365,12 @@
       transition: all 0.2s;
     }
     .add-alarm-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(240,160,48,0.04); }
+    #alarm-warning {
+      display: none; font-size: 0.7rem; line-height: 1.4;
+      color: #ffcf8a; background: rgba(240,160,48,0.09);
+      border: 1px solid rgba(240,160,48,0.3); border-radius: var(--r-xs);
+      padding: 0.55rem 0.7rem; margin-bottom: 0.6rem;
+    }
 
     /* ── Settings ── */
     #cfg-toggle {
@@ -473,6 +479,7 @@
 <!-- Sunrise -->
 <div class="card">
   <div class="card-title">Alarms</div>
+  <div id="alarm-warning"></div>
   <div id="alarms-list"></div>
   <button class="add-alarm-btn" id="btn-add-alarm">+ Add Alarm</button>
 </div>
@@ -600,6 +607,7 @@ const driftInterval  = 45;
 const BOARD_ID     = "web_app";
 const boardLastSeen   = {};
 const boardOnline     = {};   // broker-tracked presence via retained Last-Will (true/false/undefined)
+const boardNtp        = {};   // clock synced? alarms cannot fire without it
 const boardLastChange = {};
 const boardLastFw     = {};   // firmware version per board
 const boardLastPower  = {};   // last known on/off state per board
@@ -655,6 +663,25 @@ function updatePills() {
       : "offline";
     if (sub.textContent !== subText) sub.textContent = subText;
   });
+  updateAlarmWarning();
+}
+
+// Alarms are compared against the board's clock, so a board that never
+// synced NTP can't fire them. Say so instead of failing silently.
+function updateAlarmWarning() {
+  const el = document.getElementById("alarm-warning");
+  if (!el) return;
+  const bad = [[cfg.boardIdA, cfg.boardNameA], [cfg.boardIdB, cfg.boardNameB]]
+    .filter(([id]) => boardNtp[id] === false)
+    .map(([, name]) => name);
+  if (bad.length) {
+    el.textContent = `⚠ ${bad.join(" & ")} ${bad.length > 1 ? "have" : "has"} no clock `
+      + `(NTP sync failed) — alarms can't fire until it syncs. It retries hourly; `
+      + `a reboot usually fixes it.`;
+    el.style.display = "block";
+  } else {
+    el.style.display = "none";
+  }
 }
 
 // Schedule a one-shot pill refresh exactly when a board's timeout expires.
@@ -726,6 +753,7 @@ function connect() {
         const id = topicStr.split("/").pop();
         boardOnline[id] = !!d.online;
         if (d.fw) boardLastFw[id] = d.fw;
+        if (d.ntp !== undefined) boardNtp[id] = d.ntp;
         if (d.online) { boardLastSeen[id] = Date.now(); _scheduleBoardTimeout(id); }
         updatePills();
         return;
@@ -738,7 +766,12 @@ function connect() {
       }
 
       if (topicStr === topicAlarms()) {
-        if (Array.isArray(d)) { alarms = d; renderAlarms(); }
+        if (Array.isArray(d)) {
+          alarms = d;
+          // Self-heal DST shifts / legacy UTC-only alarms, then republish
+          if (normaliseAlarms()) publishAlarms();
+          renderAlarms();
+        }
         return;
       }
 
@@ -746,6 +779,7 @@ function connect() {
         boardLastSeen[d.from] = Date.now();
         boardLastChange[d.from] = boardStateDesc(d);
         if (d.fw)  boardLastFw[d.from]  = d.fw;
+        if (d.ntp !== undefined) boardNtp[d.from] = d.ntp;
         if (d.on !== undefined) boardLastPower[d.from] = d.on;
         updatePills();
         _scheduleBoardTimeout(d.from);
@@ -859,6 +893,18 @@ document.getElementById("btn-target-b").addEventListener("click",    () => { sen
 function publishRetained(topicFn, payload) {
   if (!client || !client.connected) return;
   client.publish(topicFn(), JSON.stringify(payload), { retain: true, qos: 1 });
+}
+
+// Alarms and reboots must reach BOTH boards regardless of the "Send to"
+// selector — an alarm's own `boards` field decides which lamp acts on it.
+function publishBroadcast(payload) {
+  if (!client || !client.connected) {
+    showToast("⚠ Not connected — not saved to the lamps");
+    return;
+  }
+  payload.from = BOARD_ID;
+  client.publish(topic(), JSON.stringify(payload));
+  _flashDot();
 }
 
 function publishState() {
@@ -1146,13 +1192,49 @@ document.getElementById("btn-reconnect").addEventListener("click", () => {
 // ── Alarms ──────────────────────────────────────────────────────
 const DAY_LABELS = ["Mo","Tu","We","Th","Fr","Sa","Su"];
 
+// ── Timezone ──
+// The Pico has no timezone database, so firmware compares alarms against
+// UTC. The UI therefore edits in LOCAL time and records the user's intent
+// in lh/lm, which lets the UTC fields be recomputed whenever the offset
+// changes — so an alarm set to 07:00 stays 07:00 across a DST switch.
+function localToUtc(lh, lm) {
+  const d = new Date(); d.setHours(lh, lm, 0, 0);
+  return [d.getUTCHours(), d.getUTCMinutes()];
+}
+function utcToLocal(uh, um) {
+  const d = new Date(); d.setUTCHours(uh, um, 0, 0);
+  return [d.getHours(), d.getMinutes()];
+}
+function alarmLocal(a) {
+  if (Number.isInteger(a.lh) && Number.isInteger(a.lm)) return [a.lh, a.lm];
+  return utcToLocal(a.hour || 0, a.minute || 0);   // legacy alarm: derive intent
+}
+// Re-derive the UTC fields from local intent. Returns true if anything
+// changed (DST shift, or a legacy alarm gaining lh/lm) → caller republishes.
+function normaliseAlarms() {
+  let changed = false;
+  alarms.forEach(a => {
+    const [lh, lm] = alarmLocal(a);
+    if (a.lh !== lh || a.lm !== lm) { a.lh = lh; a.lm = lm; changed = true; }
+    const [uh, um] = localToUtc(lh, lm);
+    if (a.hour !== uh || a.minute !== um) { a.hour = uh; a.minute = um; changed = true; }
+  });
+  return changed;
+}
+
 function defaultAlarm() {
-  return { enabled: true, type: "sunrise", hour: 7, minute: 0, duration_min: 30, brightness: 1.0, days: [0,1,2,3,4], boards: [cfg.boardIdA, cfg.boardIdB] };
+  const [uh, um] = localToUtc(7, 0);
+  return { enabled: true, type: "sunrise", hour: uh, minute: um, lh: 7, lm: 0,
+           duration_min: 30, brightness: 1.0, days: [0,1,2,3,4],
+           boards: [cfg.boardIdA, cfg.boardIdB] };
 }
 
 function publishAlarms() {
+  // Retained → durable: a board that is offline now still gets the schedule
+  // when it reconnects. The events copy is just the instant path for boards
+  // that are already online.
   publishRetained(topicAlarms, alarms);
-  publish({ set_alarms: alarms });
+  publishBroadcast({ set_alarms: alarms });
 }
 
 function renderAlarms() {
@@ -1161,10 +1243,13 @@ function renderAlarms() {
   alarms.forEach((alarm, idx) => {
     const el = document.createElement("div");
     el.className = "alarm-card";
-    const hh = String(alarm.hour).padStart(2,"0");
-    const mm = String(alarm.minute).padStart(2,"0");
+    const [lh, lm] = alarmLocal(alarm);
+    const hh = String(lh).padStart(2,"0");
+    const mm = String(lm).padStart(2,"0");
+    const utcHint = `${String(alarm.hour).padStart(2,"0")}:${String(alarm.minute).padStart(2,"0")} UTC`;
+    const days = alarm.days || [];
     const dayBtns = DAY_LABELS.map((d,i) =>
-      `<button class="day-btn ${alarm.days.includes(i)?"on":""}" data-d="${i}">${d}</button>`
+      `<button class="day-btn ${days.includes(i)?"on":""}" data-d="${i}">${d}</button>`
     ).join("");
     const alarmBoards = alarm.boards || [cfg.boardIdA, cfg.boardIdB];
     const boardBtns = [
@@ -1176,10 +1261,13 @@ function renderAlarms() {
     el.innerHTML = `
       <div class="alarm-header">
         <button class="alarm-toggle ${alarm.enabled?"on":""}" data-idx="${idx}"></button>
-        <input class="alarm-time" type="time" value="${hh}:${mm}" title="Time is UTC — adjust for your timezone" data-idx="${idx}">
-        <span style="font-size:0.6rem;color:var(--muted);margin-left:0.2rem">UTC</span>
+        <input class="alarm-time" type="time" value="${hh}:${mm}"
+          title="Your local time — sent to the lamps as ${utcHint}" data-idx="${idx}">
+        <span style="font-size:0.55rem;color:var(--muted);margin-left:0.2rem" title="What the lamps compare against">${utcHint}</span>
         <button class="alarm-type-btn ${(alarm.type||'sunrise')==='sunrise'?'sunrise':'sunset'}" data-idx="${idx}"
           title="Toggle sunrise / bedtime fade">${(alarm.type||'sunrise')==='sunrise'?'🌅 Rise':'🌙 Sleep'}</button>
+        <button class="alarm-type-btn" data-test="${idx}"
+          title="Run this fade on both lamps now (20 s) to verify it works">▶ Test</button>
         <button class="alarm-del" data-idx="${idx}">✕</button>
       </div>
       <div class="alarm-days">${dayBtns}</div>
@@ -1230,8 +1318,17 @@ function renderAlarms() {
     });
     el.querySelector(".alarm-time").addEventListener("change", e => {
       const [h,m] = e.target.value.split(":").map(Number);
-      alarms[idx].hour = h; alarms[idx].minute = m;
+      if (!Number.isInteger(h) || !Number.isInteger(m)) return;
+      // Store local intent, then derive the UTC time the firmware uses
+      alarms[idx].lh = h; alarms[idx].lm = m;
+      const [uh,um] = localToUtc(h, m);
+      alarms[idx].hour = uh; alarms[idx].minute = um;
       publishAlarms();
+      renderAlarms();   // refresh the UTC hint
+    });
+    el.querySelector("[data-test]").addEventListener("click", () => {
+      publishBroadcast({ test_alarm: alarms[idx].type || "sunrise", test_seconds: 20 });
+      showToast("Testing on both lamps — 20 s fade");
     });
     el.querySelector(".alarm-del").addEventListener("click", () => {
       alarms.splice(idx, 1); renderAlarms(); publishAlarms();
