@@ -50,11 +50,12 @@ class SK6812:
         self._pixels = [(r, g, b, w)] * self.num_leds
 
     def show(self):
+        # Same packing as sk6812.py: G R B W, MSB first, no pre-shift
         buf = array.array("I", [0] * self.num_leds)
         br = self.brightness
         for i, (r, g, bv, w) in enumerate(self._pixels):
-            buf[i] = (int(w*br) << 24) | (int(g*br) << 16) | (int(r*br) << 8) | int(bv*br)
-        self._sm.put(buf, 8)
+            buf[i] = (int(g*br) << 24) | (int(r*br) << 16) | (int(bv*br) << 8) | int(w*br)
+        self._sm.put(buf, 0)
 
     def off(self):
         self.set_all(0, 0, 0, 0)

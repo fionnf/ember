@@ -126,17 +126,39 @@ Alarms are stored as JSON in `alarms.json` on each board's flash and also kept i
 
 ### WiFi Watchdog
 
-If the board loses WiFi for more than 10 minutes (`WIFI_OFFLINE_REBOOT_MS = 600000`) it reboots to reconnect and pick up any OTA update. Known networks are stored in `wifi_networks.json` on flash and tried in order.
+If the board loses its MQTT connection (WiFi down or broker unreachable) for more than 10 minutes (`WIFI_OFFLINE_REBOOT_MS = 600000`) it reboots to reconnect and pick up any OTA update. Known networks are the `WIFI_NETWORKS` list in `config.py` plus any saved to `networks.json` on flash, tried in order.
 
 ### State Persistence
 
-On/off state is written to `state.json` after each power toggle and restored on boot before connecting to MQTT.
+On/off state and brightness are written to `state.json` (on power toggles and before every reboot) and restored on boot before connecting to MQTT — so the lamps come back exactly as they were after the nightly OTA reboot.
+
+### Daily OTA reboot
+
+Each board reboots once a day at **04:00 UTC** (`OTA_HOUR_UTC` in `main.py`) to pull the latest firmware — a quiet-hours maintenance window so the ~30 s restart is never visible.
+
+### Resilience layers
+
+The firmware is designed to recover from anything without human intervention:
+
+| Layer | Failure it handles |
+|-------|--------------------|
+| Hardware watchdog (8 s) | Firmware *hangs* — stuck DNS, dead socket, lockup → automatic reboot |
+| Crash guard | Any unhandled exception → reboot in 5 s, OTA pulls a fix on the way up |
+| OTA compile check | A broken push to master, truncated download, or HTML error page is **refused** — boards keep running the last good firmware |
+| Atomic file writes | Power cut mid-write can't corrupt firmware or state/alarm/network files |
+| MQTT input validation | The events topic is on a public broker — every field is validated and clamped before touching the engine or flash; malformed messages are logged and dropped |
+| MQTT watchdog | Broker unreachable > 10 min → reboot to re-establish everything |
+| NTP retry | Failed clock sync at boot retries hourly (otherwise alarms would silently stay dead until the next reboot) |
+| State persistence | On/off + brightness restored after any reboot |
+| Periodic GC | Heap stays defragmented over weeks of uptime; free memory is reported in every heartbeat |
+
+The watchdog can be disabled per board (`WATCHDOG_ENABLED = False` in `config.py`) while debugging over WebREPL.
 
 ---
 
 ## Web UI
 
-`index.html` at the repo root is served via **GitHub Pages**. It connects to the HiveMQ broker over WebSockets. No install required — open it in any browser.
+`index.html` at the repo root is served via **GitHub Pages**. It connects to the HiveMQ broker over WebSockets. No install required — open it in any browser. On a phone you can **Add to Home Screen** to get it as a standalone full-screen app (web manifest included), and the app automatically reconnects when you return to it after backgrounding.
 
 ### Controls
 
@@ -163,7 +185,7 @@ Create sunrise/bedtime alarms per board with day-of-week selection, duration, an
 
 ### Scenes
 
-Save and load complete lamp states (colours, group layout, brightness, fade speed). Stored in `localStorage`. Built-in scene: **Static Rainbow** (one LED per group, evenly spaced across the hue palette).
+Save and load complete lamp states (colours, group layout, brightness, fade speed). Stored in `localStorage`.
 
 ### Settings panel
 
@@ -178,11 +200,11 @@ Also: **Add WiFi Network** (sends credentials to both boards over MQTT), **↺ R
 
 ### Board presence pills
 
-The two pills (FF / LS) at the top right show each board's status:
+The two pills (FF / LS) at the top right show each board's status. Presence uses MQTT **Last-Will** on a retained per-board topic (`prefix/status/<board_id>`): each board publishes `{"online": true}` (retained) on connect, and the broker itself flips it to `{"online": false}` if the board dies silently (within ~90 s of its last keepalive). Because the status is retained, the pills are correct the instant the page loads. The web app additionally pings both boards on connect and every 2 minutes to refresh their full state.
 
-- **Green (online)** — board seen within 65 s and lights are on
-- **Amber (standby)** — board seen within 65 s but lights are off
-- **No highlight (offline)** — no message received within 65 s
+- **Green (online)** — retained status online (or message seen within 150 s) and lights on
+- **Amber (standby)** — same, but lights are off
+- **No highlight (offline)** — broker reported the board offline, or nothing heard within 150 s
 
 ---
 
@@ -209,8 +231,20 @@ The two pills (FF / LS) at the top right show each board's status:
 ### Heartbeat (board → all)
 
 ```json
-{"from": "board_a", "heartbeat": true, "fw": "1.4.2"}
+{"from": "board_a", "heartbeat": true, "fw": "2026-07-26.2"}
 ```
+
+### Presence (retained, per board, on `prefix/status/<board_id>`)
+
+```json
+{"online": true, "fw": "2026-07-26.2"}
+```
+
+Set as the board's MQTT Last-Will (`{"online": false}`), so the broker publishes the offline state automatically if a board dies.
+
+### State echo (board → web clients)
+
+When a board answers a web command or ping, its state reply carries `"echo": true`. Boards **ignore** echo-flagged messages — only genuine touch impulses and boss syncs (no flag) make the other board re-apply colours. This prevents the fade-restart flicker that occurred when each board re-applied the other's echo.
 
 ### Impulse / sync (board → board)
 
@@ -262,9 +296,10 @@ The two pills (FF / LS) at the top right show each board's status:
    ```bash
    mpremote connect /dev/ttyACM0 cp boot.py config.py :
    ```
-   Create `wifi_networks.json` on the board:
+   Set your WiFi credentials in `WIFI_NETWORKS` in the board's `config.py`
+   (or create `networks.json` on the board — a list of `[ssid, password]` pairs):
    ```json
-   [{"ssid": "YourNetwork", "password": "YourPassword"}]
+   [["YourNetwork", "YourPassword"]]
    ```
 
 4. **Edit `config.py`** — set `BOARD_ID`, `BOSS`, `NUM_LEDS`, `LED_PIN`, `MQTT_TOPIC_PREFIX`.
@@ -293,17 +328,22 @@ The two pills (FF / LS) at the top right show each board's status:
 
 ```
 linked_friend_lights/
-├── index.html              # GitHub Pages web UI (copy of web_app/index.html)
-├── web_app/
-│   └── index.html          # Web UI source
+├── index.html              # Web UI — single source, served by GitHub Pages
 ├── main.py                 # Firmware — main loop (OTA-fetched)
 ├── colour.py               # Firmware — colour engine (OTA-fetched)
 ├── sk6812.py               # Firmware — PIO LED driver (OTA-fetched)
 ├── touch.py                # Firmware — capacitive touch (OTA-fetched)
 ├── boot.py                 # OTA bootstrap (deployed manually, never overwritten)
-├── config.py               # Per-board hardware config (never overwritten)
+├── config.py               # Per-board config TEMPLATE — real credentials live
+│                           #   only on the boards, never in the repo
+├── hardware_test.py        # Standalone wiring test (no WiFi/MQTT needed)
+├── favicon.svg
 └── README.md
 ```
+
+> **Security note:** this repo is public (it serves the web UI via GitHub Pages).
+> Never commit real WiFi or WebREPL passwords — edit them only in the `config.py`
+> that lives on each board, which OTA never touches.
 
 ---
 

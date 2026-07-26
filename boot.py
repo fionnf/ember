@@ -69,6 +69,7 @@ def _update():
     except ImportError:
         print("[ota] urequests not available — skipping update")
         return
+    import os
 
     updated = []
     for fname in SYNC_FILES:
@@ -78,6 +79,15 @@ def _update():
             if r.status_code == 200:
                 content = r.text
                 r.close()
+                # Refuse to install anything that doesn't compile — a bad
+                # push to master (or a truncated download / HTML error
+                # page) must never brick the boards. They just keep
+                # running the last known-good firmware.
+                try:
+                    compile(content, fname, "exec")
+                except Exception as e:
+                    print(f"[ota] {fname} failed syntax check — keeping existing ({e})")
+                    continue
                 # Compare with existing file to avoid unnecessary writes
                 try:
                     with open(fname, "r") as f:
@@ -86,8 +96,13 @@ def _update():
                         continue
                 except OSError:
                     pass  # file doesn't exist yet
-                with open(fname, "w") as f:
+                # Atomic install: write to a temp file, then rename.
+                # A power cut mid-write must never leave a truncated
+                # main.py/colour.py behind.
+                tmp = fname + ".new"
+                with open(tmp, "w") as f:
                     f.write(content)
+                os.rename(tmp, fname)
                 updated.append(fname)
                 print(f"[ota] updated {fname}")
             else:

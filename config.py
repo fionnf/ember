@@ -8,9 +8,11 @@ BOSS     = True               # True on board_a (boss), False on board_b (follow
 
 # ── WiFi credentials ────────────────────────────────────────
 # List all known networks — the board will try each in order until one connects.
+# NOTE: this repo copy is a TEMPLATE. Put real credentials only in the
+# config.py on the board itself — OTA never overwrites it. Do NOT commit
+# real passwords: this repo is public (it serves the GitHub Pages web app).
 WIFI_NETWORKS = [
-    ("eth-iot",       "-6uWFXWia3Vb"),
-    ("Gaydar",  "rainb0wLAN"),
+    ("YourNetwork",   "YourPassword"),
     # ("iPhone",      "hotspotpass"),
 ]
 
@@ -48,10 +50,6 @@ HOLD_TIME_MS      = 3000        # ms held before it counts as a "long press" (to
 # Base warm-white RGBW values  (R, G, B, W)  — 0-255 each
 # W channel carries most of the warmth; RGB adds tint.
 BASE_WARM_WHITE = (0, 0, 0, 200)       # W channel only — pure warm white LED
-
-# How much each impulse can shift hue (0.0 – 1.0 of the full palette)
-HUE_SHIFT_MIN  = 0.20
-HUE_SHIFT_MAX  = 0.50
 
 # Palette of possible hue tints blended on top of warm white.
 # Each entry is (R, G, B) normalised 0-255.  Order matters — adjacent
@@ -97,9 +95,8 @@ NUM_GROUPS    = 3
 GROUP_MIN_LEDS = 1    # a group can be as small as a single LED
 GROUP_MAX_LEDS = 8    # a group won't consume more than this many LEDs
 
-# ── Animation parameters ─────────────────────────────────────
-FADE_STEPS     = 60            # steps in a colour-change crossfade
-FADE_DELAY_MS  = 16             # ms between fade steps  (~60 fps)
+# ── Fade / breathing ─────────────────────────────────────────
+FADE_STEPS     = 60            # steps in a colour-change crossfade (~60 fps ticks)
 BREATHE_SPEED  = 0.0008        # how fast brightness "breathes" when idle
 BREATHE_DEPTH  = 0.1          # how much brightness oscillates (0 = none)
 IDLE_DRIFT_INTERVAL_S = 65     # seconds between autonomous gentle hue drifts
@@ -107,7 +104,12 @@ IDLE_DRIFT_INTERVAL_S = 65     # seconds between autonomous gentle hue drifts
 # ── WebREPL ─────────────────────────────────────────────────
 # Allows wireless file editing and REPL access over WiFi.
 # Connect at http://micropython.org/webrepl/ using the board's IP address.
-WEBREPL_PASSWORD = "linked1"   # 4–9 characters
+WEBREPL_PASSWORD = "changeme"  # 4–9 characters — set per board, don't commit the real one
 
 # ── Reconnect behaviour ─────────────────────────────────────
 RECONNECT_DELAY_MS = 5000      # ms to wait before retrying WiFi / MQTT
+
+# ── Hardware watchdog ───────────────────────────────────────
+# Reboots the board if the firmware hangs for 8 s. Set False only while
+# debugging over WebREPL (a paused REPL would otherwise trigger reboots).
+WATCHDOG_ENABLED = True
