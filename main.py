@@ -20,7 +20,7 @@ from config import (
     WEBREPL_PASSWORD,
 )
 
-FIRMWARE_VERSION       = "2026-07-26"
+FIRMWARE_VERSION       = "2026-07-26.2"
 FRAME_MS               = 16
 SYNC_INTERVAL_MS       = 60_000
 SYNC_FADE_STEPS        = 300
@@ -33,6 +33,10 @@ from colour  import ColourEngine
 # All boards publish to and subscribe from the same shared topic.
 # They ignore messages that carry their own BOARD_ID (echo prevention).
 TOPIC_EVENTS = (MQTT_TOPIC_PREFIX + "/events").encode()
+# Retained per-board presence topic. A Last-Will makes the BROKER flip it
+# to offline if the board dies silently; retained delivery means a web
+# client knows each board's state the instant it subscribes.
+TOPIC_STATUS = (MQTT_TOPIC_PREFIX + "/status/" + BOARD_ID).encode()
 
 # ── Module-level objects ─────────────────────────────────────
 strip  = SK6812(pin=LED_PIN, num_leds=NUM_LEDS, brightness=LED_BRIGHTNESS)
@@ -122,6 +126,12 @@ def on_message(topic, msg):
     if target is not None and target != BOARD_ID:
         return
 
+    # State echoes are for web clients only. Without this, every web
+    # command made each board re-apply the OTHER board's echo and restart
+    # its fade — the visible stutter/flash on every interaction.
+    if data.get("echo"):
+        return
+
     print(f"[mqtt] recv: {data}")
     groups        = data.get("groups")
     on            = data.get("on")
@@ -166,7 +176,9 @@ def on_message(topic, msg):
     # Only echo messages that didn't come from another board (avoids loops).
     sender = data.get("from", "")
     if sender and not sender.startswith("board_"):
-        publish_event(engine.get_event_payload())
+        payload = engine.get_event_payload()
+        payload["echo"] = True
+        publish_event(payload)
 
 
 def connect_mqtt() -> MQTTClient:
@@ -182,8 +194,12 @@ def connect_mqtt() -> MQTTClient:
         keepalive=60,
     )
     c.set_callback(on_message)
+    c.set_last_will(TOPIC_STATUS, b'{"online": false}', retain=True)
     c.connect()
     c.subscribe(TOPIC_EVENTS)
+    c.publish(TOPIC_STATUS,
+              ujson.dumps({"online": True, "fw": FIRMWARE_VERSION}),
+              retain=True)
     print(f"[mqtt] connected — client_id={client_id}, topic={TOPIC_EVENTS}")
     return c
 

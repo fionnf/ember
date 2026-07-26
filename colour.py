@@ -122,14 +122,20 @@ class ColourEngine:
             def _resize(lst, default):
                 while len(lst) < n: lst.append(default)
                 del lst[n:]
-            _resize(self._pos,           0.0)
-            _resize(self._target_pos,    0.0)
-            _resize(self._colour,        BASE_WARM_WHITE)
-            _resize(self._target_col,    BASE_WARM_WHITE)
+            # Seed appended groups from the last group's CURRENT colour —
+            # seeding with warm white made those LEDs flash white for a
+            # frame before fading to their target.
+            last_pos = self._pos[-1]    if self._pos    else 0.0
+            last_col = self._colour[-1] if self._colour else BASE_WARM_WHITE
+            last_w   = self._w_level[-1] if self._w_level else 1.0
+            _resize(self._pos,           last_pos)
+            _resize(self._target_pos,    last_pos)
+            _resize(self._colour,        last_col)
+            _resize(self._target_col,    last_col)
             _resize(self._fade_step,     0)
             _resize(self._fading,        False)
-            _resize(self._w_level,       1.0)
-            _resize(self._w_target,      1.0)
+            _resize(self._w_level,       last_w)
+            _resize(self._w_target,      last_w)
             _resize(self._w_step,        0)
             _resize(self._w_fading,      False)
             _resize(self._breathe_phase,  0.0)

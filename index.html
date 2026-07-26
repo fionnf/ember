@@ -594,6 +594,7 @@ const driftEnabled   = false;
 const driftInterval  = 45;
 const BOARD_ID     = "web_app";
 const boardLastSeen   = {};
+const boardOnline     = {};   // broker-tracked presence via retained Last-Will (true/false/undefined)
 const boardLastChange = {};
 const boardLastFw     = {};   // firmware version per board
 const boardLastPower  = {};   // last known on/off state per board
@@ -625,8 +626,12 @@ function updatePills() {
     const labelEl = document.getElementById(labelId);
     if (labelEl.textContent !== name) labelEl.textContent = name;
 
-    const seen    = boardLastSeen[boardId];
-    const reachable = !!(seen && (Date.now() - seen) < BOARD_TIMEOUT_MS);
+    const seen  = boardLastSeen[boardId];
+    const fresh = !!(seen && (Date.now() - seen) < BOARD_TIMEOUT_MS);
+    // Broker-tracked Last-Will is authoritative: false → offline now,
+    // true → online; undefined (no retained status yet) → fall back to freshness
+    const st = boardOnline[boardId];
+    const reachable = st === false ? false : (st === true || fresh);
     const lightsOn  = boardLastPower[boardId] !== false; // default true if unknown
     // three states: "online" (reachable + on), "standby" (reachable + off), "" (offline)
     const state = reachable ? (lightsOn ? "online" : "standby") : "";
@@ -678,6 +683,7 @@ let _pingIntervalId = null;
 function topic()       { return cfg.prefix + "/events"; }
 function topicScenes() { return cfg.prefix + "/scenes"; }
 function topicAlarms() { return cfg.prefix + "/alarms"; }
+function topicStatus() { return cfg.prefix + "/status/+"; }
 
 function setStatus(cls, text) {
   document.getElementById("dot").className = cls;
@@ -698,6 +704,7 @@ function connect() {
     client.subscribe(topic());
     client.subscribe(topicScenes());
     client.subscribe(topicAlarms());
+    client.subscribe(topicStatus());  // retained — pills light up immediately
     // Ping boards immediately so they echo their state back (pills update fast)
     setTimeout(() => publish({ ping: true }), 300);
     // Then keep polling every 2 min so pills stay current without relying on board heartbeats
@@ -707,6 +714,15 @@ function connect() {
     const topicStr = t.toString();
     try {
       const d = JSON.parse(msg.toString());
+
+      if (topicStr.startsWith(cfg.prefix + "/status/")) {
+        const id = topicStr.split("/").pop();
+        boardOnline[id] = !!d.online;
+        if (d.fw) boardLastFw[id] = d.fw;
+        if (d.online) { boardLastSeen[id] = Date.now(); _scheduleBoardTimeout(id); }
+        updatePills();
+        return;
+      }
 
       if (topicStr === topicScenes()) {
         updatePills();
@@ -728,6 +744,7 @@ function connect() {
         _scheduleBoardTimeout(d.from);
       }
       if (d.from === BOARD_ID) return;
+      if (Date.now() < _holdUntil) return;  // user is mid-interaction — don't yank controls
       if (d.on         !== undefined) { powered = d.on;              updatePowerBtn(); }
       if (d.brightness !== undefined) { brightness = d.brightness;   syncBrightnessSlider(); }
       if (d.fade_steps !== undefined) { fadeSteps = d.fade_steps;    syncFadeSlider(); }
@@ -758,6 +775,12 @@ function debounce(fn, ms) {
   return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
 }
 
+// While the user is actively adjusting a control, ignore incoming state
+// echoes — otherwise the round-trip echo yanks the slider/handle they are
+// still holding. Refreshed on every local interaction, expires after 1.5 s.
+let _holdUntil = 0;
+function markLocalInteraction() { _holdUntil = Date.now() + 1500; }
+
 let _publishFlashTimer = null;
 function _flashDot() {
   const dot = document.getElementById("dot");
@@ -780,8 +803,16 @@ function showToast(msg) {
   t._timer = setTimeout(() => { t.style.opacity = "0"; }, 2500);
 }
 
+let _offlineToastAt = 0;
 function publish(payload) {
-  if (!client || !client.connected) return;
+  if (!client || !client.connected) {
+    // Silently dropping the change made the app feel broken — say so instead
+    if (Date.now() - _offlineToastAt > 3000) {
+      _offlineToastAt = Date.now();
+      showToast("⚠ Not connected — change not sent");
+    }
+    return;
+  }
   payload.from = BOARD_ID;
   if (sendTarget !== "both") payload.target = sendTarget;
   // Mirror on/off state immediately so pills update without waiting for echo
@@ -813,6 +844,7 @@ function publishRetained(topicFn, payload) {
 }
 
 function publishState() {
+  markLocalInteraction();
   const p = { groups: getGroups(), on: powered, brightness, fade_steps: fadeSteps,
               drift_enabled: driftEnabled, drift_interval: driftInterval };
   publish(p);
@@ -881,6 +913,18 @@ function renderStrip() {
   }
 }
 
+// Recolour existing LED cells without rebuilding the DOM — used on the
+// drag hot path where innerHTML rebuilds at 60 Hz cause visible jank.
+function updateStripColours() {
+  const ledsRow = document.getElementById("leds-row");
+  if (ledsRow.children.length !== cfg.numLeds) { renderStrip(); return; }
+  let idx = 0;
+  getGroups().forEach(g => {
+    const colour = powered ? rgbStr(g.pos) : "#111";
+    for (let j = 0; j < g.size; j++) ledsRow.children[idx++].style.background = colour;
+  });
+}
+
 function rebuildGroupData() {
   const n = groupCount();
   while (groupPositions.length < n) groupPositions.push(randFloat(0,1));
@@ -913,7 +957,8 @@ function _palettePos(e, bar) {
     }
     const sw = document.getElementById(`gsw-${i}`);
     if (sw) sw.style.background = rgbStr(pos);
-    renderStrip(); _publishPalette();
+    markLocalInteraction();
+    updateStripColours(); _publishPalette();
   }
   document.addEventListener("mousemove",  onMove);
   document.addEventListener("touchmove",  onMove, { passive: false });
@@ -988,6 +1033,7 @@ function syncFadeSlider() {
 // ── Group handlers ─────────────────────────────────────────────
 const _publishStateDebounced = debounce(publishState, 120);
 function onGroupW(i, val) {
+  markLocalInteraction();
   groupWLevels[i] = val;
   document.getElementById(`gww-${i}`).textContent = Math.round(val*100)+"%";
   _publishStateDebounced();
@@ -998,7 +1044,7 @@ function updatePowerBtn() {
   const btn = document.getElementById("btn-power");
   btn.className = powered ? "power-btn on" : "power-btn off";
   btn.querySelector(".power-label").textContent = powered ? "On" : "Off";
-  renderStrip();
+  updateStripColours();
 }
 
 
@@ -1019,12 +1065,14 @@ document.getElementById("btn-reset").addEventListener("click", () => {
 
 
 document.getElementById("sl-brightness").addEventListener("input", function() {
+  markLocalInteraction();
   brightness = this.value/100;
   document.getElementById("val-brightness").textContent = this.value+"%";
   _publishStateDebounced();
 });
 
 document.getElementById("sl-fade").addEventListener("input", function() {
+  markLocalInteraction();
   fadeSteps = parseInt(this.value);
   document.getElementById("val-fade").textContent = Math.round(fadeSteps*16/1000*10)/10+"s";
   _publishStateDebounced();

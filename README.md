@@ -178,11 +178,11 @@ Also: **Add WiFi Network** (sends credentials to both boards over MQTT), **↺ R
 
 ### Board presence pills
 
-The two pills (FF / LS) at the top right show each board's status. The web app actively pings both boards on connect and every 2 minutes; each ping makes the boards echo their full state back.
+The two pills (FF / LS) at the top right show each board's status. Presence uses MQTT **Last-Will** on a retained per-board topic (`prefix/status/<board_id>`): each board publishes `{"online": true}` (retained) on connect, and the broker itself flips it to `{"online": false}` if the board dies silently (within ~90 s of its last keepalive). Because the status is retained, the pills are correct the instant the page loads. The web app additionally pings both boards on connect and every 2 minutes to refresh their full state.
 
-- **Green (online)** — board responded within the last 150 s and lights are on
-- **Amber (standby)** — board responded within the last 150 s but lights are off
-- **No highlight (offline)** — no response within 150 s
+- **Green (online)** — retained status online (or message seen within 150 s) and lights on
+- **Amber (standby)** — same, but lights are off
+- **No highlight (offline)** — broker reported the board offline, or nothing heard within 150 s
 
 ---
 
@@ -209,8 +209,20 @@ The two pills (FF / LS) at the top right show each board's status. The web app a
 ### Heartbeat (board → all)
 
 ```json
-{"from": "board_a", "heartbeat": true, "fw": "1.4.2"}
+{"from": "board_a", "heartbeat": true, "fw": "2026-07-26.2"}
 ```
+
+### Presence (retained, per board, on `prefix/status/<board_id>`)
+
+```json
+{"online": true, "fw": "2026-07-26.2"}
+```
+
+Set as the board's MQTT Last-Will (`{"online": false}`), so the broker publishes the offline state automatically if a board dies.
+
+### State echo (board → web clients)
+
+When a board answers a web command or ping, its state reply carries `"echo": true`. Boards **ignore** echo-flagged messages — only genuine touch impulses and boss syncs (no flag) make the other board re-apply colours. This prevents the fade-restart flicker that occurred when each board re-applied the other's echo.
 
 ### Impulse / sync (board → board)
 
