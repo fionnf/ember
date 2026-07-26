@@ -97,7 +97,7 @@ WIFI_NETWORKS = [
 - **Events topic:** `picolight_lf26/events`
 - **Alarms topic:** `picolight_lf26/alarms` (retained, subscribed by boards)
 - **Status topic:** `picolight_lf26/status/<board_id>` (retained, Last-Will)
-- **Scenes topic:** `picolight_lf26/scenes` (retained, clients only)
+- **Scenes topic:** `picolight_lf26/scenes` (retained, reserved for clients — unused by this app)
 
 All messages are JSON with a `from` field for echo suppression. The full contract is documented in [MQTT Protocol Specification](#mqtt-protocol-specification) — that section is the reference for writing an additional client.
 
@@ -233,7 +233,7 @@ With `MQTT_TOPIC_PREFIX = "picolight_lf26"` (call it `P`):
 | `P/events` | client ⇄ board | no | Command / state object (below) |
 | `P/alarms` | client → board | **yes, QoS 1** | Bare JSON **array** of alarm objects |
 | `P/status/<board_id>` | board → client | **yes** | `{"online": bool, "fw": str, "ntp": bool}` |
-| `P/scenes` | client ⇄ client | yes | Free-form; boards ignore it |
+| `P/scenes` | client ⇄ client | yes | **Reserved / unused.** Boards ignore it, and this web app keeps scenes in `localStorage`. Free for another client to use for cross-device scene sync |
 
 Board IDs are `board_a` (BOSS, display name FF) and `board_b` (follower, LS).
 

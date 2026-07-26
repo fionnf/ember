@@ -71,11 +71,6 @@ class SK6812:
         """Set every LED to the same RGBW value."""
         self._pixels = [(r, g, b, w)] * self.num_leds
 
-    def fill_from_list(self, pixel_list):
-        """Set all LEDs from a list of (r,g,b,w) tuples."""
-        for i, px in enumerate(pixel_list[:self.num_leds]):
-            self._pixels[i] = px
-
     def set_brightness(self, brightness: float):
         self.brightness = max(0.0, min(1.0, brightness))
 

@@ -715,7 +715,6 @@ let client = null;
 let _pingIntervalId = null;
 
 function topic()       { return cfg.prefix + "/events"; }
-function topicScenes() { return cfg.prefix + "/scenes"; }
 function topicAlarms() { return cfg.prefix + "/alarms"; }
 function topicStatus() { return cfg.prefix + "/status/+"; }
 
@@ -736,7 +735,6 @@ function connect() {
   client.on("connect", () => {
     setStatus("connected", cfg.broker.replace(/^wss?:\/\//,"").replace(/\/mqtt$/,""));
     client.subscribe(topic());
-    client.subscribe(topicScenes());
     client.subscribe(topicAlarms());
     client.subscribe(topicStatus());  // retained — pills light up immediately
     // Ping boards immediately so they echo their state back (pills update fast)
@@ -756,12 +754,6 @@ function connect() {
         if (d.ntp !== undefined) boardNtp[id] = d.ntp;
         if (d.online) { boardLastSeen[id] = Date.now(); _scheduleBoardTimeout(id); }
         updatePills();
-        return;
-      }
-
-      if (topicStr === topicScenes()) {
-        updatePills();
-        updateTargetBtns();
         return;
       }
 

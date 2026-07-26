@@ -28,7 +28,6 @@ class TouchSensor:
     """
 
     def __init__(self, pin: int, samples: int = 10):
-        self._pin_num = pin
         self._samples = samples
         # One reusable Pin object. Constructing a Pin per measurement meant
         # an allocation on every main-loop iteration (~1000/s) — pure GC churn
