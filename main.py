@@ -324,9 +324,7 @@ def publish_event(payload: dict):
         client = None   # trigger reconnect
 
 
-OTA_HOUR_UTC = 4    # 4 am UTC — daily OTA reboot while nobody is watching
-                    # (was 17:00 UTC — early evening, exactly when the
-                    # lamps are most likely to be on and visibly restart)
+OTA_HOUR_UTC = 17   # 5 pm UTC — daily reboot triggers boot.py OTA
 
 STATE_FILE  = "state.json"
 ALARM_FILE  = "alarms.json"

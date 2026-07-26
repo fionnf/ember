@@ -134,7 +134,7 @@ On/off state and brightness are written to `state.json` (on power toggles and be
 
 ### Daily OTA reboot
 
-Each board reboots once a day at **04:00 UTC** (`OTA_HOUR_UTC` in `main.py`) to pull the latest firmware — a quiet-hours maintenance window so the ~30 s restart is never visible.
+Each board reboots once a day at **17:00 UTC** (`OTA_HOUR_UTC` in `main.py`) to pull the latest firmware. State (on/off + brightness) is saved before the reboot and restored after, so the lamps come back as they were.
 
 ### Resilience layers
 
