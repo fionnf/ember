@@ -6,7 +6,6 @@ import urandom
 import utime
 from config import (
     BASE_WARM_WHITE, TINT_PALETTE,
-    HUE_SHIFT_MIN, HUE_SHIFT_MAX,
     FADE_STEPS,
     BREATHE_SPEED, BREATHE_DEPTH,
     IDLE_DRIFT_INTERVAL_S,

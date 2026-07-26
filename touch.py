@@ -34,6 +34,7 @@ class TouchSensor:
         self._baseline = self._measure_raw_avg()
         self._is_touched = False
         self._touch_start = 0
+        self._hold_fired = False
 
     # ── Calibration ─────────────────────────────────────────
 

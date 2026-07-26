@@ -126,7 +126,7 @@ Alarms are stored as JSON in `alarms.json` on each board's flash and also kept i
 
 ### WiFi Watchdog
 
-If the board loses WiFi for more than 10 minutes (`WIFI_OFFLINE_REBOOT_MS = 600000`) it reboots to reconnect and pick up any OTA update. Known networks are stored in `wifi_networks.json` on flash and tried in order.
+If the board loses its MQTT connection (WiFi down or broker unreachable) for more than 10 minutes (`WIFI_OFFLINE_REBOOT_MS = 600000`) it reboots to reconnect and pick up any OTA update. Known networks are the `WIFI_NETWORKS` list in `config.py` plus any saved to `networks.json` on flash, tried in order.
 
 ### State Persistence
 
@@ -163,7 +163,7 @@ Create sunrise/bedtime alarms per board with day-of-week selection, duration, an
 
 ### Scenes
 
-Save and load complete lamp states (colours, group layout, brightness, fade speed). Stored in `localStorage`. Built-in scene: **Static Rainbow** (one LED per group, evenly spaced across the hue palette).
+Save and load complete lamp states (colours, group layout, brightness, fade speed). Stored in `localStorage`.
 
 ### Settings panel
 
@@ -178,11 +178,11 @@ Also: **Add WiFi Network** (sends credentials to both boards over MQTT), **↺ R
 
 ### Board presence pills
 
-The two pills (FF / LS) at the top right show each board's status:
+The two pills (FF / LS) at the top right show each board's status. The web app actively pings both boards on connect and every 2 minutes; each ping makes the boards echo their full state back.
 
-- **Green (online)** — board seen within 65 s and lights are on
-- **Amber (standby)** — board seen within 65 s but lights are off
-- **No highlight (offline)** — no message received within 65 s
+- **Green (online)** — board responded within the last 150 s and lights are on
+- **Amber (standby)** — board responded within the last 150 s but lights are off
+- **No highlight (offline)** — no response within 150 s
 
 ---
 
@@ -262,9 +262,10 @@ The two pills (FF / LS) at the top right show each board's status:
    ```bash
    mpremote connect /dev/ttyACM0 cp boot.py config.py :
    ```
-   Create `wifi_networks.json` on the board:
+   Set your WiFi credentials in `WIFI_NETWORKS` in the board's `config.py`
+   (or create `networks.json` on the board — a list of `[ssid, password]` pairs):
    ```json
-   [{"ssid": "YourNetwork", "password": "YourPassword"}]
+   [["YourNetwork", "YourPassword"]]
    ```
 
 4. **Edit `config.py`** — set `BOARD_ID`, `BOSS`, `NUM_LEDS`, `LED_PIN`, `MQTT_TOPIC_PREFIX`.
@@ -293,17 +294,22 @@ The two pills (FF / LS) at the top right show each board's status:
 
 ```
 linked_friend_lights/
-├── index.html              # GitHub Pages web UI (copy of web_app/index.html)
-├── web_app/
-│   └── index.html          # Web UI source
+├── index.html              # Web UI — single source, served by GitHub Pages
 ├── main.py                 # Firmware — main loop (OTA-fetched)
 ├── colour.py               # Firmware — colour engine (OTA-fetched)
 ├── sk6812.py               # Firmware — PIO LED driver (OTA-fetched)
 ├── touch.py                # Firmware — capacitive touch (OTA-fetched)
 ├── boot.py                 # OTA bootstrap (deployed manually, never overwritten)
-├── config.py               # Per-board hardware config (never overwritten)
+├── config.py               # Per-board config TEMPLATE — real credentials live
+│                           #   only on the boards, never in the repo
+├── hardware_test.py        # Standalone wiring test (no WiFi/MQTT needed)
+├── favicon.svg
 └── README.md
 ```
+
+> **Security note:** this repo is public (it serves the web UI via GitHub Pages).
+> Never commit real WiFi or WebREPL passwords — edit them only in the `config.py`
+> that lives on each board, which OTA never touches.
 
 ---
 

@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>Linked Lights</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
@@ -279,28 +278,6 @@
       transition: color 0.15s, border-color 0.15s;
     }
     .scene-del:hover { color: var(--red); border-color: rgba(224,72,72,0.3); }
-    .board-lib-row {
-      display: flex; align-items: center; gap: 0.5rem;
-      padding: 0.45rem 0.6rem; border-radius: var(--r-xs);
-      border: 1px solid var(--border); background: var(--surface2);
-      transition: border-color 0.15s;
-    }
-    .board-lib-row:hover { border-color: var(--border2); }
-    .board-lib-name { flex: 1; font-size: 0.8rem; color: var(--text2); }
-    .board-lib-play {
-      padding: 0.28rem 0.65rem; font-size: 0.72rem; font-weight: 600;
-      border-radius: var(--r-xs); border: 1px solid rgba(240,160,48,0.35);
-      background: rgba(240,160,48,0.08); color: var(--accent); cursor: pointer;
-      font-family: inherit; transition: background 0.15s;
-    }
-    .board-lib-play:hover { background: rgba(240,160,48,0.18); }
-    .board-lib-del {
-      padding: 0.28rem 0.45rem; font-size: 0.72rem; border-radius: var(--r-xs);
-      border: 1px solid transparent; background: transparent; color: var(--muted);
-      cursor: pointer; font-family: inherit; transition: color 0.15s, border-color 0.15s;
-    }
-    .board-lib-del:hover { color: var(--red); border-color: rgba(224,72,72,0.3); }
-    .board-lib-empty { font-size:0.78rem; color:var(--muted); padding:0.3rem 0; }
     .save-row { display: flex; gap: 0.5rem; }
     .save-row input {
       flex: 1; background: rgba(0,0,0,0.25); border: 1px solid var(--border);
@@ -904,8 +881,6 @@ function renderStrip() {
   }
 }
 
-function renderDividerBar() { /* merged into renderStrip */ }
-
 function rebuildGroupData() {
   const n = groupCount();
   while (groupPositions.length < n) groupPositions.push(randFloat(0,1));
@@ -995,7 +970,6 @@ function renderGroupPanels() {
 function renderAll() {
   rebuildGroupData();
   renderStrip();
-  renderDividerBar();
   renderPaletteBar();
   renderGroupPanels();
 }
@@ -1304,6 +1278,10 @@ function renderScenes() {
     ...userScenes.map((s, i) => ({ item: s, builtin: false, idx: i })),
   ];
   container.innerHTML = "";
+  if (!all.length) {
+    container.innerHTML = `<div class="no-scenes">No scenes yet — set some colours and save one below</div>`;
+    return;
+  }
   all.forEach(({ item, builtin, idx }) => {
     const row = document.createElement("div");
     row.className = "scene-row";

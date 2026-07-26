@@ -20,7 +20,7 @@ from config import (
     WEBREPL_PASSWORD,
 )
 
-FIRMWARE_VERSION       = "2026-06-23"
+FIRMWARE_VERSION       = "2026-07-26"
 FRAME_MS               = 16
 SYNC_INTERVAL_MS       = 60_000
 SYNC_FADE_STEPS        = 300
@@ -486,9 +486,14 @@ def main():
         if _sunrise["active"]:
             elapsed = utime.ticks_diff(now, _sunrise["start_ms"])
             if elapsed >= _sunrise["dur_ms"]:
-                engine.set_brightness(_sunrise["target_br"])
                 if _sunrise.get("sunset"):
                     engine.set_power(False)
+                    # Restore pre-sunset brightness so the next power-on
+                    # doesn't come up at brightness 0 (invisible)
+                    engine.set_brightness(_sunrise.get("start_br", LED_BRIGHTNESS))
+                    save_state()
+                else:
+                    engine.set_brightness(_sunrise["target_br"])
                 _sunrise["active"] = False
                 publish_event(engine.get_event_payload())
             else:
