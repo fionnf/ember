@@ -130,13 +130,17 @@ If the board loses its MQTT connection (WiFi down or broker unreachable) for mor
 
 ### State Persistence
 
-On/off state is written to `state.json` after each power toggle and restored on boot before connecting to MQTT.
+On/off state and brightness are written to `state.json` (on power toggles and before every reboot) and restored on boot before connecting to MQTT — so the lamps come back exactly as they were after the nightly OTA reboot.
+
+### Daily OTA reboot
+
+Each board reboots once a day at **04:00 UTC** (`OTA_HOUR_UTC` in `main.py`) to pull the latest firmware — a quiet-hours maintenance window so the ~30 s restart is never visible.
 
 ---
 
 ## Web UI
 
-`index.html` at the repo root is served via **GitHub Pages**. It connects to the HiveMQ broker over WebSockets. No install required — open it in any browser.
+`index.html` at the repo root is served via **GitHub Pages**. It connects to the HiveMQ broker over WebSockets. No install required — open it in any browser. On a phone you can **Add to Home Screen** to get it as a standalone full-screen app (web manifest included), and the app automatically reconnects when you return to it after backgrounding.
 
 ### Controls
 

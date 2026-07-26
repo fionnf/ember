@@ -4,7 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>Linked Lights</title>
+  <meta name="theme-color" content="#060608">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="favicon.svg">
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -629,9 +634,11 @@ function updatePills() {
     const seen  = boardLastSeen[boardId];
     const fresh = !!(seen && (Date.now() - seen) < BOARD_TIMEOUT_MS);
     // Broker-tracked Last-Will is authoritative: false → offline now,
-    // true → online; undefined (no retained status yet) → fall back to freshness
+    // true → online; undefined (no retained status yet) → fall back to freshness.
+    // And if the web app itself is disconnected, we can't know — show offline.
+    const mqttUp = !!(client && client.connected);
     const st = boardOnline[boardId];
-    const reachable = st === false ? false : (st === true || fresh);
+    const reachable = mqttUp && (st === false ? false : (st === true || fresh));
     const lightsOn  = boardLastPower[boardId] !== false; // default true if unknown
     // three states: "online" (reachable + on), "standby" (reachable + off), "" (offline)
     const state = reachable ? (lightsOn ? "online" : "standby") : "";
@@ -759,15 +766,26 @@ function connect() {
         });
         renderAll();
       }
-    } catch(e) {}
+    } catch(e) { console.warn("[mqtt] bad message on", topicStr, e); }
   });
   client.on("error",     () => setStatus("disconnected", "error"));
   client.on("close",     () => {
     setStatus("disconnected", "disconnected");
     if (_pingIntervalId) { clearInterval(_pingIntervalId); _pingIntervalId = null; }
+    updatePills();   // don't keep showing stale green pills with no connection
   });
   client.on("reconnect", () => setStatus("connecting",   "reconnecting…"));
 }
+
+// Phones suspend the WebSocket when the tab is backgrounded; on return the
+// app would sit on a dead socket until mqtt.js noticed. Reconnect (or
+// refresh state) the moment the tab becomes visible again.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  if (!client || !client.connected) connect();
+  else publish({ ping: true });
+  updatePills();
+});
 
 // ── Debounce helper ────────────────────────────────────────────
 function debounce(fn, ms) {

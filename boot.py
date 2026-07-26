@@ -69,6 +69,7 @@ def _update():
     except ImportError:
         print("[ota] urequests not available — skipping update")
         return
+    import os
 
     updated = []
     for fname in SYNC_FILES:
@@ -86,8 +87,13 @@ def _update():
                         continue
                 except OSError:
                     pass  # file doesn't exist yet
-                with open(fname, "w") as f:
+                # Atomic install: write to a temp file, then rename.
+                # A power cut mid-write must never leave a truncated
+                # main.py/colour.py behind.
+                tmp = fname + ".new"
+                with open(tmp, "w") as f:
                     f.write(content)
+                os.rename(tmp, fname)
                 updated.append(fname)
                 print(f"[ota] updated {fname}")
             else:

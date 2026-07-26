@@ -48,6 +48,9 @@ class SK6812:
         # Pixel buffer: store full 0-255 values; apply brightness at show() time
         # Each pixel: [R, G, B, W]
         self._pixels = [(0, 0, 0, 0)] * num_leds
+        # Preallocated word buffer reused every frame — allocating it in
+        # show() at 60 Hz caused GC pauses (visible micro-stutter)
+        self._buf = array.array("I", [0] * num_leds)
 
         self._sm = rp2.StateMachine(
             0,
@@ -79,7 +82,7 @@ class SK6812:
     def show(self):
         """Push the pixel buffer to the strip."""
         # SK6812 byte order: G R B W
-        buf = array.array("I", [0] * self.num_leds)
+        buf = self._buf
         b = self.brightness
         for i, (r, g, bv, w) in enumerate(self._pixels):
             ri = int(r * b)

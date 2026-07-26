@@ -1,0 +1,12 @@
+{
+  "name": "Linked Lights",
+  "short_name": "Lights",
+  "description": "Control two linked SK6812 lamps over MQTT",
+  "display": "standalone",
+  "background_color": "#060608",
+  "theme_color": "#060608",
+  "start_url": ".",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

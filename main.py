@@ -20,7 +20,7 @@ from config import (
     WEBREPL_PASSWORD,
 )
 
-FIRMWARE_VERSION       = "2026-07-26.2"
+FIRMWARE_VERSION       = "2026-07-26.3"
 FRAME_MS               = 16
 SYNC_INTERVAL_MS       = 60_000
 SYNC_FADE_STEPS        = 300
@@ -217,7 +217,9 @@ def publish_event(payload: dict):
         client = None   # trigger reconnect
 
 
-OTA_HOUR_UTC = 17   # 5 pm UTC — daily reboot triggers boot.py OTA
+OTA_HOUR_UTC = 4    # 4 am UTC — daily OTA reboot while nobody is watching
+                    # (was 17:00 UTC — early evening, exactly when the
+                    # lamps are most likely to be on and visibly restart)
 
 STATE_FILE  = "state.json"
 ALARM_FILE  = "alarms.json"
@@ -246,7 +248,8 @@ def save_alarms(data):
 def save_state():
     try:
         with open(STATE_FILE, "w") as f:
-            ujson.dump({"on": engine._powered_on}, f)
+            ujson.dump({"on": engine._powered_on,
+                        "brightness": round(engine._brightness, 3)}, f)
     except Exception as e:
         print(f"[state] save failed: {e}")
 
@@ -254,12 +257,15 @@ def restore_state():
     try:
         with open(STATE_FILE) as f:
             d = ujson.load(f)
+        br = d.get("brightness")
+        if br is not None:
+            engine.set_brightness(float(br))
         if not d.get("on", True):
             engine.set_power(False)
             engine._power_level = 0.0  # instant off, no fade-in
             print("[state] restored: off")
         else:
-            print("[state] restored: on")
+            print(f"[state] restored: on, brightness {br}")
     except Exception:
         pass  # no saved state — use default (on)
 
@@ -395,7 +401,9 @@ def main():
                 wlan = network.WLAN(network.STA_IF)
                 if not wlan.isconnected():
                     print("[wifi] lost — reconnecting before MQTT retry")
-                    connect_wifi(tick=None)
+                    # Keep rendering while the blocking reconnect runs —
+                    # otherwise the lamps freeze mid-breath for up to ~12 s
+                    connect_wifi(tick=lambda: engine.tick(strip))
                 client = connect_mqtt()
                 _backoff_ms    = RECONNECT_DELAY_MS   # reset on success
                 _ping_at       = utime.ticks_add(now, 20_000)
@@ -453,7 +461,7 @@ def main():
             if t[3] == OTA_HOUR_UTC and cur_min != _ota_check_min:
                 _ota_check_min = cur_min
                 if cur_min == 0:
-                    print("[ota] 5 pm UTC — saving state and rebooting for OTA")
+                    print("[ota] daily maintenance window — saving state and rebooting for OTA")
                     save_state()
                     import machine
                     machine.reset()
@@ -495,7 +503,12 @@ def main():
                             engine.set_power(True)
                             engine.set_brightness(0.0)
                             print(f"[alarm] sunrise! {key[0]:02d}:{key[1]:02d}")
-                        publish_event(engine.get_event_payload())
+                        # echo flag: web-UI info only. Each board runs its own
+                        # alarm — without the flag, an alarm targeting ONE
+                        # board leaked its state onto the other board.
+                        payload = engine.get_event_payload()
+                        payload["echo"] = True
+                        publish_event(payload)
                         break
 
         # ── Sunrise / sunset ramp ──
@@ -511,7 +524,9 @@ def main():
                 else:
                     engine.set_brightness(_sunrise["target_br"])
                 _sunrise["active"] = False
-                publish_event(engine.get_event_payload())
+                payload = engine.get_event_payload()
+                payload["echo"] = True
+                publish_event(payload)
             else:
                 progress = elapsed / _sunrise["dur_ms"]
                 if _sunrise.get("sunset"):
