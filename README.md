@@ -107,7 +107,7 @@ The `ColourEngine` class manages per-group colour state:
 
 - **Palette position** (`pos`, float 0.0–1.0): maps into a 30-stop hue palette blended with warm white. `0.0` = pure warm white (W channel only); higher values = saturated hues with W fading out.
 - **Groups**: the strip is split into 1–N independent colour zones. Each group has a `pos` (hue) and a `w` (warm-white level). Group sizes are stored separately.
-- **Fade**: each group independently crossfades to its target over `FADE_STEPS` ticks.
+- **Fade**: each group independently crossfades from its start colour to its target over `FADE_STEPS` ticks, eased with smoothstep so the transition begins and ends imperceptibly. A fade takes the time it says it does — `fade_steps: 60` really is ~1 s.
 - **Breathing**: a per-group sine oscillator adds a slow ±4% brightness pulse with staggered phases.
 - **Drift**: optional autonomous colour drift — subtle hue nudges and group-size shifts every `IDLE_DRIFT_INTERVAL_S` seconds. Disabled by default in the web UI (`driftEnabled = false`).
 - **Power**: soft on/off with an ~800 ms fade.
@@ -164,6 +164,8 @@ The watchdog can be disabled per board (`WATCHDOG_ENABLED = False` in `config.py
 ## Web UI
 
 `index.html` at the repo root is served via **GitHub Pages**. It connects to the HiveMQ broker over WebSockets. No install required — open it in any browser. On a phone you can **Add to Home Screen** to get it as a standalone full-screen app (web manifest included), and the app automatically reconnects when you return to it after backgrounding.
+
+A service worker (`sw.js`) caches the app shell and the mqtt.js library, so the UI keeps working if the CDN is unreachable. HTML is fetched network-first, so a pushed update always lands rather than stranding you on a cached build.
 
 ### Controls
 
@@ -289,9 +291,11 @@ A `groups` entry:
 | `w` | number | 0.0–1.0 | Warm-white level for this group |
 | `size` | integer | ≥1 | How many consecutive LEDs this group covers |
 
-`size` values should sum to `NUM_LEDS`. The firmware resizes its internal
-group arrays to match the array length, so a per-LED gradient is simply
-`NUM_LEDS` groups of `size: 1`.
+`size` values should sum to `NUM_LEDS`. If they sum to less, the firmware
+extends the last group to cover the remainder (so no LED is left showing a
+stale colour); if they sum to more, the extra is trimmed. The firmware
+resizes its internal group arrays to match the array length, so a per-LED
+gradient is simply `NUM_LEDS` groups of `size: 1`.
 
 Example — set three groups and full brightness:
 
@@ -476,6 +480,8 @@ board runs the real alarm code path immediately.
 ```
 linked_friend_lights/
 ├── index.html              # Web UI — single source, served by GitHub Pages
+├── sw.js                   # Service worker — caches shell + mqtt.js
+├── manifest.json           # PWA manifest (Add to Home Screen)
 ├── main.py                 # Firmware — main loop (OTA-fetched)
 ├── colour.py               # Firmware — colour engine (OTA-fetched)
 ├── sk6812.py               # Firmware — PIO LED driver (OTA-fetched)

@@ -30,6 +30,10 @@ class TouchSensor:
     def __init__(self, pin: int, samples: int = 10):
         self._pin_num = pin
         self._samples = samples
+        # One reusable Pin object. Constructing a Pin per measurement meant
+        # an allocation on every main-loop iteration (~1000/s) — pure GC churn
+        # in the hottest path in the firmware.
+        self._pin = machine.Pin(pin, machine.Pin.OUT)
         # Baseline calibrated at startup
         self._baseline = self._measure_raw_avg()
         self._is_touched = False
@@ -49,7 +53,8 @@ class TouchSensor:
         One charge-time measurement.
         Returns a count proportional to capacitance.
         """
-        pin = machine.Pin(self._pin_num, machine.Pin.OUT)
+        pin = self._pin
+        pin.init(machine.Pin.OUT)
         pin.value(1)
         utime.sleep_us(10)           # charge
         pin.init(machine.Pin.IN)     # release to float

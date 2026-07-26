@@ -1472,6 +1472,15 @@ document.getElementById("btn-save-scene").addEventListener("click", () => {
   renderScenes();
 });
 
+// Cache the shell + mqtt.js so a CDN outage can't take the app down.
+// Wrapped in a guard: a service-worker failure must never break the UI.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(e =>
+      console.warn("[sw] registration failed (app still works)", e));
+  });
+}
+
 // ── Init ──────────────────────────────────────────────────────
 initGroups(cfg.numGroups);
 renderAll();

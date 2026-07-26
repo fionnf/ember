@@ -24,7 +24,7 @@ from config import (
     WEBREPL_PASSWORD,
 )
 
-FIRMWARE_VERSION       = "2026-07-26.5"
+FIRMWARE_VERSION       = "2026-07-26.6"
 FRAME_MS               = 16
 SYNC_INTERVAL_MS       = 60_000
 SYNC_FADE_STEPS        = 300

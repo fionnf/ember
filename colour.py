@@ -19,6 +19,15 @@ from config import REVERSE_LEDS
 def _lerp(a, b, t):
     return a + (b - a) * t
 
+def _ease(t):
+    """Smoothstep — symmetric ease-in-out, zero velocity at both ends.
+    Makes a fade start and finish imperceptibly instead of stepping."""
+    if t <= 0.0:
+        return 0.0
+    if t >= 1.0:
+        return 1.0
+    return t * t * (3.0 - 2.0 * t)
+
 def _lerp_colour(c1, c2, t):
     return tuple(int(_lerp(a, b, t)) for a, b in zip(c1, c2))
 
@@ -71,10 +80,15 @@ class ColourEngine:
         self._pos           = [0.0] * n
         self._target_pos    = [0.0] * n
         self._colour        = [BASE_WARM_WHITE] * n
+        # Fades interpolate start → target. Lerping from the *current* colour
+        # each step compounded the easing: a nominal 1 s fade was 99 % done in
+        # ~0.35 s, so the Fade Speed slider barely did anything.
+        self._start_col     = [BASE_WARM_WHITE] * n
         self._target_col    = [BASE_WARM_WHITE] * n
         self._fade_step     = [0] * n
         self._fading        = [False] * n
         self._w_level       = [1.0] * n
+        self._w_start       = [1.0] * n
         self._w_target      = [1.0] * n
         self._w_step        = [0] * n
         self._w_fading      = [False] * n
@@ -103,9 +117,7 @@ class ColourEngine:
         self._group_sizes = _random_partition(NUM_LEDS, self._n, GROUP_MIN_LEDS, GROUP_MAX_LEDS)
         for i in range(self._n):
             self._start_fade(i, _rand_float(0.0, 1.0))
-            self._w_target[i] = _rand_float(0.6, 1.0)
-            self._w_step[i]   = 0
-            self._w_fading[i] = True
+            self._start_w_fade(i, _rand_float(0.6, 1.0))
 
     def toggle_power(self):
         self._powered_on = not self._powered_on
@@ -131,23 +143,38 @@ class ColourEngine:
             _resize(self._pos,           last_pos)
             _resize(self._target_pos,    last_pos)
             _resize(self._colour,        last_col)
+            _resize(self._start_col,     last_col)
             _resize(self._target_col,    last_col)
             _resize(self._fade_step,     0)
             _resize(self._fading,        False)
             _resize(self._w_level,       last_w)
+            _resize(self._w_start,       last_w)
             _resize(self._w_target,      last_w)
             _resize(self._w_step,        0)
             _resize(self._w_fading,      False)
-            _resize(self._breathe_phase,  0.0)
+            # Spread the phase of any appended group. Seeding them all with
+            # 0.0 made every new group breathe in perfect unison, which reads
+            # as one flat pulse instead of the intended organic shimmer.
+            old_bp = self._breathe_phase
+            self._breathe_phase = [old_bp[k] if k < len(old_bp)
+                                   else (k * 6.283185 / n) for k in range(n)]
             _resize(self._fade_steps_per, self._fade_steps)
             self._n = n
         self._group_sizes = []
         for i, g in enumerate(groups):
             self._group_sizes.append(g["size"])
             self._start_fade(i, g["pos"], fs)
-            self._w_target[i] = g["w"]
-            self._w_step[i]   = 0
-            self._w_fading[i] = True
+            self._start_w_fade(i, g["w"])
+        # Make the groups cover exactly the whole strip. A client whose sizes
+        # sum to less than NUM_LEDS would otherwise leave the trailing LEDs
+        # displaying stale colours from the previous scene.
+        total = 0
+        for k in range(len(self._group_sizes)):
+            keep = max(0, min(self._group_sizes[k], NUM_LEDS - total))
+            self._group_sizes[k] = keep
+            total += keep
+        if total < NUM_LEDS:
+            self._group_sizes[-1] += NUM_LEDS - total
 
     def set_power(self, on):
         if on != self._powered_on:
@@ -187,9 +214,7 @@ class ColourEngine:
             self._start_fade(i, new_pos)
             # Small W nudge — stay within ±8% of current level
             new_w = max(0.6, min(1.0, self._w_level[i] + _rand_float(-0.08, 0.08)))
-            self._w_target[i] = new_w
-            self._w_step[i]   = 0
-            self._w_fading[i] = True
+            self._start_w_fade(i, new_w)
 
         # Occasionally shift one random group by ±1 LED
         if urandom.getrandbits(2) == 0:  # ~25% chance per drift event
@@ -230,9 +255,9 @@ class ColourEngine:
             fs = self._fade_steps_per[i]
 
             if self._fading[i]:
-                t = self._fade_step[i] / fs
-                self._colour[i]    = _lerp_colour(self._colour[i], self._target_col[i], t)
                 self._fade_step[i] += 1
+                e = _ease(self._fade_step[i] / fs)
+                self._colour[i] = _lerp_colour(self._start_col[i], self._target_col[i], e)
                 if self._fade_step[i] >= fs:
                     self._fading[i] = False
                     self._colour[i] = self._target_col[i]
@@ -240,16 +265,21 @@ class ColourEngine:
 
             # W-level fade
             if self._w_fading[i]:
-                t = self._w_step[i] / fs
-                self._w_level[i] = _lerp(self._w_level[i], self._w_target[i], t)
                 self._w_step[i] += 1
+                e = _ease(self._w_step[i] / fs)
+                self._w_level[i] = _lerp(self._w_start[i], self._w_target[i], e)
                 if self._w_step[i] >= fs:
                     self._w_fading[i] = False
                     self._w_level[i]  = self._w_target[i]
 
-            # Breathing
-            self._breathe_phase[i] += BREATHE_SPEED * dt
-            breath = 1.0 + math.sin(self._breathe_phase[i]) * BREATHE_DEPTH
+            # Breathing — phase wraps at 2π so it never grows large enough
+            # for float precision loss to make the breath jerky (it would
+            # reach ~10^6 rad after a few weeks of uptime)
+            ph = self._breathe_phase[i] + BREATHE_SPEED * dt
+            if ph > 6.283185:
+                ph -= 6.283185
+            self._breathe_phase[i] = ph
+            breath = 1.0 + math.sin(ph) * BREATHE_DEPTH
 
             scale = breath * self._power_level
 
@@ -291,7 +321,14 @@ class ColourEngine:
 
     def _start_fade(self, group, new_pos, steps=None):
         self._target_pos[group] = new_pos
+        self._start_col[group]  = self._colour[group]   # anchor for interpolation
         self._target_col[group] = _palette_colour(new_pos)
         self._fade_steps_per[group] = steps if steps is not None else self._fade_steps
         self._fade_step[group]  = 0
         self._fading[group]     = True
+
+    def _start_w_fade(self, group, new_w):
+        self._w_start[group]  = self._w_level[group]
+        self._w_target[group] = new_w
+        self._w_step[group]   = 0
+        self._w_fading[group] = True
