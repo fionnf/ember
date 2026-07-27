@@ -134,7 +134,60 @@ def run():
     check("groups cover the whole strip", sum(fw.engine._group_sizes) == 10,
           str(fw.engine._group_sizes))
 
-    print("\n=== 6. test_alarm ===")
+    print("\n=== 6. flash wear ===")
+    # The web app puts `on` in every state publish, so a slider drag sends
+    # ~8 messages/s. Each one used to rewrite state.json — a flash
+    # erase/write cycle that also stalls the render loop.
+    import os as _os
+    st = _os.path.join(work, "state.json")
+    def mtime_writes(fn, n):
+        seen = 0
+        for i in range(n):
+            before = _os.stat(st).st_mtime_ns if _os.path.exists(st) else -1
+            fn(i)
+            after = _os.stat(st).st_mtime_ns if _os.path.exists(st) else -1
+            if after != before: seen += 1
+        return seen
+
+    def drag(i):
+        fw.client.inject(b"test_prefix/events", json.dumps({
+            "from": "web_app", "on": True, "brightness": 0.30 + i * 0.01}).encode())
+        fw.client.check_msg()
+    writes = mtime_writes(drag, 40)
+    check("slider drag does not rewrite flash", writes == 0, f"{writes} writes in 40 msgs")
+
+    def toggle(i):
+        fw.client.inject(b"test_prefix/events", json.dumps({
+            "from": "web_app", "on": bool(i % 2)}).encode())
+        fw.client.check_msg()
+    writes = mtime_writes(toggle, 6)
+    check("real power toggles DO persist", writes == 6, f"{writes}/6 persisted")
+
+    # repeating the same power state must not rewrite
+    fw.client.inject(b"test_prefix/events", json.dumps({"from":"web_app","on":True}).encode())
+    fw.client.check_msg()
+    writes = mtime_writes(lambda i: (
+        fw.client.inject(b"test_prefix/events", json.dumps({"from":"web_app","on":True}).encode()),
+        fw.client.check_msg()), 10)
+    check("repeated identical state is a no-op", writes == 0, f"{writes} redundant writes")
+
+    print("\n=== 7. per-lamp targeting sticks ===")
+    # The BOSS re-publishes state every 60 s; that used to overwrite a lamp
+    # the user had deliberately set on its own ("Send to -> LS" reverted).
+    fw._independent_until = None
+    fw.client.inject(b"test_prefix/events", json.dumps({
+        "from": "web_app", "target": "board_b",
+        "groups": [{"pos": 0.8, "w": 0.2, "size": 10}]}).encode())
+    fw.client.check_msg()
+    check("targeted command unlinks the lamps", fw._independent_until is not None)
+
+    fw.client.inject(b"test_prefix/events", json.dumps({
+        "from": "web_app",
+        "groups": [{"pos": 0.1, "w": 1.0, "size": 10}]}).encode())
+    fw.client.check_msg()
+    check("broadcast command re-links them", fw._independent_until is None)
+
+    print("\n=== 8. test_alarm ===")
     fw._test_alarm = None
     fw.client.inject(b"test_prefix/events", json.dumps({
         "from": "web_app", "test_alarm": "sunrise", "test_seconds": 20}).encode())

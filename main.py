@@ -24,7 +24,7 @@ from config import (
     WEBREPL_PASSWORD,
 )
 
-FIRMWARE_VERSION       = "2026-07-26.7"
+FIRMWARE_VERSION       = "2026-07-27.2"
 FRAME_MS               = 16
 SYNC_INTERVAL_MS       = 60_000
 SYNC_FADE_STEPS        = 300
@@ -67,6 +67,13 @@ TOPIC_ALARMS = (MQTT_TOPIC_PREFIX + "/alarms").encode()
 ntp_ok = False        # module-level so status/heartbeat can report clock health
 _test_alarm = None    # set by MQTT test_alarm, consumed by the main loop
 
+# The BOSS re-publishes its state every 60 s so the lamps converge. That
+# also silently undid deliberate per-lamp settings ("Send to → LS" reverted
+# within a minute). A targeted command therefore unlinks the lamps, and a
+# broadcast command — which sets both to the same thing — re-links them.
+INDEPENDENT_MS   = 30 * 60 * 1000
+_independent_until = None   # ticks_ms deadline, or None when linked
+
 # ── Module-level objects ─────────────────────────────────────
 strip  = SK6812(pin=LED_PIN, num_leds=NUM_LEDS, brightness=LED_BRIGHTNESS)
 touch  = TouchManager(TOUCH_PINS)
@@ -108,6 +115,56 @@ def save_network(ssid, password):
 
 def all_networks():
     return WIFI_NETWORKS + load_extra_networks()
+
+
+# ── Crash-loop rollback (paired with boot.py) ────────────────
+# boot.py counts boots that never reach stability and restores `.ok`
+# backups after too many. Our job is to declare this firmware good once it
+# has actually run for a while. Constants mirror boot.py, which is not
+# OTA-updated and so cannot be imported from.
+STABLE_MS     = 60_000
+FAIL_FILE     = "bootfail.txt"
+ROLLBACK_FLAG = "rolledback.txt"
+OK_SUFFIX     = ".ok"
+SYNCED_FILES  = ("main.py", "colour.py", "sk6812.py", "touch.py")
+
+def _rolled_back():
+    try:
+        open(ROLLBACK_FLAG).close()
+        return True
+    except OSError:
+        return False
+
+def mark_stable():
+    """This firmware has run long enough to be trusted: clear the crash
+    counter and promote the running files to known-good backups."""
+    try:
+        with open(FAIL_FILE, "w") as f:
+            f.write("0")
+    except Exception as e:
+        print(f"[boot] could not clear fail counter: {e}")
+    try:
+        os.remove(ROLLBACK_FLAG)     # recovered; stop reporting it
+    except OSError:
+        pass
+    for fname in SYNCED_FILES:
+        try:
+            with open(fname) as f:
+                current = f.read()
+            try:
+                with open(fname + OK_SUFFIX) as f:
+                    if f.read() == current:
+                        continue         # backup already matches — no write
+            except OSError:
+                pass                     # no backup yet
+            tmp = fname + OK_SUFFIX + ".tmp"
+            with open(tmp, "w") as f:
+                f.write(current)
+            os.rename(tmp, fname + OK_SUFFIX)
+            print(f"[boot] known-good backup updated: {fname}")
+        except Exception as e:
+            print(f"[boot] backup of {fname} failed: {e}")
+    print("[boot] firmware marked stable")
 
 def connect_wifi(tick=None):
     wlan = network.WLAN(network.STA_IF)
@@ -246,8 +303,18 @@ def _handle_message(data):
     if data.get("from") == BOARD_ID:
         return
 
-    # Ignore messages targeted at a different board
+    # Note independence BEFORE the target filter, so the BOSS also sees
+    # commands aimed at the follower and stops overwriting them.
     target = data.get("target")
+    sender = data.get("from", "")
+    if sender and not sender.startswith("board_"):
+        global _independent_until
+        if target is not None:
+            _independent_until = utime.ticks_add(utime.ticks_ms(), INDEPENDENT_MS)
+        elif data.get("groups") is not None:
+            _independent_until = None   # both lamps just got the same state
+
+    # Ignore messages targeted at a different board
     if target is not None and target != BOARD_ID:
         return
 
@@ -267,8 +334,14 @@ def _handle_message(data):
     drift_interval = _num(data.get("drift_interval"), 5, 86400)
 
     if on is not None:
+        # Only touch flash when the power state actually flips. The web app
+        # includes `on` in every state publish, so persisting unconditionally
+        # meant a flash erase/write on every slider tick (~8/s while dragging)
+        # — needless wear, and each write stalls the render loop.
+        was_on = engine._powered_on
         engine.set_power(bool(on))
-        save_state()  # persist so board restores correct state after unexpected reboot
+        if engine._powered_on != was_on:
+            save_state()
     if brightness is not None:
         engine.set_brightness(float(brightness))
     if reverse is not None:
@@ -311,7 +384,6 @@ def _handle_message(data):
 
     # Echo current state back to web clients so the UI stays in sync.
     # Only echo messages that didn't come from another board (avoids loops).
-    sender = data.get("from", "")
     if sender and not sender.startswith("board_"):
         payload = engine.get_event_payload()
         payload["echo"] = True
@@ -382,14 +454,23 @@ def save_alarms(data):
     except Exception as e:
         print(f"[alarm] save failed: {e}")
 
+_saved_state = None
+
 def save_state():
+    """Persist power + brightness. Skips the write when nothing changed, so
+    callers can invoke it freely without wearing out the flash."""
+    global _saved_state
+    snap = (engine._powered_on, round(engine._brightness, 3))
+    if snap == _saved_state:
+        return
     try:
-        _write_json(STATE_FILE, {"on": engine._powered_on,
-                                 "brightness": round(engine._brightness, 3)})
+        _write_json(STATE_FILE, {"on": snap[0], "brightness": snap[1]})
+        _saved_state = snap
     except Exception as e:
         print(f"[state] save failed: {e}")
 
 def restore_state():
+    global _saved_state
     try:
         with open(STATE_FILE) as f:
             d = ujson.load(f)
@@ -402,6 +483,8 @@ def restore_state():
             print("[state] restored: off")
         else:
             print(f"[state] restored: on, brightness {br}")
+        # Seed the snapshot so an unchanged state never rewrites flash
+        _saved_state = (engine._powered_on, round(engine._brightness, 3))
     except Exception:
         pass  # no saved state — use default (on)
 
@@ -532,6 +615,12 @@ def main():
     _heartbeat_at   = utime.ticks_add(utime.ticks_ms(), 5_000)  # first beat soon after boot
     _status_at      = utime.ticks_add(utime.ticks_ms(), 300_000)
     _ntp_retry_at   = utime.ticks_add(utime.ticks_ms(), 60_000)
+    _state_flush_at = utime.ticks_add(utime.ticks_ms(), 300_000)
+    _stable_at      = utime.ticks_add(utime.ticks_ms(), STABLE_MS)
+    _marked_stable  = False
+    _was_rolled_back = _rolled_back()
+    if _was_rolled_back:
+        print("[boot] running RESTORED firmware — a previous version crash-looped")
     _backoff_ms     = RECONNECT_DELAY_MS
     _offline_since  = None   # when client first became None (WiFi watchdog)
 
@@ -588,10 +677,13 @@ def main():
 
         # ── Boss sync — publish current state every 60 s for follower to drift to ──
         if BOSS and client is not None and utime.ticks_diff(now, _sync_at) >= 0:
-            payload = engine.get_event_payload()
-            payload["sync"] = True
-            publish_event(payload)
-            print("[sync] boss published state")
+            if _independent_until is not None and utime.ticks_diff(_independent_until, now) > 0:
+                pass   # lamps deliberately set apart — don't overwrite
+            else:
+                payload = engine.get_event_payload()
+                payload["sync"] = True
+                publish_event(payload)
+                print("[sync] boss published state")
             _sync_at = utime.ticks_add(now, SYNC_INTERVAL_MS)
 
         # ── Heartbeat — announce presence every 30 s ──
@@ -601,9 +693,12 @@ def main():
             gc.collect()
             # ntp/alarms let a client warn "alarms can't fire" instead of
             # the schedule failing silently when the clock never synced
-            publish_event({"heartbeat": True, "fw": FIRMWARE_VERSION,
-                           "mem": gc.mem_free(),
-                           "ntp": ntp_ok, "alarms": len(_alarms)})
+            hb = {"heartbeat": True, "fw": FIRMWARE_VERSION,
+                  "mem": gc.mem_free(),
+                  "ntp": ntp_ok, "alarms": len(_alarms)}
+            if _was_rolled_back:
+                hb["rolled_back"] = True   # surfaces a rejected firmware push
+            publish_event(hb)
             _heartbeat_at = utime.ticks_add(now, 30_000)
 
         # ── Refresh retained presence every 5 min ──
@@ -618,6 +713,18 @@ def main():
                 print(f"[mqtt] status publish error: {e}")
                 client = None
             _status_at = utime.ticks_add(now, 300_000)
+
+        # ── Declare the firmware good once it has run a full minute ──
+        if not _marked_stable and utime.ticks_diff(now, _stable_at) >= 0:
+            mark_stable()
+            _marked_stable = True
+
+        # ── Flush state if it drifted (no-op when unchanged) ──
+        # Brightness is no longer persisted on every message, so this
+        # bounds what an unexpected power cut can lose to ~5 min.
+        if utime.ticks_diff(now, _state_flush_at) >= 0:
+            save_state()
+            _state_flush_at = utime.ticks_add(now, 300_000)
 
         # ── NTP retry — a board that booted without NTP has no clock,
         #    which would silently disable alarms + daily OTA forever ──
@@ -719,6 +826,7 @@ def main():
                     save_state()
                 else:
                     engine.set_brightness(_sunrise["target_br"])
+                    engine.set_sunrise(1.0)   # land on clean warm white
                 _sunrise["active"] = False
                 payload = engine.get_event_payload()
                 payload["echo"] = True
@@ -728,8 +836,12 @@ def main():
                 if _sunrise.get("sunset"):
                     start_br = _sunrise.get("start_br", engine._brightness)
                     engine.set_brightness(start_br * (1.0 - progress))
+                    # Reverse the dawn: warm white deepens to ember as it dims
+                    engine.set_sunrise(1.0 - progress)
                 else:
                     engine.set_brightness(progress * _sunrise["target_br"])
+                    # Ember red at dawn → warm white at full brightness
+                    engine.set_sunrise(progress)
 
         # ── Idle drift — subtle nudge with slow fade, synced to other board ──
         if engine.check_drift():

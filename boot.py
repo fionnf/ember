@@ -5,12 +5,96 @@
 #  config.py is never touched — it stays per-board.
 # ============================================================
 
+import machine
 import network
 import utime
 
 # ── Files to sync from GitHub ────────────────────────────────
 REPO_RAW = "https://raw.githubusercontent.com/fionnf/linked_friend_lights/master/"
 SYNC_FILES = ["main.py", "colour.py", "sk6812.py", "touch.py"]
+
+# ── Crash-loop rollback ──────────────────────────────────────
+# The compile gate below rejects firmware that doesn't parse, but code can
+# be perfectly valid and still fail at runtime — a stray function-level
+# import once shadowed a module-level one and every board boot-looped,
+# unreachable until a human pushed a fix.
+#
+# So: count boots that never reach stability. main.py clears the counter
+# after it has run for a minute and promotes the running files to `.ok`
+# backups. After MAX_FAILS unstable boots we restore those backups and skip
+# the update for one boot, which brings the lamp back on its own.
+#
+# No record is kept of the rejected version: the next scheduled reboot
+# re-downloads master, so a pushed fix is picked up with no stale state to
+# clear, and a few quick power cycles can't pin a board to old firmware.
+FAIL_FILE     = "bootfail.txt"
+ROLLBACK_FLAG = "rolledback.txt"
+OK_SUFFIX     = ".ok"
+MAX_FAILS     = 3
+
+def _read_fails():
+    try:
+        with open(FAIL_FILE) as f:
+            return int(f.read().strip() or 0)
+    except Exception:
+        return 0
+
+def _write_fails(n):
+    try:
+        with open(FAIL_FILE, "w") as f:
+            f.write(str(n))
+    except Exception:
+        pass
+
+def _have_backups():
+    for fname in SYNC_FILES:
+        try:
+            open(fname + OK_SUFFIX).close()
+        except OSError:
+            return False
+    return True
+
+def _rollback():
+    """Restore the last firmware set that proved itself stable."""
+    import os
+    for fname in SYNC_FILES:
+        try:
+            with open(fname + OK_SUFFIX) as src:
+                data = src.read()
+            tmp = fname + ".new"
+            with open(tmp, "w") as dst:
+                dst.write(data)
+            os.rename(tmp, fname)
+            print(f"[ota] rolled back {fname}")
+        except Exception as e:
+            print(f"[ota] could not roll back {fname}: {e}")
+    try:
+        with open(ROLLBACK_FLAG, "w") as f:
+            f.write("1")     # main.py reports this so the failure is visible
+    except Exception:
+        pass
+
+def _check_crash_loop():
+    """Returns True if firmware was rolled back (skip the update this boot)."""
+    # A power cycle is not a crash — only soft/watchdog resets accumulate.
+    fresh_power_on = False
+    try:
+        if machine.reset_cause() == machine.PWRON_RESET:
+            fresh_power_on = True
+    except Exception:
+        pass          # not all ports expose reset_cause; assume it counts
+
+    fails = 0 if fresh_power_on else _read_fails() + 1
+    _write_fails(fails)
+    if fails >= MAX_FAILS and _have_backups():
+        print(f"[ota] {fails} boots without reaching stability — "
+              "restoring last known-good firmware")
+        _rollback()
+        _write_fails(0)
+        return True
+    if fails > 1:
+        print(f"[ota] warning: {fails} consecutive unstable boots")
+    return False
 
 # ── Connect WiFi (mirrors main.py logic, standalone) ─────────
 def _load_networks():
@@ -71,54 +155,86 @@ def _update():
         return
     import os
 
-    updated = []
+    # Clear anything a previous interrupted run left behind
     for fname in SYNC_FILES:
-        url = REPO_RAW + fname
         try:
-            r = urequests.get(url, timeout=10)
-            if r.status_code == 200:
-                content = r.text
-                r.close()
-                # Refuse to install anything that doesn't compile — a bad
-                # push to master (or a truncated download / HTML error
-                # page) must never brick the boards. They just keep
-                # running the last known-good firmware.
-                try:
-                    compile(content, fname, "exec")
-                except Exception as e:
-                    print(f"[ota] {fname} failed syntax check — keeping existing ({e})")
-                    continue
-                # Compare with existing file to avoid unnecessary writes
-                try:
-                    with open(fname, "r") as f:
-                        existing = f.read()
-                    if existing == content:
-                        continue
-                except OSError:
-                    pass  # file doesn't exist yet
-                # Atomic install: write to a temp file, then rename.
-                # A power cut mid-write must never leave a truncated
-                # main.py/colour.py behind.
-                tmp = fname + ".new"
-                with open(tmp, "w") as f:
-                    f.write(content)
-                os.rename(tmp, fname)
-                updated.append(fname)
-                print(f"[ota] updated {fname}")
-            else:
-                print(f"[ota] {fname} — HTTP {r.status_code}, keeping existing")
-                r.close()
-        except Exception as e:
-            print(f"[ota] {fname} failed: {e}, keeping existing")
+            os.remove(fname + ".new")
+        except OSError:
+            pass
 
-    if not updated:
+    # ── Phase 1: download and verify EVERY file before installing any ──
+    # Installing file-by-file meant a mid-update network drop could leave
+    # a new main.py running against an old colour.py. The firmware files
+    # are versioned together, so they must be installed together.
+    staged = []
+    ok = True
+    for fname in SYNC_FILES:
+        try:
+            r = urequests.get(REPO_RAW + fname, timeout=10)
+            if r.status_code != 200:
+                print(f"[ota] {fname} — HTTP {r.status_code}, aborting update")
+                r.close()
+                ok = False
+                break
+            content = r.text
+            r.close()
+        except Exception as e:
+            print(f"[ota] {fname} download failed: {e}, aborting update")
+            ok = False
+            break
+
+        # Refuse anything that doesn't compile — a bad push to master, a
+        # truncated download or an HTML error page must never brick a board.
+        try:
+            compile(content, fname, "exec")
+        except Exception as e:
+            print(f"[ota] {fname} failed syntax check, aborting update ({e})")
+            ok = False
+            break
+
+        try:
+            with open(fname, "r") as f:
+                if f.read() == content:
+                    continue            # already current, nothing to stage
+        except OSError:
+            pass                        # file doesn't exist yet
+
+        try:
+            with open(fname + ".new", "w") as f:
+                f.write(content)
+            staged.append(fname)
+        except Exception as e:
+            print(f"[ota] {fname} could not be staged: {e}, aborting update")
+            ok = False
+            break
+
+    # ── Phase 2: commit, or discard the whole set ──
+    if not ok:
+        for fname in staged:
+            try:
+                os.remove(fname + ".new")
+            except OSError:
+                pass
+        print("[ota] update abandoned — running existing firmware")
+        return
+
+    if not staged:
         print("[ota] all files up to date")
-    else:
-        print(f"[ota] updated: {updated}")
+        return
+
+    for fname in staged:
+        os.rename(fname + ".new", fname)   # rename is atomic
+        print(f"[ota] updated {fname}")
+    print(f"[ota] installed: {staged}")
 
 
 # ── Run ───────────────────────────────────────────────────────
-print("[ota] checking for updates...")
-if _connect():
-    _update()
-print("[ota] booting...")
+# Rolled back? Boot the restored firmware without re-fetching master, or we
+# would immediately reinstall the version that was just failing.
+if _check_crash_loop():
+    print("[ota] booting restored firmware (update skipped this boot)")
+else:
+    print("[ota] checking for updates...")
+    if _connect():
+        _update()
+    print("[ota] booting...")

@@ -70,6 +70,30 @@ def _palette_colour(position):
     return (r, g, b, w)
 
 
+# ── Sunrise gradient ─────────────────────────────────────────
+# Explicit RGBW keyframes, deliberately NOT taken from TINT_PALETTE: there
+# `pos` sets hue and saturation together, so anything warm is also nearly
+# white and a dawn would be an invisible tint. Sweep: ember red → amber →
+# golden → warm white. Brightness is ramped separately on top, so the early
+# stops are seen dim and deep, exactly like a real dawn.
+SUNRISE_STOPS = (
+    (255,  20,   0,   0),   # 0.00  ember red
+    (255,  70,   0,   0),   # 0.33  deep orange
+    (255, 140,  20,  40),   # 0.66  amber, white creeping in
+    (255, 190, 110, 190),   # 1.00  warm white
+)
+
+def sunrise_colour(t):
+    """RGBW along the sunrise gradient for t in 0.0–1.0."""
+    t = max(0.0, min(1.0, t))
+    n = len(SUNRISE_STOPS) - 1
+    scaled = t * n
+    i = int(scaled)
+    if i >= n:
+        return SUNRISE_STOPS[-1]
+    return _lerp_colour(SUNRISE_STOPS[i], SUNRISE_STOPS[i + 1], scaled - i)
+
+
 # ── ColourEngine ─────────────────────────────────────────────
 
 class ColourEngine:
@@ -175,6 +199,29 @@ class ColourEngine:
             total += keep
         if total < NUM_LEDS:
             self._group_sizes[-1] += NUM_LEDS - total
+
+    def set_sunrise(self, t):
+        """Put the whole strip at the sunrise colour for progress `t` (0→1).
+
+        Immediate, with no crossfade: the alarm ramps drive colour every
+        frame, so a crossfade would restart continuously and never land.
+        The palette can't express this sweep — `pos` couples hue and
+        saturation, so its warm end is always mostly white — hence the
+        explicit RGBW keyframes in SUNRISE_STOPS.
+        """
+        col = sunrise_colour(t)
+        for i in range(self._n):
+            self._colour[i]     = col
+            self._start_col[i]  = col
+            self._target_col[i] = col
+            self._fading[i]     = False
+            # Report warm white: where the sunrise lands, and the closest
+            # palette position to it for any client reading the state back
+            self._pos[i]        = 0.0
+            self._target_pos[i] = 0.0
+            self._w_level[i]    = 1.0
+            self._w_target[i]   = 1.0
+            self._w_fading[i]   = False
 
     def set_power(self, on):
         if on != self._powered_on:
