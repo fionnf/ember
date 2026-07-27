@@ -118,6 +118,8 @@ When the BOSS's physical touch sensor fires, it runs `ColourEngine.impulse()` (r
 
 Every 60 s the BOSS publishes its state with `"sync": true` as a drift-correction heartbeat. The follower applies it with a slow 300-step fade so re-alignment is invisible.
 
+**Independent mode.** That periodic sync would otherwise undo deliberate per-lamp settings — set one lamp with **Send to → LS** and it reverted within a minute. So a **targeted** command (one carrying `target`) unlinks the lamps and suppresses the BOSS sync for 30 minutes; a **broadcast** colour command — which sets both lamps to the same thing — re-links them immediately. Boards notice targeted traffic even when it is addressed to the other lamp, so the BOSS knows to stand down.
+
 ### Alarms
 
 Each board holds the whole schedule on its own flash (`alarms.json`) and evaluates it against its own clock, so **alarms fire with no client connected**. On each main-loop tick the board compares the current UTC time against enabled alarms and runs:
@@ -135,7 +137,9 @@ If the board loses its MQTT connection (WiFi down or broker unreachable) for mor
 
 ### State Persistence
 
-On/off state and brightness are written to `state.json` (on power toggles and before every reboot) and restored on boot before connecting to MQTT — so the lamps come back exactly as they were after the nightly OTA reboot.
+On/off state and brightness are written to `state.json` and restored on boot before connecting to MQTT — so the lamps come back exactly as they were after the nightly OTA reboot.
+
+Writes are deliberately rationed. The web app includes `on` in every state publish, so persisting on each message meant a flash erase/write on every slider tick (~8 per second while dragging) — needless wear, and each write stalls the render loop. State is now written only when it actually changes: immediately on a power toggle, before any planned reboot, and on a 5-minute flush that bounds what an unexpected power cut can lose.
 
 ### Daily OTA reboot
 
@@ -150,6 +154,8 @@ The firmware is designed to recover from anything without human intervention:
 | Hardware watchdog (8 s) | Firmware *hangs* — stuck DNS, dead socket, lockup → automatic reboot |
 | Crash guard | Any unhandled exception → reboot in 5 s, OTA pulls a fix on the way up |
 | OTA compile check | A broken push to master, truncated download, or HTML error page is **refused** — boards keep running the last good firmware |
+| All-or-nothing OTA | Every file is downloaded and verified before *any* is installed, so a mid-update network drop can't leave a new `main.py` running against an old `colour.py` |
+| Flash-write rationing | State is written only when it changes, so slider drags can't wear out the flash |
 | Atomic file writes | Power cut mid-write can't corrupt firmware or state/alarm/network files |
 | MQTT input validation | The events topic is on a public broker — every field is validated and clamped before touching the engine or flash; malformed messages are logged and dropped |
 | MQTT watchdog | Broker unreachable > 10 min → reboot to re-establish everything |
@@ -507,7 +513,8 @@ Personal project — no license.
 ## Tests
 
 ```bash
-python3 tests/test_firmware.py
+python3 tests/test_firmware.py     # boots main(), MQTT commands, flash writes
+python3 tests/test_ota.py          # OTA all-or-nothing install
 ```
 
 Runs `main()` against stubbed MicroPython modules (`tests/stubs/`) and checks
@@ -516,7 +523,11 @@ that the board boots, arms and feeds the watchdog, subscribes to the events
 heartbeats, reboots on command, installs a retained alarm schedule, applies
 colour commands, and survives malformed input.
 
-Run this before pushing to `master`. `python -m py_compile` only catches syntax
+`test_ota.py` drives `boot.py`'s updater against a stubbed HTTP layer and
+asserts that a network drop, a syntax error, or an HTTP error part-way
+through leaves the existing firmware completely untouched.
+
+Run both before pushing to `master`. `python -m py_compile` only catches syntax
 errors — it cannot catch a runtime fault such as a stray function-level
 `import`, which once shadowed a module-level import for the whole of `main()`
 and put every board into a boot loop.
