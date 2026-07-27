@@ -24,7 +24,7 @@ from config import (
     WEBREPL_PASSWORD,
 )
 
-FIRMWARE_VERSION       = "2026-07-27.1"
+FIRMWARE_VERSION       = "2026-07-27.2"
 FRAME_MS               = 16
 SYNC_INTERVAL_MS       = 60_000
 SYNC_FADE_STEPS        = 300
@@ -115,6 +115,56 @@ def save_network(ssid, password):
 
 def all_networks():
     return WIFI_NETWORKS + load_extra_networks()
+
+
+# ── Crash-loop rollback (paired with boot.py) ────────────────
+# boot.py counts boots that never reach stability and restores `.ok`
+# backups after too many. Our job is to declare this firmware good once it
+# has actually run for a while. Constants mirror boot.py, which is not
+# OTA-updated and so cannot be imported from.
+STABLE_MS     = 60_000
+FAIL_FILE     = "bootfail.txt"
+ROLLBACK_FLAG = "rolledback.txt"
+OK_SUFFIX     = ".ok"
+SYNCED_FILES  = ("main.py", "colour.py", "sk6812.py", "touch.py")
+
+def _rolled_back():
+    try:
+        open(ROLLBACK_FLAG).close()
+        return True
+    except OSError:
+        return False
+
+def mark_stable():
+    """This firmware has run long enough to be trusted: clear the crash
+    counter and promote the running files to known-good backups."""
+    try:
+        with open(FAIL_FILE, "w") as f:
+            f.write("0")
+    except Exception as e:
+        print(f"[boot] could not clear fail counter: {e}")
+    try:
+        os.remove(ROLLBACK_FLAG)     # recovered; stop reporting it
+    except OSError:
+        pass
+    for fname in SYNCED_FILES:
+        try:
+            with open(fname) as f:
+                current = f.read()
+            try:
+                with open(fname + OK_SUFFIX) as f:
+                    if f.read() == current:
+                        continue         # backup already matches — no write
+            except OSError:
+                pass                     # no backup yet
+            tmp = fname + OK_SUFFIX + ".tmp"
+            with open(tmp, "w") as f:
+                f.write(current)
+            os.rename(tmp, fname + OK_SUFFIX)
+            print(f"[boot] known-good backup updated: {fname}")
+        except Exception as e:
+            print(f"[boot] backup of {fname} failed: {e}")
+    print("[boot] firmware marked stable")
 
 def connect_wifi(tick=None):
     wlan = network.WLAN(network.STA_IF)
@@ -566,6 +616,11 @@ def main():
     _status_at      = utime.ticks_add(utime.ticks_ms(), 300_000)
     _ntp_retry_at   = utime.ticks_add(utime.ticks_ms(), 60_000)
     _state_flush_at = utime.ticks_add(utime.ticks_ms(), 300_000)
+    _stable_at      = utime.ticks_add(utime.ticks_ms(), STABLE_MS)
+    _marked_stable  = False
+    _was_rolled_back = _rolled_back()
+    if _was_rolled_back:
+        print("[boot] running RESTORED firmware — a previous version crash-looped")
     _backoff_ms     = RECONNECT_DELAY_MS
     _offline_since  = None   # when client first became None (WiFi watchdog)
 
@@ -638,9 +693,12 @@ def main():
             gc.collect()
             # ntp/alarms let a client warn "alarms can't fire" instead of
             # the schedule failing silently when the clock never synced
-            publish_event({"heartbeat": True, "fw": FIRMWARE_VERSION,
-                           "mem": gc.mem_free(),
-                           "ntp": ntp_ok, "alarms": len(_alarms)})
+            hb = {"heartbeat": True, "fw": FIRMWARE_VERSION,
+                  "mem": gc.mem_free(),
+                  "ntp": ntp_ok, "alarms": len(_alarms)}
+            if _was_rolled_back:
+                hb["rolled_back"] = True   # surfaces a rejected firmware push
+            publish_event(hb)
             _heartbeat_at = utime.ticks_add(now, 30_000)
 
         # ── Refresh retained presence every 5 min ──
@@ -655,6 +713,11 @@ def main():
                 print(f"[mqtt] status publish error: {e}")
                 client = None
             _status_at = utime.ticks_add(now, 300_000)
+
+        # ── Declare the firmware good once it has run a full minute ──
+        if not _marked_stable and utime.ticks_diff(now, _stable_at) >= 0:
+            mark_stable()
+            _marked_stable = True
 
         # ── Flush state if it drifted (no-op when unchanged) ──
         # Brightness is no longer persisted on every message, so this
@@ -763,6 +826,7 @@ def main():
                     save_state()
                 else:
                     engine.set_brightness(_sunrise["target_br"])
+                    engine.set_sunrise(1.0)   # land on clean warm white
                 _sunrise["active"] = False
                 payload = engine.get_event_payload()
                 payload["echo"] = True
@@ -772,8 +836,12 @@ def main():
                 if _sunrise.get("sunset"):
                     start_br = _sunrise.get("start_br", engine._brightness)
                     engine.set_brightness(start_br * (1.0 - progress))
+                    # Reverse the dawn: warm white deepens to ember as it dims
+                    engine.set_sunrise(1.0 - progress)
                 else:
                     engine.set_brightness(progress * _sunrise["target_br"])
+                    # Ember red at dawn → warm white at full brightness
+                    engine.set_sunrise(progress)
 
         # ── Idle drift — subtle nudge with slow fade, synced to other board ──
         if engine.check_drift():

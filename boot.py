@@ -5,12 +5,96 @@
 #  config.py is never touched — it stays per-board.
 # ============================================================
 
+import machine
 import network
 import utime
 
 # ── Files to sync from GitHub ────────────────────────────────
 REPO_RAW = "https://raw.githubusercontent.com/fionnf/linked_friend_lights/master/"
 SYNC_FILES = ["main.py", "colour.py", "sk6812.py", "touch.py"]
+
+# ── Crash-loop rollback ──────────────────────────────────────
+# The compile gate below rejects firmware that doesn't parse, but code can
+# be perfectly valid and still fail at runtime — a stray function-level
+# import once shadowed a module-level one and every board boot-looped,
+# unreachable until a human pushed a fix.
+#
+# So: count boots that never reach stability. main.py clears the counter
+# after it has run for a minute and promotes the running files to `.ok`
+# backups. After MAX_FAILS unstable boots we restore those backups and skip
+# the update for one boot, which brings the lamp back on its own.
+#
+# No record is kept of the rejected version: the next scheduled reboot
+# re-downloads master, so a pushed fix is picked up with no stale state to
+# clear, and a few quick power cycles can't pin a board to old firmware.
+FAIL_FILE     = "bootfail.txt"
+ROLLBACK_FLAG = "rolledback.txt"
+OK_SUFFIX     = ".ok"
+MAX_FAILS     = 3
+
+def _read_fails():
+    try:
+        with open(FAIL_FILE) as f:
+            return int(f.read().strip() or 0)
+    except Exception:
+        return 0
+
+def _write_fails(n):
+    try:
+        with open(FAIL_FILE, "w") as f:
+            f.write(str(n))
+    except Exception:
+        pass
+
+def _have_backups():
+    for fname in SYNC_FILES:
+        try:
+            open(fname + OK_SUFFIX).close()
+        except OSError:
+            return False
+    return True
+
+def _rollback():
+    """Restore the last firmware set that proved itself stable."""
+    import os
+    for fname in SYNC_FILES:
+        try:
+            with open(fname + OK_SUFFIX) as src:
+                data = src.read()
+            tmp = fname + ".new"
+            with open(tmp, "w") as dst:
+                dst.write(data)
+            os.rename(tmp, fname)
+            print(f"[ota] rolled back {fname}")
+        except Exception as e:
+            print(f"[ota] could not roll back {fname}: {e}")
+    try:
+        with open(ROLLBACK_FLAG, "w") as f:
+            f.write("1")     # main.py reports this so the failure is visible
+    except Exception:
+        pass
+
+def _check_crash_loop():
+    """Returns True if firmware was rolled back (skip the update this boot)."""
+    # A power cycle is not a crash — only soft/watchdog resets accumulate.
+    fresh_power_on = False
+    try:
+        if machine.reset_cause() == machine.PWRON_RESET:
+            fresh_power_on = True
+    except Exception:
+        pass          # not all ports expose reset_cause; assume it counts
+
+    fails = 0 if fresh_power_on else _read_fails() + 1
+    _write_fails(fails)
+    if fails >= MAX_FAILS and _have_backups():
+        print(f"[ota] {fails} boots without reaching stability — "
+              "restoring last known-good firmware")
+        _rollback()
+        _write_fails(0)
+        return True
+    if fails > 1:
+        print(f"[ota] warning: {fails} consecutive unstable boots")
+    return False
 
 # ── Connect WiFi (mirrors main.py logic, standalone) ─────────
 def _load_networks():
@@ -145,7 +229,12 @@ def _update():
 
 
 # ── Run ───────────────────────────────────────────────────────
-print("[ota] checking for updates...")
-if _connect():
-    _update()
-print("[ota] booting...")
+# Rolled back? Boot the restored firmware without re-fetching master, or we
+# would immediately reinstall the version that was just failing.
+if _check_crash_loop():
+    print("[ota] booting restored firmware (update skipped this boot)")
+else:
+    print("[ota] checking for updates...")
+    if _connect():
+        _update()
+    print("[ota] booting...")

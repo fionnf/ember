@@ -716,6 +716,7 @@ let _pingIntervalId = null;
 
 function topic()       { return cfg.prefix + "/events"; }
 function topicAlarms() { return cfg.prefix + "/alarms"; }
+function topicScenes() { return cfg.prefix + "/scenes"; }
 function topicStatus() { return cfg.prefix + "/status/+"; }
 
 function setStatus(cls, text) {
@@ -736,11 +737,15 @@ function connect() {
     setStatus("connected", cfg.broker.replace(/^wss?:\/\//,"").replace(/\/mqtt$/,""));
     client.subscribe(topic());
     client.subscribe(topicAlarms());
+    client.subscribe(topicScenes());  // retained — shared scene library
     client.subscribe(topicStatus());  // retained — pills light up immediately
     // Ping boards immediately so they echo their state back (pills update fast)
     setTimeout(() => publish({ ping: true }), 300);
     // Then keep polling every 2 min so pills stay current without relying on board heartbeats
     _pingIntervalId = setInterval(() => publish({ ping: true }), PING_INTERVAL_MS);
+    // Share our scene library. Delayed so the retained copy lands first and
+    // we publish the merge of both, rather than overwriting it with ours.
+    setTimeout(() => { if (loadScenes().length) publishScenes(); }, 1200);
   });
   client.on("message", (t, msg) => {
     const topicStr = t.toString();
@@ -754,6 +759,16 @@ function connect() {
         if (d.ntp !== undefined) boardNtp[id] = d.ntp;
         if (d.online) { boardLastSeen[id] = Date.now(); _scheduleBoardTimeout(id); }
         updatePills();
+        return;
+      }
+
+      if (topicStr === topicScenes()) {
+        if (d.from === BOARD_ID) return;          // our own retained copy
+        if (mergeScenes(d)) {
+          renderScenes();
+          publishScenes();                        // share the merged result
+          showToast("Scenes synced");
+        }
         return;
       }
 
@@ -1348,13 +1363,97 @@ document.getElementById("btn-add-alarm").addEventListener("click", () => {
 });
 
 // ── Scenes ──────────────────────────────────────────────────────
+// Scenes live in localStorage, and are also mirrored to the retained
+// `P/scenes` topic so every client — this app on your phone and laptop, and
+// any other client — converges on the same library.
+//
+// Sync rules, chosen so no device can wipe another's work:
+//   • merge by `id`, keeping whichever copy has the newer `updated`
+//   • deletions travel as tombstones, since a scene simply missing from a
+//     remote list means "that device hasn't seen it yet", not "delete it"
+//   • tombstones are capped, oldest dropped first
+const SCENE_TOMBSTONE_CAP = 50;
+
 function loadScenes() {
-  try { return JSON.parse(localStorage.getItem("ll_scenes") || "[]"); }
-  catch(e) { return []; }
+  try {
+    const s = JSON.parse(localStorage.getItem("ll_scenes") || "[]");
+    return Array.isArray(s) ? s.filter(x => x && typeof x === "object") : [];
+  } catch(e) { return []; }
 }
 
 function saveScenes(scenes) {
   localStorage.setItem("ll_scenes", JSON.stringify(scenes));
+}
+
+function loadTombstones() {
+  try {
+    const t = JSON.parse(localStorage.getItem("ll_scenes_deleted") || "[]");
+    return Array.isArray(t) ? t.filter(x => typeof x === "string") : [];
+  } catch(e) { return []; }
+}
+
+function saveTombstones(ids) {
+  localStorage.setItem("ll_scenes_deleted",
+    JSON.stringify(ids.slice(-SCENE_TOMBSTONE_CAP)));
+}
+
+function newSceneId() {
+  return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+}
+
+// Give legacy scenes an identity so they can participate in sync
+function ensureSceneIds(scenes) {
+  let changed = false;
+  scenes.forEach(s => {
+    if (typeof s.id !== "string")      { s.id = newSceneId();  changed = true; }
+    if (typeof s.updated !== "number") { s.updated = Date.now(); changed = true; }
+  });
+  return changed;
+}
+
+function publishScenes() {
+  publishRetained(topicScenes, {
+    v: 1, from: BOARD_ID,
+    scenes: loadScenes(),
+    deleted: loadTombstones(),
+  });
+}
+
+// Merge a remote library into ours. Returns true if our copy changed.
+function mergeScenes(remote) {
+  if (!remote || typeof remote !== "object") return false;
+  const incoming = Array.isArray(remote.scenes) ? remote.scenes : [];
+  const remoteDead = Array.isArray(remote.deleted) ? remote.deleted : [];
+
+  const dead = new Set([...loadTombstones(), ...remoteDead.filter(x => typeof x === "string")]);
+  const byId = new Map();
+  loadScenes().forEach(s => { if (typeof s.id === "string") byId.set(s.id, s); });
+
+  let changed = false;
+  incoming.forEach(s => {
+    if (!s || typeof s !== "object" || typeof s.id !== "string") return;
+    if (dead.has(s.id)) return;                       // deleted somewhere
+    const mine = byId.get(s.id);
+    const theirs = typeof s.updated === "number" ? s.updated : 0;
+    if (!mine || theirs > (mine.updated || 0)) {
+      byId.set(s.id, s);
+      changed = true;
+    }
+  });
+
+  // Apply tombstones — ours and theirs
+  for (const id of byId.keys()) {
+    if (dead.has(id)) { byId.delete(id); changed = true; }
+  }
+
+  const mergedDead = [...dead];
+  if (mergedDead.length !== loadTombstones().length) changed = true;
+
+  if (changed) {
+    saveScenes([...byId.values()]);
+    saveTombstones(mergedDead);
+  }
+  return changed;
 }
 
 // ── Scenes (unified — built-ins + user-saved) ─────────────────────────
@@ -1394,6 +1493,7 @@ function _sceneSwatches(item) {
 
 function captureScene(name) {
   return {
+    id: newSceneId(), updated: Date.now(),   // identity, for cross-device sync
     name,
     groups: getGroups(), boundaries: Array.from(boundaries),
     groupPositions: [...groupPositions], groupWLevels: [...groupWLevels],
@@ -1448,7 +1548,16 @@ function renderScenes() {
     row.querySelector(".scene-load").addEventListener("click", e => _applySceneOrBuiltin(item, e.currentTarget));
     if (!builtin) {
       row.querySelector(".scene-del").addEventListener("click", () => {
-        const s = loadScenes(); s.splice(idx, 1); saveScenes(s); renderScenes();
+        const s = loadScenes();
+        const [gone] = s.splice(idx, 1);
+        saveScenes(s);
+        // Tombstone, so the deletion propagates instead of other devices
+        // helpfully syncing the scene straight back
+        if (gone && typeof gone.id === "string") {
+          saveTombstones([...loadTombstones(), gone.id]);
+        }
+        renderScenes();
+        publishScenes();
       });
     }
     container.appendChild(row);
@@ -1462,6 +1571,7 @@ document.getElementById("btn-save-scene").addEventListener("click", () => {
   saveScenes(scenes);
   document.getElementById("scene-name").value = "";
   renderScenes();
+  publishScenes();
 });
 
 // Cache the shell + mqtt.js so a CDN outage can't take the app down.
@@ -1474,6 +1584,13 @@ if ("serviceWorker" in navigator) {
 }
 
 // ── Init ──────────────────────────────────────────────────────
+// Legacy scenes predate sync and have no id/updated — give them one so they
+// can take part rather than being silently ignored by the merge.
+(function migrateSceneIds() {
+  const s = loadScenes();
+  if (ensureSceneIds(s)) saveScenes(s);
+})();
+
 initGroups(cfg.numGroups);
 renderAll();
 renderScenes();

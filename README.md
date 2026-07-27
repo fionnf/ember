@@ -61,6 +61,21 @@ If board B connects via the far end (DOUT side), set `REVERSE_LEDS = True` in `c
 
 To update both boards: commit and push to `master`, then click **↺ Reboot Both Boards** in the Settings panel.
 
+Updates are **all-or-nothing**: every file is downloaded and compile-checked before any is installed, so a mid-update network drop can't leave a new `main.py` running against an old `colour.py`.
+
+### Crash-loop rollback
+
+The compile gate rejects firmware that doesn't parse, but valid code can still fail at runtime — a stray function-level `import` once shadowed a module-level one and both boards boot-looped, unreachable until a human pushed a fix. So the boards now keep a way back:
+
+1. `boot.py` increments a counter in `bootfail.txt` on every boot. A **power-on** reset doesn't count — only soft and watchdog resets, which is what a crash loop produces.
+2. Once `main.py` has run for a minute it calls `mark_stable()`: the counter is cleared and the running files are promoted to `.ok` backups. Backups are only rewritten when they actually differ, so this costs no flash in steady state.
+3. After **3** boots that never reach stability, `boot.py` restores the `.ok` set and skips the update for that one boot — otherwise it would immediately reinstall the firmware that was failing. The lamp comes back on its own in about 15 seconds.
+4. The board reports `rolled_back: true` in its heartbeat until it is stable again, so a rejected push is visible rather than silent.
+
+No record is kept of the rejected version: the next scheduled reboot re-downloads `master`, so a pushed fix is picked up with no stale state to clear, and a few quick power cycles can't pin a board to old firmware.
+
+> `boot.py` is **never** updated over the air — a broken bootloader would need USB to recover. Copy it to each board manually once to get this feature (`mpremote connect /dev/ttyACM0 cp boot.py :`).
+
 ### Configuration (`config.py`)
 
 ```python
@@ -97,7 +112,7 @@ WIFI_NETWORKS = [
 - **Events topic:** `picolight_lf26/events`
 - **Alarms topic:** `picolight_lf26/alarms` (retained, subscribed by boards)
 - **Status topic:** `picolight_lf26/status/<board_id>` (retained, Last-Will)
-- **Scenes topic:** `picolight_lf26/scenes` (retained, reserved for clients — unused by this app)
+- **Scenes topic:** `picolight_lf26/scenes` (retained, client-to-client scene library)
 
 All messages are JSON with a `from` field for echo suppression. The full contract is documented in [MQTT Protocol Specification](#mqtt-protocol-specification) — that section is the reference for writing an additional client.
 
@@ -124,8 +139,10 @@ Every 60 s the BOSS publishes its state with `"sync": true` as a drift-correctio
 
 Each board holds the whole schedule on its own flash (`alarms.json`) and evaluates it against its own clock, so **alarms fire with no client connected**. On each main-loop tick the board compares the current UTC time against enabled alarms and runs:
 
-- **Sunrise** (`type: "sunrise"`): switches on and ramps brightness from 0 to `alarm.brightness` over `duration_min` minutes.
-- **Bedtime** (`type: "sunset"`): fades brightness to 0 over `duration_min` minutes, then switches off (and restores the previous brightness so the next power-on isn't dark).
+- **Sunrise** (`type: "sunrise"`): switches on and ramps brightness from 0 to `alarm.brightness` over `duration_min` minutes, sweeping **colour** alongside it — ember red → deep orange → amber → warm white. Because brightness rises together with the colour, the early stops are seen dim and deep, like a real dawn.
+- **Bedtime** (`type: "sunset"`): the same sweep in reverse — warm white deepens to ember as it dims — then switches off (restoring the previous brightness so the next power-on isn't dark).
+
+The gradient is `SUNRISE_STOPS` in `colour.py`, deliberately **not** taken from `TINT_PALETTE`: there a single `pos` sets hue and saturation together, so anything warm is also nearly white and a dawn would be an invisible tint.
 
 The schedule reaches boards two ways: the **retained** `P/alarms` topic, which boards subscribe to so an offline or rebooting board picks it up on reconnect, and a `set_alarms` message on `P/events` for boards that are already online. Alarms are compared in **UTC**; clients convert local time. See the [protocol spec](#alarms-1) for the exact format.
 
@@ -202,7 +219,13 @@ Each alarm has a **▶ Test** button that runs its fade on both lamps immediatel
 
 ### Scenes
 
-Save and load complete lamp states (colours, group layout, brightness, fade speed). Stored in `localStorage`.
+Save and load complete lamp states (colours, group layout, brightness, fade speed).
+
+Scenes are stored in `localStorage` **and** mirrored to the retained `P/scenes` topic, so your phone, your laptop and any other client converge on one shared library. The merge is deliberately conservative — no device can destroy another's work:
+
+- scenes merge by `id`, keeping whichever copy has the newer `updated` stamp
+- a scene simply missing from another device's list means "not seen yet", never "delete it"
+- deletions travel as **tombstones**, so a deleted scene isn't helpfully synced back by a device that still has it (kept to the last 50)
 
 ### Settings panel
 
@@ -239,7 +262,7 @@ With `MQTT_TOPIC_PREFIX = "picolight_lf26"` (call it `P`):
 | `P/events` | client ⇄ board | no | Command / state object (below) |
 | `P/alarms` | client → board | **yes, QoS 1** | Bare JSON **array** of alarm objects |
 | `P/status/<board_id>` | board → client | **yes** | `{"online": bool, "fw": str, "ntp": bool}` |
-| `P/scenes` | client ⇄ client | yes | **Reserved / unused.** Boards ignore it, and this web app keeps scenes in `localStorage`. Free for another client to use for cross-device scene sync |
+| `P/scenes` | client ⇄ client | **yes** | Shared scene library (below). Boards ignore it entirely |
 
 Board IDs are `board_a` (BOSS, display name FF) and `board_b` (follower, LS).
 
@@ -423,6 +446,47 @@ To verify a schedule without waiting for the clock, send
 `{"from": "my_app", "test_alarm": "sunrise", "test_seconds": 20}` — the
 board runs the real alarm code path immediately.
 
+### Scenes (retained on `P/scenes`)
+
+Boards ignore this topic entirely; it exists so multiple clients share one
+scene library. Publish **retained** so a client that connects later gets it.
+
+```json
+{
+  "v": 1,
+  "from": "web_app",
+  "scenes": [
+    {
+      "id": "lz4f8x-a91b2c",
+      "updated": 1774598400000,
+      "name": "Evening",
+      "groups": [{"pos": 0.0, "w": 1.0, "size": 10}],
+      "boundaries": [], "groupPositions": [0.0], "groupWLevels": [1.0],
+      "brightness": 0.4, "fadeSteps": 120, "on": true
+    }
+  ],
+  "deleted": ["old-scene-id"]
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `id` | Stable unique string. **Required** for a scene to take part in sync |
+| `updated` | Epoch ms of the last edit — the conflict tiebreak |
+| `deleted` | Tombstoned ids, capped at the most recent 50 |
+
+Merge rules (implement these and two clients can't fight):
+
+- union by `id`; on a clash keep the higher `updated`
+- a scene absent from the other side means "not seen yet", **not** "delete"
+- honour incoming tombstones, and keep publishing your own so a delete
+  doesn't get synced back by a device that still holds the scene
+- if the merge changed nothing, don't republish — otherwise two clients
+  ping-pong retained messages forever
+
+Everything except `id`, `updated` and `name` is opaque payload; this app
+stores the fields shown, but another client may store whatever it needs.
+
 ### Guarantees for client authors
 
 - Malformed messages are logged and dropped; they never crash a board or
@@ -515,6 +579,8 @@ Personal project — no license.
 ```bash
 python3 tests/test_firmware.py     # boots main(), MQTT commands, flash writes
 python3 tests/test_ota.py          # OTA all-or-nothing install
+python3 tests/test_rollback.py     # crash-loop rollback
+node    tests/test_scene_sync.js   # scene merge / tombstone rules
 ```
 
 Runs `main()` against stubbed MicroPython modules (`tests/stubs/`) and checks
