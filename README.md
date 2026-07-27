@@ -501,3 +501,22 @@ linked_friend_lights/
 ---
 
 Personal project — no license.
+
+---
+
+## Tests
+
+```bash
+python3 tests/test_firmware.py
+```
+
+Runs `main()` against stubbed MicroPython modules (`tests/stubs/`) and checks
+that the board boots, arms and feeds the watchdog, subscribes to the events
+**and** retained alarms topics, registers its Last-Will, publishes presence and
+heartbeats, reboots on command, installs a retained alarm schedule, applies
+colour commands, and survives malformed input.
+
+Run this before pushing to `master`. `python -m py_compile` only catches syntax
+errors — it cannot catch a runtime fault such as a stray function-level
+`import`, which once shadowed a module-level import for the whole of `main()`
+and put every board into a boot loop.

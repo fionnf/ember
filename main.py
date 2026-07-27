@@ -24,7 +24,7 @@ from config import (
     WEBREPL_PASSWORD,
 )
 
-FIRMWARE_VERSION       = "2026-07-26.6"
+FIRMWARE_VERSION       = "2026-07-26.7"
 FRAME_MS               = 16
 SYNC_INTERVAL_MS       = 60_000
 SYNC_FADE_STEPS        = 300
@@ -307,7 +307,6 @@ def _handle_message(data):
     if data.get("reboot"):
         print("[mqtt] reboot requested — saving state and rebooting")
         save_state()
-        import machine
         machine.reset()
 
     # Echo current state back to web clients so the UI stays in sync.
@@ -583,7 +582,6 @@ def main():
             elif utime.ticks_diff(now, _offline_since) >= WIFI_OFFLINE_REBOOT_MS:
                 print("[wifi] offline > 10 min — rebooting to recover connection")
                 save_state()
-                import machine
                 machine.reset()
         else:
             _offline_since = None
@@ -636,7 +634,6 @@ def main():
                 if cur_min == 0:
                     print("[ota] daily maintenance window — saving state and rebooting for OTA")
                     save_state()
-                    import machine
                     machine.reset()
 
         # ── Sunrise alarm check ──
