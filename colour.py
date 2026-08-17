@@ -76,10 +76,19 @@ def _palette_colour(position):
 # white and a dawn would be an invisible tint. Sweep: ember red → amber →
 # golden → warm white. Brightness is ramped separately on top, so the early
 # stops are seen dim and deep, exactly like a real dawn.
+#
+# Stops are evenly spaced by index, so *where* the stops sit is what shapes
+# the curve. Weighting them toward the red end is what makes the dawn open
+# deeper and hold there: the old middle stops now land at 0.6 and 0.8 rather
+# than 0.33 and 0.66, so the white LED stays dark for the first three fifths
+# and only creeps in near the end. Red never leaves — R is 255 the whole way,
+# so the landing is a warm white with red still under it, not a cold white.
 SUNRISE_STOPS = (
-    (255,  20,   0,   0),   # 0.00  ember red
-    (255,  70,   0,   0),   # 0.33  deep orange
-    (255, 140,  20,  40),   # 0.66  amber, white creeping in
+    (255,   6,   0,   0),   # 0.00  deepest ember — almost pure red
+    (255,  18,   0,   0),   # 0.20  ember red
+    (255,  45,   0,   0),   # 0.40  red, barely turning
+    (255,  85,   0,   0),   # 0.60  deep orange
+    (255, 145,  25,  55),   # 0.80  amber, white just creeping in
     (255, 190, 110, 190),   # 1.00  warm white
 )
 

@@ -144,6 +144,8 @@ Each board holds the whole schedule on its own flash (`alarms.json`) and evaluat
 
 The gradient is `SUNRISE_STOPS` in `colour.py`, deliberately **not** taken from `TINT_PALETTE`: there a single `pos` sets hue and saturation together, so anything warm is also nearly white and a dawn would be an invisible tint.
 
+Stops are evenly spaced by index, so where they sit is what shapes the fade. They are weighted toward the red end: the dawn opens on near-pure red `(255,6,0,0)`, the white LED stays completely dark for the first three fifths, and the turn to warm white happens in the last stretch. Red is never given up — the R channel is full the whole way — so it lands on a warm white with red still under it rather than a cold one. `tests/test_sunrise.py` pins that shape, so the stops stay tunable but the character can't drift back to turning orange almost immediately.
+
 The schedule reaches boards two ways: the **retained** `P/alarms` topic, which boards subscribe to so an offline or rebooting board picks it up on reconnect, and a `set_alarms` message on `P/events` for boards that are already online. Alarms are compared in **UTC**; clients convert local time. See the [protocol spec](#alarms-1) for the exact format.
 
 Two requirements: the board needs a **synced clock** (NTP at boot, retried hourly — the heartbeat's `ntp` field reports this, and the web UI warns when it's false), and it needs to have **received the schedule** (the heartbeat's `alarms` count confirms it). Use the **▶ Test** button on any alarm to run its fade immediately and verify the whole path.
@@ -580,6 +582,7 @@ Personal project — no license.
 python3 tests/test_firmware.py     # boots main(), MQTT commands, flash writes
 python3 tests/test_ota.py          # OTA all-or-nothing install
 python3 tests/test_rollback.py     # crash-loop rollback
+python3 tests/test_sunrise.py      # dawn gradient shape
 node    tests/test_scene_sync.js   # scene merge / tombstone rules
 ```
 
