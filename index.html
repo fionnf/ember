@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <!-- viewport-fit=cover is what makes env(safe-area-inset-*) report anything
+       other than 0. Without it, the black-translucent status bar declared
+       below has nothing to push content clear of, and on a notched iPhone the
+       header sits under the clock once the page is added to the home screen. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
   <title>Linked Lights</title>
   <meta name="theme-color" content="#060608">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -43,7 +47,14 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 1.4rem 1rem 5rem;
+      /* Insets resolve to 0 everywhere without a notch, so this is the same
+         1.4rem / 1rem / 5rem as before on desktop and on Android. On a notched
+         iPhone added to the home screen it is what keeps the header out from
+         under the status bar and the last card off the home indicator. */
+      padding: calc(1.4rem + env(safe-area-inset-top, 0px))
+               calc(1rem + env(safe-area-inset-right, 0px))
+               calc(5rem + env(safe-area-inset-bottom, 0px))
+               calc(1rem + env(safe-area-inset-left, 0px));
       gap: 0.75rem;
     }
 
@@ -177,7 +188,10 @@
     }
     .ctrl-pill {
       display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+      /* 44px floor: these measured 37px, under Apple's minimum target, and
+         they are the main mode switches on a phone-sized screen. */
       padding: 0.65rem 0.5rem;
+      min-height: 44px;
       border: 1px solid var(--border); border-radius: var(--r-sm);
       background: transparent; color: var(--text2);
       font-family: inherit; font-size: 0.78rem; font-weight: 500; cursor: pointer;
@@ -202,14 +216,26 @@
       background: rgba(255,255,255,0.1);
     }
     input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 20px; height: 20px;
-      border-radius: 50%; background: #fff;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.5);
-      cursor: pointer; transition: transform 0.1s, box-shadow 0.15s;
+      /* 44x44 of grabbable area, 20x20 of visible dot. The transparent border
+         is the target; background-clip keeps the white inside the content box.
+         Done on the thumb rather than the input because several of these
+         sliders set `background:` inline, and that shorthand resets
+         background-clip — padding the input itself painted the track as a
+         45px slab. The thumb has no such conflict. */
+      -webkit-appearance: none;
+      width: 44px; height: 44px;
+      border: 12px solid transparent;
+      background-clip: content-box;
+      border-radius: 50%; background-color: #fff;
+      /* drop-shadow, not box-shadow: box-shadow follows the 44px border box,
+         so the depth shadow spread into a visible haze either side of the
+         20px dot. A filter follows the shape actually painted. */
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.55));
+      cursor: pointer; transition: transform 0.1s, filter 0.15s;
     }
     input[type=range]::-webkit-slider-thumb:active {
       transform: scale(1.25);
-      box-shadow: 0 2px 12px rgba(240,160,48,0.5), 0 0 0 3px rgba(240,160,48,0.15);
+      filter: drop-shadow(0 2px 5px rgba(240,160,48,0.75));
     }
 
     /* ── Palette bar ── */
@@ -285,13 +311,14 @@
     .scene-del:hover { color: var(--red); border-color: rgba(224,72,72,0.3); }
     .save-row { display: flex; gap: 0.5rem; }
     .save-row input {
-      flex: 1; background: rgba(0,0,0,0.25); border: 1px solid var(--border);
+      flex: 1; min-height: 44px; background: rgba(0,0,0,0.25); border: 1px solid var(--border);
       border-radius: var(--r-xs); color: var(--text); font-family: inherit; font-size: 0.8rem;
       padding: 0.55rem 0.75rem; outline: none; transition: border-color 0.2s;
     }
     .save-row input:focus { border-color: rgba(240,160,48,0.45); }
     .save-row input::placeholder { color: var(--muted); }
     .save-row button {
+      min-height: 44px;
       flex-shrink: 0; padding: 0.55rem 1rem; font-size: 0.8rem;
       border: 1px solid var(--border); border-radius: var(--r-xs);
       background: var(--surface2); color: var(--text2);
@@ -358,7 +385,7 @@
     }
     .alarm-del:hover { color: var(--red); }
     .add-alarm-btn {
-      width: 100%; margin-top: 0.3rem; padding: 0.7rem;
+      width: 100%; margin-top: 0.3rem; padding: 0.7rem; min-height: 44px;
       border: 1px dashed var(--border); border-radius: var(--r-sm);
       background: transparent; color: var(--muted);
       font-family: inherit; font-size: 0.78rem; cursor: pointer;
@@ -374,6 +401,7 @@
 
     /* ── Settings ── */
     #cfg-toggle {
+      min-height: 44px;
       background: transparent; border: 1px solid var(--border);
       border-radius: 20px; color: var(--muted);
       font-family: inherit; font-size: 0.65rem; font-weight: 600;
@@ -853,7 +881,7 @@ function showToast(msg) {
   if (!t) {
     t = document.createElement("div");
     t.id = "ll-toast";
-    t.style.cssText = "position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:rgba(30,30,40,0.95);color:#fff;padding:.5rem 1.2rem;border-radius:2rem;font-size:.85rem;z-index:9999;pointer-events:none;transition:opacity .3s";
+    t.style.cssText = "position:fixed;bottom:calc(1.5rem + env(safe-area-inset-bottom, 0px));left:50%;transform:translateX(-50%);background:rgba(30,30,40,0.95);color:#fff;padding:.5rem 1.2rem;border-radius:2rem;font-size:.85rem;z-index:9999;pointer-events:none;transition:opacity .3s";
     document.body.appendChild(t);
   }
   t.textContent = msg;
