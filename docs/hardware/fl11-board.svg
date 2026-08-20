@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" class="pcb" viewBox="-7 -13 296 46" role="img" aria-label="FL-11 board outline, 282 by 20 millimetres, eleven LEDs at 16.667 mm pitch with a break-away touch tab">
+<style>
+:root{--mask:#FFFFFF;--edge:#D9D4CA;--cu5v:rgba(168,90,42,.15);--cugnd:rgba(107,100,91,.16);
+  --copper:#A85A2A;--partfill:#EDEAE3;--ledfill:#F5F3EE;--silk:#6B645B;--ink-svg:#1B1917;
+  --ledtext:#6B645B;--slotfill:#D9D4CA;--dimline:#6B645B;--dimtext:#6B645B}
+@media (prefers-color-scheme:dark){
+ :root{--mask:#1C1A18;--edge:#332F2B;--cu5v:rgba(213,131,75,.20);--cugnd:rgba(154,145,135,.16);
+  --copper:#D5834B;--partfill:#211E1B;--ledfill:#131211;--silk:#9A9187;--ink-svg:#E9E4DC;
+  --ledtext:#9A9187;--slotfill:#332F2B;--dimline:#9A9187;--dimtext:#9A9187}}
+
+.pcb{width:100%;height:auto;display:block;font-family:"IBM Plex Mono",ui-monospace,monospace}
+.pcb .sub{fill:var(--mask);stroke:var(--edge);stroke-width:.35}
+.pcb .pour5v{fill:var(--cu5v)}
+.pcb .pourgnd{fill:var(--cugnd)}
+.pcb .guard{fill:var(--cugnd)}
+.pcb .sense{fill:var(--copper)}
+.pcb .part{fill:var(--partfill);stroke:var(--edge);stroke-width:.22}
+.pcb .led{fill:var(--ledfill);stroke:var(--copper);stroke-width:.3}
+.pcb .pin1{fill:var(--copper)}
+.pcb .cap{fill:var(--silk)}
+.pcb .hole{fill:none;stroke:var(--edge);stroke-width:.35}
+.pcb .slot{fill:var(--slotfill)}
+.pcb .bite{fill:var(--mask)}
+.pcb .padg{fill:var(--cugnd);stroke:var(--copper);stroke-width:.25}
+.pcb .pads{fill:var(--cu5v);stroke:var(--copper);stroke-width:.25}
+.pcb .thole{fill:var(--copper)}
+.pcb .tdrill{fill:var(--mask)}
+.pcb .dim,.pcb .dtick{stroke:var(--dimline);stroke-width:.18}
+.pcb .lead{stroke:var(--dimline);stroke-width:.18;stroke-dasharray:1.2 1}
+.pcb text{fill:var(--silk)}
+.pcb .pl{font-size:1.5px;text-anchor:middle;fill:var(--ink-svg)}
+.pcb .ln{font-size:1.7px;text-anchor:middle;fill:var(--ledtext)}
+.pcb .pn{font-size:1.7px;text-anchor:middle;fill:var(--ink-svg)}
+.pcb .dt{font-size:2.1px;text-anchor:middle;fill:var(--dimtext)}
+.pcb .zl{font-size:2.2px;text-anchor:middle;fill:var(--dimtext);letter-spacing:.12px}
+.pcb .sl{font-size:1.7px;text-anchor:middle;fill:var(--dimtext)}
+</style>
+<title>FL-11 board — 282.0 × 20.0 mm, top view, to scale</title>
+<rect class="sub" x="0" y="0" width="282.0" height="20.0" rx="0.8"/>
+<rect class="pour5v" x="0.4" y="0.40" width="249.2" height="7.80"/>
+<rect class="pourgnd" x="0.4" y="13.60" width="249.2" height="3.40"/>
+<rect class="guard" x="0.4" y="17.30" width="249.2" height="0.50"/>
+<rect class="sense" x="0.4" y="18.15" width="249.2" height="0.30"/>
+<rect class="guard" x="0.4" y="18.80" width="249.2" height="0.50"/>
+<rect class="part" x="2.0" y="6.2" width="12.0" height="7.6" rx="0.4"/>
+<text class="pl" x="8.0" y="10.55">USB-C</text>
+<rect class="part" x="16.0" y="4.0" width="7.0" height="7.0" rx="0.4"/>
+<text class="pl" x="19.5" y="8.05">470µF</text>
+<rect class="part" x="24.5" y="6.0" width="3.2" height="3.0" rx="0.4"/>
+<text class="pl" x="26.1" y="8.05">F1</text>
+<rect class="part" x="28.5" y="6.0" width="3.0" height="3.0" rx="0.4"/>
+<text class="pl" x="30.0" y="8.05">Q1</text>
+<rect class="part" x="32.5" y="6.0" width="3.0" height="3.0" rx="0.4"/>
+<text class="pl" x="34.0" y="8.05">LDO</text>
+<rect class="part" x="24.5" y="10.5" width="4.0" height="2.4" rx="0.4"/>
+<text class="pl" x="26.5" y="12.25">ESD</text>
+<rect class="part" x="36.5" y="3.0" width="16.0" height="13.2" rx="0.4"/>
+<text class="pl" x="44.5" y="10.15">ESP32-C3-MINI-1</text>
+<rect class="part" x="30.0" y="17.0" width="3.4" height="2.2" rx="0.4"/>
+<text class="pl" x="31.7" y="18.650000000000002">AHCT</text>
+<circle class="hole" cx="4.5" cy="4.5" r="1.35"/>
+<circle class="hole" cx="4.5" cy="15.5" r="1.35"/>
+<rect class="led" x="61.5" y="8.5" width="5" height="5" rx="0.35"/>
+<circle class="pin1" cx="62.25" cy="9.25" r="0.42"/>
+<text class="ln" x="64.0" y="11.55">1</text>
+<rect class="cap" x="67.15" y="15.0" width="0.5" height="1.0"/>
+<rect class="led" x="78.167" y="8.5" width="5" height="5" rx="0.35"/>
+<circle class="pin1" cx="78.917" cy="9.25" r="0.42"/>
+<text class="ln" x="80.667" y="11.55">2</text>
+<rect class="cap" x="83.81700000000001" y="15.0" width="0.5" height="1.0"/>
+<rect class="led" x="94.833" y="8.5" width="5" height="5" rx="0.35"/>
+<circle class="pin1" cx="95.583" cy="9.25" r="0.42"/>
+<text class="ln" x="97.333" y="11.55">3</text>
+<rect class="cap" x="100.483" y="15.0" width="0.5" height="1.0"/>
+<rect class="led" x="111.5" y="8.5" width="5" height="5" rx="0.35"/>
+<circle class="pin1" cx="112.25" cy="9.25" r="0.42"/>
+<text class="ln" x="114.0" y="11.55">4</text>
+<rect class="cap" x="117.15" y="15.0" width="0.5" height="1.0"/>
+<rect class="led" x="128.167" y="8.5" width="5" height="5" rx="0.35"/>
+<circle class="pin1" cx="128.917" cy="9.25" r="0.42"/>
+<text class="ln" x="130.667" y="11.55">5</text>
+<rect class="cap" x="133.817" y="15.0" width="0.5" height="1.0"/>
+<rect class="led" x="144.833" y="8.5" width="5" height="5" rx="0.35"/>
+<circle class="pin1" cx="145.583" cy="9.25" r="0.42"/>
+<text class="ln" x="147.333" y="11.55">6</text>
+<rect class="cap" x="150.483" y="15.0" width="0.5" height="1.0"/>
+<rect class="led" x="161.5" y="8.5" width="5" height="5" rx="0.35"/>
+<circle class="pin1" cx="162.25" cy="9.25" r="0.42"/>
+<text class="ln" x="164.0" y="11.55">7</text>
+<rect class="cap" x="167.15" y="15.0" width="0.5" height="1.0"/>
+<rect class="led" x="178.167" y="8.5" width="5" height="5" rx="0.35"/>
+<circle class="pin1" cx="178.917" cy="9.25" r="0.42"/>
+<text class="ln" x="180.667" y="11.55">8</text>
+<rect class="cap" x="183.817" y="15.0" width="0.5" height="1.0"/>
+<rect class="led" x="194.833" y="8.5" width="5" height="5" rx="0.35"/>
+<circle class="pin1" cx="195.583" cy="9.25" r="0.42"/>
+<text class="ln" x="197.333" y="11.55">9</text>
+<rect class="cap" x="200.483" y="15.0" width="0.5" height="1.0"/>
+<rect class="led" x="211.5" y="8.5" width="5" height="5" rx="0.35"/>
+<circle class="pin1" cx="212.25" cy="9.25" r="0.42"/>
+<text class="ln" x="214.0" y="11.55">10</text>
+<rect class="cap" x="217.15" y="15.0" width="0.5" height="1.0"/>
+<rect class="led" x="228.167" y="8.5" width="5" height="5" rx="0.35"/>
+<circle class="pin1" cx="228.917" cy="9.25" r="0.42"/>
+<text class="ln" x="230.667" y="11.55">11</text>
+<rect class="cap" x="233.817" y="15.0" width="0.5" height="1.0"/>
+<rect class="slot" x="249.6" y="0" width="0.8" height="20"/>
+<rect class="bite" x="249.6" y="2.65" width="0.8" height="0.7"/>
+<rect class="bite" x="249.6" y="6.65" width="0.8" height="0.7"/>
+<rect class="bite" x="249.6" y="9.65" width="0.8" height="0.7"/>
+<rect class="bite" x="249.6" y="12.65" width="0.8" height="0.7"/>
+<rect class="bite" x="249.6" y="16.65" width="0.8" height="0.7"/>
+<rect class="padg" x="254.0" y="1.20" width="25" height="8.00" rx="0.4"/>
+<rect class="pads" x="254.0" y="10.60" width="25" height="8.00" rx="0.4"/>
+<text class="pn" x="266.5" y="5.9">PAD_G · GND return</text>
+<text class="pn" x="266.5" y="15.3">PAD_S · SENSE</text>
+<rect class="guard" x="280.5" y="1.2" width="1.0" height="17.4"/>
+<circle class="thole" cx="245.0" cy="8.73" r="0.80"/>
+<circle class="tdrill" cx="245.0" cy="8.73" r="0.50"/>
+<circle class="thole" cx="245.0" cy="11.27" r="0.80"/>
+<circle class="tdrill" cx="245.0" cy="11.27" r="0.50"/>
+<circle class="thole" cx="254.0" cy="8.73" r="0.80"/>
+<circle class="tdrill" cx="254.0" cy="8.73" r="0.50"/>
+<circle class="thole" cx="254.0" cy="11.27" r="0.80"/>
+<circle class="tdrill" cx="254.0" cy="11.27" r="0.50"/>
+<line class="dim" x1="0" y1="-6.0" x2="282.0" y2="-6.0"/>
+<line class="dtick" x1="0" y1="-7.1" x2="0" y2="-4.9"/>
+<line class="dtick" x1="282.0" y1="-7.1" x2="282.0" y2="-4.9"/>
+<text class="dt" x="141.0" y="-7.6">282.0 mm overall</text>
+<line class="dim" x1="64.0" y1="-1.8" x2="230.667" y2="-1.8"/>
+<line class="dtick" x1="64.0" y1="-2.9000000000000004" x2="64.0" y2="-0.7"/>
+<line class="dtick" x1="230.667" y1="-2.9000000000000004" x2="230.667" y2="-0.7"/>
+<text class="dt" x="147.33350000000002" y="-3.4000000000000004">166.667  LED1 → LED11</text>
+<line class="dim" x1="64.0" y1="26.0" x2="80.667" y2="26.0"/>
+<line class="dtick" x1="64.0" y1="24.9" x2="64.0" y2="27.1"/>
+<line class="dtick" x1="80.667" y1="24.9" x2="80.667" y2="27.1"/>
+<text class="dt" x="72.3335" y="24.4">16.667 pitch (60 LED/m)</text>
+<line class="dim" x1="55.67" y1="30.5" x2="239.0" y2="30.5"/>
+<line class="dtick" x1="55.67" y1="29.4" x2="55.67" y2="31.6"/>
+<line class="dtick" x1="239.0" y1="29.4" x2="239.0" y2="31.6"/>
+<text class="dt" x="147.335" y="28.9">183.33 lit zone — make the diffuser this length</text>
+<line class="dim" x1="-3.2" y1="0" x2="-3.2" y2="20"/>
+<line class="dtick" x1="-4.3" y1="0" x2="-2.1" y2="0"/>
+<line class="dtick" x1="-4.3" y1="20" x2="-2.1" y2="20"/>
+<text class="dt dtv" x="-4.6" y="10" transform="rotate(-90 -4.6 10)">20.0</text>
+<text class="zl" x="28" y="-8.4">HEAD — placement indicative</text>
+<text class="zl" x="147" y="-8.4">LIT ZONE — coordinates exact</text>
+<text class="zl" x="266" y="-8.4">BREAK-AWAY TAB</text>
+<line class="lead" x1="250" y1="-7.4" x2="250" y2="21"/>
+<line class="lead" x1="56" y1="-7.4" x2="56" y2="-0.6"/>
+<text class="sl" x="266.5" y="23.4">snap here · cut both traces first</text>
+</svg>

@@ -508,6 +508,14 @@ J2 doubles as a SENSE + GND probe point at the far end.
 
 ## 7. Layout and mechanical
 
+### 7.0 Board drawing
+
+![FL-11 top view, drawn to scale](fl11-board.svg)
+
+Top view, to scale. LED centres, pitch, pad extents, break slot, mounting holes and the copper
+bands are the specified values from the sections below. Head-section parts are indicative — this
+design fixes their nets and clearances, not their exact x/y, which falls out of routing.
+
 ### 7.1 Outline and cross-section
 
 **282.0 × 20.0 × 1.6 mm, 2 layer, 1 oz, single-sided SMT, white mask, black silkscreen.**
