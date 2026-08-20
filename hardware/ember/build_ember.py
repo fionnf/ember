@@ -99,8 +99,8 @@ put("H2","MountingHole","MountingHole_2.7mm_M2.5", 126.0, 26.5, 0, "M2.5")
 put("H3","MountingHole","MountingHole_2.7mm_M2.5", 6.0, 4.5, 0, "M2.5")
 put("H4","MountingHole","MountingHole_2.7mm_M2.5", 181.0, 4.5, 0, "M2.5")
 
-TP = {"TP1":("LED_5V",127.0,21.0),"TP2":("+3V3",122.0,27.0),"TP3":("GND",119.0,27.0),
-      "TP4":("GND",116.0,27.0),"TP5":("LED_DIN1",79.5,20.9),"TP6":("TOUCH_SENSE",99.5,26.5),
+TP = {"TP1":("LED_5V",120.78,27.3),"TP2":("+3V3",118.24,27.3),"TP3":("GND",115.70,27.3),
+      "TP4":("GND",113.16,27.3),"TP5":("LED_DIN1",79.5,20.9),"TP6":("TOUCH_SENSE",99.5,26.5),
       "TP7":("LD11_DOUT",178.0,18.6),"TP8":("UART_TX",104.0,31.0),"TP9":("UART_RX",101.0,31.0),
       "TP10":("EN",100.0,18.5),"TP11":("VBUS_F",87.5,18.8)}
 for ref,(net,x,y) in TP.items():
@@ -120,14 +120,14 @@ for pd in fp.Pads():
 # Sited directly above IO4 and IO10 on the module's top edge, in the gap between the
 # regulator row and the module. A pad row on the far side of the board needed a B.Cu
 # jumper straight through the antenna keep-out; here the runs are a few millimetres.
-for ref,(xx,yy,net) in {"I4":(105.5,27.3,"GND"),    "I3":(108.0,27.3,"+3V3"),
-                        "I1":(110.5,27.3,"I2C_SDA"),"I2":(113.0,27.3,"I2C_SCL")}.items():
+for ref,(xx,yy,net) in {"I4":(103.00,27.3,"GND"),    "I3":(105.54,27.3,"+3V3"),
+                        "I1":(108.08,27.3,"I2C_SDA"),"I2":(110.62,27.3,"I2C_SCL")}.items():
     fp = put(ref,"TestPoint","TestPoint_Pad_D1.0mm", xx, yy, 0, net)
     for pd in fp.Pads(): pd.SetNet(N(net))
 
 # Same order in solder terminals, for when no JST housing is to hand.
-for ref,(xx,yy,net) in {"TS3":(99.0,35.5,"TOUCH_SENSE"), "TS4":(102.0,35.5,"+3V3"),
-                        "TS5":(105.0,35.5,"GND")}.items():
+for ref,(xx,yy,net) in {"TS3":(99.00,35.5,"TOUCH_SENSE"), "TS4":(101.54,35.5,"+3V3"),
+                        "TS5":(104.08,35.5,"GND")}.items():
     fp = put(ref,"TestPoint","TestPoint_Pad_D1.0mm", xx, yy, 0, net)
     for pd in fp.Pads(): pd.SetNet(N(net))
 
@@ -207,7 +207,7 @@ for ref, fp in placed.items():
     r.SetTextSize(VECTOR2I(MM(0.8), MM(0.8))); r.SetTextThickness(MM(0.15))
     if ref.startswith(("TP","J2_","J3_","J4_","H")) or (ref.startswith("C") and ref[1:].isdigit() and int(ref[1:]) >= 10):
         r.SetVisible(False)
-    fp.Value().SetVisible(ref.startswith("J4_"))   # J4 pads label themselves
+    fp.Value().SetVisible(ref.startswith(("J4","I1","I2","I3","I4","TS")))
 
 # Identity, in the clear band beside the LED row: below the 5 V pour (ends y=17.0), above
 # the board edge, right of x=120 where the DIN trace never runs. Bare soldermask under it.
@@ -217,8 +217,8 @@ for ref, fp in placed.items():
 silk("EMBER", 93.5, 3.2, 2.4, 0.36)
 silk(f"EM-15 {VERSION}   \u00b7   {COPYRIGHT}", 93.5, 6.0, 0.9, 0.16)
 silk("EMBER", 96.0, 51.0, 0.8, 0.15)
-silk("TTP223  IO VCC GND", 102.0, 37.6, 0.8, 0.15)
-silk("I2C GND 3V3 SDA SCL", 109.0, 25.6, 0.8, 0.15)
+silk("TTP223", 95.6, 35.8, 0.9, 0.16)
+silk("I2C", 100.0, 27.6, 0.9, 0.16)
 
 pcbnew.SaveBoard(OUT, board)
 print("PLACED:", len(placed), " NETS:", len(nets),
