@@ -31,22 +31,23 @@ def via(x,y,net):
     v.SetWidth(MM(0.6)); v.SetDrill(MM(0.3)); v.SetNet(N(net)); board.Add(v); return v
 
 # ── Strip cross-section (GND at the y=0 side, 5 V under the LED anodes)
-rect(pcbnew.F_Cu, "GND",    0.4, 0.40, 195.0, 9.30, prio=1)
-rect(pcbnew.F_Cu, "LED_5V", 0.4, 12.40, 195.0, 17.00, prio=1)
-# SENSE lane guards. In rev B the sense line cannot use the y=1.4 channel: it would
-# have to cross the LED data channel, and every x between LEDs carries a hop. It runs
-# in the y=18.6 lane instead, guarded above and below, and crosses the pours only once.
-rect(pcbnew.F_Cu, "GND", 118.0, 17.40, 190.0, 17.90, prio=2)
-rect(pcbnew.F_Cu, "GND", 118.0, 19.20, 190.0, 19.70, prio=2)
-# Bottom plane covers strip + bulge as one L, stopping short of the break slot
-zone(pcbnew.B_Cu, "GND", [(0.4,0.4),(195.0,0.4),(195.0,19.6),(119.6,19.6),
+rect(pcbnew.F_Cu, "GND",    0.4, 0.40, 186.6, 9.30, prio=1)
+rect(pcbnew.F_Cu, "LED_5V", 0.4, 12.40, 186.6, 17.00, prio=1)
+# Bottom plane over strip + bulge. NOT under the pad tab (PAD_BACK_KO).
+zone(pcbnew.B_Cu, "GND", [(0.4,0.4),(186.6,0.4),(186.6,19.6),(119.6,19.6),
                           (119.6,47.6),(72.4,47.6),(72.4,19.6),(0.4,19.6)], prio=0, solid=True)
-# Bulge: 5 V feed and GND, both necked around the antenna keep-out (DRC enforces it)
-rect(pcbnew.F_Cu, "LED_5V", 72.4, 20.0, 119.6, 28.6, prio=1)
-rect(pcbnew.F_Cu, "GND",    72.4, 29.0, 119.6, 47.6, prio=1)
-# Tab electrodes
-rect(pcbnew.F_Cu, "TOUCH_SENSE", 200.0, 1.20, 225.0, 9.20,  prio=1, solid=True)
-rect(pcbnew.F_Cu, "GND",         200.0, 10.60, 225.0, 18.60, prio=1)
+# Bulge: GND everywhere, with a 5 V island that reaches up into the strip pour to merge.
+rect(pcbnew.F_Cu, "GND",    72.4, 20.0, 119.6, 47.6, prio=0)
+# U1's thermal pad wants a solid tie; the rest of the bulge keeps thermal relief so the
+# 0402s do not tombstone (§7.7).
+rect(pcbnew.F_Cu, "GND", 93.0, 29.0, 107.0, 47.0, prio=3, solid=True)
+# prio 2 so the overlap with the strip pour resolves instead of reading as an intersect
+rect(pcbnew.F_Cu, "LED_5V", 84.0, 16.5, 97.0, 29.5, prio=2)
+# Touch pad, on the snap-off section. Electrodes 17 x 12 = 204 mm2 each, guard ring
+# on the far edge, no copper on B.Cu beneath either.
+rect(pcbnew.F_Cu, "TOUCH_SENSE", 126.0, 22.0, 143.0, 34.0, prio=1, solid=True)
+rect(pcbnew.F_Cu, "GND",         126.0, 35.4, 143.0, 47.4, prio=1)
+rect(pcbnew.F_Cu, "GND",         143.6, 22.0, 144.6, 47.4, prio=2)
 
 def pad(ref, num):
     fp = board.FindFootprintByReference(ref)
@@ -76,21 +77,17 @@ routed += 3
 for i in range(1,12):
     gx,gy = pad(f"C{9+i}","2"); via(gx,gy,"GND"); routed += 1
 
-# ── SENSE: out of the bulge at x=121? No - the bulge ends at 118, so it climbs at
-# x=120.5 in the strip, threading the gap between LD8 (126.667) and LD7 (110.0).
-# It crosses both pours once, at right angles, which is the minimum coupling geometry.
-# SENSE: bulge -> y=18.6 guarded lane -> climbs at x=188, which is past LD11_DOUT's
-# end at 186, so it is the only place it can cross the data channel without a hop there.
-SY = 18.6
-sx,sy = pad("R7","2")
-track(sx,sy, sx,29.0, "TOUCH_SENSE", 0.30); track(sx,29.0, 118.5,29.0, "TOUCH_SENSE", 0.30)
-track(118.5,29.0, 118.5,SY, "TOUCH_SENSE", 0.30)
-tx,ty = pad("TP6","1"); track(tx,ty, sx,ty, "TOUCH_SENSE", 0.30); routed += 4
-jx,jy = pad("J2_1","1")
-track(118.5,SY, 188.0,SY, "TOUCH_SENSE", 0.30); track(188.0,SY, 188.0,jy, "TOUCH_SENSE", 0.30)
-track(188.0,jy, jx,jy, "TOUCH_SENSE", 0.30); routed += 3
-track(jx,jy, 202.0,jy, "TOUCH_SENSE", 0.30); routed += 1
-gx,gy = pad("J2_2","1"); track(gx,gy, 202.0,gy, "GND", 0.5); routed += 1
+# ── SENSE. In rev C this is ~13 mm inside the bulge instead of ~70 mm down the strip:
+# it never crosses the LED data channel and never runs beside the 5 V rail. It sits in
+# the bulge GND pour, which is the guard.
+sx,sy = pad("R7","2"); jx,jy = pad("J2_1","1")
+track(sx,sy, jx,sy, "TOUCH_SENSE", 0.30); track(jx,sy, jx,jy, "TOUCH_SENSE", 0.30)
+tx,ty = pad("TP6","1"); track(tx,ty, tx,sy, "TOUCH_SENSE", 0.30); routed += 3
+track(jx,jy, 130.0,jy, "TOUCH_SENSE", 0.30); routed += 1        # across the web
+gx,gy = pad("J2_2","1"); track(gx,gy, 130.0,gy, "GND", 0.5); routed += 1
+# Stitch the bulge GND pour to the bottom plane
+for vx,vy in [(76.0,29.5),(76.0,44.0),(88.0,45.5),(117.0,22.0),(117.0,45.5)]:
+    via(vx,vy,"GND"); routed += 1
 
 pcbnew.SaveBoard(B, board)
 print("zones:", len([z for z in board.Zones()]), " tracks/vias added:", routed)

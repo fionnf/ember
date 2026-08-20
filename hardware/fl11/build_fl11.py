@@ -9,14 +9,16 @@ from pcbnew import VECTOR2I, FromMM as MM
 OUT, ESP, PADMAP = sys.argv[1], sys.argv[2], sys.argv[3]
 KI = os.path.expanduser("~/Applications/KiCad.app/Contents/SharedSupport/footprints")
 
-VERSION  = "rev B"
+VERSION  = "rev C"
 DESIGNER = "Fionn Ferreira"
 REPO     = "github.com/fionnf/linked-friend-lights-public"
 
-W, H = 228.0, 20.0
-BX1, BX2, BY = 72.0, 120.0, 48.0          # bulge (48 x 28)
+W, H = 187.0, 20.0
+BX1, BX2, BY = 72.0, 120.0, 48.0          # electronics bulge
+PX1, PX2 = 120.0, 145.0                   # snap-off touch pad, beside the bulge
+SLOT_X = 120.0                            # break line between them
 LED_X = [10.0 + 16.66667*i for i in range(11)]
-LED_Y, SLOT_X = 11.000, 196.0
+LED_Y = 11.000
 
 board = pcbnew.BOARD()
 board.GetDesignSettings().SetBoardThickness(MM(1.6))
@@ -79,14 +81,14 @@ put("H1","MountingHole","MountingHole_2.7mm_M2.5", 76.5, 34.0, 0, "M2.5")
 put("H2","MountingHole","MountingHole_2.7mm_M2.5", 114.0, 43.0, 0, "M2.5")
 
 TP = {"TP1":("LED_5V",116.0,21.0),"TP2":("+3V3",118.0,30.5),"TP3":("GND",118.0,33.0),
-      "TP4":("GND",185.0,5.0),"TP5":("LED_DIN1",80.0,37.0),"TP6":("TOUCH_SENSE",106.5,27.0),
-      "TP7":("LD11_DOUT",186.0,13.0),"TP8":("UART_TX",108.5,39.5),"TP9":("UART_RX",108.5,42.0),
+      "TP4":("GND",122.5,44.5),"TP5":("LED_DIN1",80.0,37.0),"TP6":("TOUCH_SENSE",106.5,27.0),
+      "TP7":("LD11_DOUT",183.0,15.5),"TP8":("UART_TX",108.5,39.5),"TP9":("UART_RX",108.5,42.0),
       "TP10":("EN",108.5,44.5),"TP11":("VBUS_F",93.5,21.5)}
 for ref,(net,x,y) in TP.items():
     fp = put(ref,"TestPoint","TestPoint_Pad_D1.0mm", x, y, 0, net)
     for p in fp.Pads(): p.SetNet(N(net))
-for ref, x in (("J2",191.0),("J3",200.0)):
-    for idx,(yy,net) in enumerate(((8.73,"TOUCH_SENSE"),(11.27,"GND")), start=1):
+for ref, x in (("J2",117.5),("J3",128.0)):
+    for idx,(yy,net) in enumerate(((28.0,"TOUCH_SENSE"),(41.0,"GND")), start=1):
         fp = put(f"{ref}_{idx}","TestPoint","TestPoint_Pad_D1.0mm", x, yy, 0, net)
         for p in fp.Pads(): p.SetNet(N(net))
 
@@ -145,32 +147,20 @@ def seg(x1,y1,x2,y2):
     s.SetLayer(pcbnew.Edge_Cuts); s.SetWidth(MM(0.1)); board.Add(s)
 
 # Outline: strip with the bulge hanging off the y=20 edge. LED row never interrupted.
-for a in [(0,0,W,0),(W,0,W,H),(W,H,BX2,H),(BX2,H,BX2,BY),(BX2,BY,BX1,BY),
+for a in [(0,0,W,0),(W,0,W,H),(W,H,PX2,H),(PX2,H,PX2,BY),(PX2,BY,BX1,BY),
           (BX1,BY,BX1,H),(BX1,H,0,H),(0,H,0,0)]:
     seg(*a)
-BITES=[(3.0,0.7),(8.73,1.8),(11.27,1.8),(16.5,0.7)]
-edges=[0.35]
+# Break line runs vertically between bulge and pad tab. Webs sit exactly where the
+# SENSE and GND terminals cross it, as before.
+BITES=[(28.0,1.8),(41.0,1.8)]
+edges=[20.35]
 for cy,w in BITES: edges += [cy-w/2, cy+w/2]
-edges.append(H-0.35)
+edges.append(BY-0.35)
 for i in range(0,len(edges),2):
     y1,y2 = edges[i], edges[i+1]
     if y2-y1 > 0.05:
         seg(SLOT_X-0.4,y1,SLOT_X-0.4,y2); seg(SLOT_X+0.4,y1,SLOT_X+0.4,y2)
         seg(SLOT_X-0.4,y1,SLOT_X+0.4,y1); seg(SLOT_X-0.4,y2,SLOT_X+0.4,y2)
-
-# ── Silkscreen identity
-def silk(txt, x, y, size=0.9, thick=0.15, layer=pcbnew.F_SilkS):
-    t = pcbnew.PCB_TEXT(board); t.SetText(txt)
-    t.SetPosition(VECTOR2I(MM(x), MM(y))); t.SetLayer(layer)
-    t.SetTextSize(VECTOR2I(MM(size), MM(size))); t.SetTextThickness(MM(thick))
-    t.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_CENTER)
-    board.Add(t); return t
-
-silk("LINKED FRIEND LIGHTS", 150.0, 18.3, 1.1, 0.18)
-silk(f"FL-11  {VERSION}   \u00b7   {DESIGNER}", 150.0, 19.5, 0.85, 0.14)
-silk(REPO, 96.0, 47.2, 0.85, 0.14)
-silk(f"FL-11 {VERSION}", 212.0, 19.4, 0.85, 0.14)          # stays on the snapped-off tab
-silk(f"LINKED FRIEND LIGHTS  \u00b7  FL-11 {VERSION}  \u00b7  {DESIGNER}", 96.0, 21.0, 0.9, 0.15)
 
 pcbnew.SaveBoard(OUT, board)
 print("PLACED:", len(placed), " NETS:", len(nets),
