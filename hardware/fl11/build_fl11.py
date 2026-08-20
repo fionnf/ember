@@ -9,7 +9,7 @@ from pcbnew import VECTOR2I, FromMM as MM
 OUT, ESP, PADMAP = sys.argv[1], sys.argv[2], sys.argv[3]
 KI = os.path.expanduser("~/Applications/KiCad.app/Contents/SharedSupport/footprints")
 
-VERSION  = "rev D"
+VERSION  = "rev E"
 DESIGNER = "Fionn Ferreira"
 REPO     = "github.com/fionnf/linked-friend-lights-public"
 
