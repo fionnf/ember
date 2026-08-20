@@ -1,6 +1,6 @@
-# FL-11 rev F — KiCad project
+# FL-11 rev G — KiCad project
 
-**Linked Friend Lights · FL-11 rev F · © 2026 Fionn Ferreira**
+**Linked Friend Lights · FL-11 rev G · © 2026 Fionn Ferreira**
 <https://github.com/fionnf/linked-friend-lights-public>
 
 Generated from [`../../docs/hardware/README.md`](../../docs/hardware/README.md).
@@ -45,6 +45,49 @@ Deleting the end tab also removed the 31 mm tab, the gap, and the strip's break 
 **Cost.** Still one bottom-side part (J1), so the second-setup charge stands at roughly
 **+$0.63/unit at qty 100**. The outline is a T with a notch, so the 6-up panel still needs
 re-nesting and re-quoting.
+
+## rev G — 15 LEDs, fully routed
+
+**15 LEDs at 11.13333 mm pitch.** The lit zone stays at exactly **167.00 mm** — the lamp
+length does not move — and worst-case current drops to **~1.69 A**, back under the 2 A PPTC
+hold and inside a 2.4 A supply. F1 returns to the 2 A/4 A part. Both of the warnings rev F
+carried (3 A supply, copper resized for 2.25 A) are withdrawn: at 1.69 A the §5.5 sizing
+holds with margin.
+
+**The LEDs are warm white.** `C5378724` is `SKC6812RGBW-**WS**` — the WS suffix is warm white.
+The neutral-white part is `C5348912` (`-NW`) and would fight `BASE_WARM_WHITE = (0,0,0,200)`,
+which is the whole basis of `colour.py`'s model. The BOM note says so explicitly.
+
+### Routing: complete
+
+| | |
+|---|---|
+| **Unconnected component pads** | **0** |
+| DRC errors | 2 (below) |
+| Tracks / vias | 345 / 202 — 279 on F.Cu, 66 on B.Cu |
+| Copper routed | 865 mm |
+| SENSE vias | **0**, as §7.1 requires |
+
+The bulge was finished with **freerouting 2.3.0** driven through KiCad's Specctra DSN/SES
+path, then post-processed by `finish_routing.py`. §7.9 says not to autoroute, and that stands
+for the three nets it names — so SENSE, the LED chain, the tab bridges and the pours were
+hand-routed **first** and the router had to work around them. It did: SENSE still has zero
+vias and still never crosses the LED data channel.
+
+`finish_routing.py` then does what the router got wrong: widens its 0.15 mm tracks to the
+0.20 mm floor, stitches the ground pours to the plane with 146 collision-checked vias, ties
+the priority-3 solid patches that the pour clips around, and removes floating copper islands.
+
+### The two remaining DRC errors — both need a human
+
+1. **`J1.A6` (USB_DP_CONN) vs a USB_DM_CONN track.** This is the 0.5 mm-pitch USB-C fan-out,
+   where D+ and D− interleave (`B7 · A6 · A7 · B6` at 0.5 mm). Untangling it needs either a
+   via pair under the connector or hand-drawn geometry; it is exactly the case §6.2 means when
+   it says route D± by hand.
+2. **A STRAP2 via vs a +3V3 track.** A router artifact, a local nudge in KiCad.
+
+Neither is a connectivity failure — every pad is connected. Both are clearance, in the
+head area, and both want the PCB editor rather than a script.
 
 ## rev F — 20 LEDs
 

@@ -9,7 +9,7 @@ from pcbnew import VECTOR2I, FromMM as MM
 OUT, ESP, PADMAP = sys.argv[1], sys.argv[2], sys.argv[3]
 KI = os.path.expanduser("~/Applications/KiCad.app/Contents/SharedSupport/footprints")
 
-VERSION  = "rev F"
+VERSION  = "rev G"
 DESIGNER = "Fionn Ferreira"
 REPO     = "github.com/fionnf/linked-friend-lights-public"
 COPYRIGHT= "\u00a9 2026 Fionn Ferreira"
@@ -18,11 +18,11 @@ W, H = 187.0, 20.0
 BX1, BX2, BY = 72.0, 120.0, 48.0          # electronics bulge
 PX1, PX2 = 120.0, 145.0                   # snap-off touch pad, beside the bulge
 SLOT_X = 120.0                            # break line between them
-# 20 LEDs at 8.33333 mm = 120 LEDs/m, a standard strip density. Twenty at that pitch
-# gives a lit zone of exactly 166.67 mm - the same lamp length as eleven at 60/m, at
-# double the density, so the dots blend instead of reading individually.
-NLED = 20
-LED_X = [10.0 + 8.33333*i for i in range(NLED)]
+# 15 LEDs at 11.13333 mm pitch. Fifteen at that spacing give a lit zone of exactly
+# 167.00 mm - the lamp length stays put - while worst-case current drops to ~1.69 A,
+# back under the 2 A PPTC hold and inside a 2.4 A supply. 20 LEDs needed neither.
+NLED = 15
+LED_X = [10.0 + 11.13333*i for i in range(NLED)]
 LED_Y = 11.000
 
 board = pcbnew.BOARD()
@@ -73,9 +73,8 @@ put("U4","Package_TO_SOT_SMD","SOT-23-6", 89.2, 41.5, 0, "USBLC6-2SC6")
 put("R1",*R0402, 87.5, 45.5, 0, "5k1"); put("R2",*R0402, 90.5, 45.5, 0, "5k1")
 put("C1","Capacitor_SMD","CP_Elec_8x10", 80.0, 25.0, 0, "470uF/10V")
 put("SW1","Button_Switch_SMD","SW_SPST_EVQP7C", 90.0, 24.0, 0, "BOOT")
-# 3A/5A, not 2A/4A: twenty LEDs put worst case at ~2.25 A and a 2 A hold would
-# nuisance-trip. Same 1812 footprint, no layout change.
-put("F1","Resistor_SMD","R_1812_4532Metric", 98.0, 23.0, 0, "PPTC 3A/5A")
+# Back to 2A/4A: at 15 LEDs worst case is ~1.69 A, comfortably under a 2 A hold.
+put("F1","Resistor_SMD","R_1812_4532Metric", 98.0, 23.0, 0, "PPTC 2A/4A")
 put("Q1","Package_TO_SOT_SMD","SOT-23", 105.0, 23.0, 0, "AO3401A")
 put("R8",*R0402, 110.0, 22.0, 0, "100k"); put("C7",*C0402, 112.5, 22.0, 0, "100nF")
 put("U3","Package_TO_SOT_SMD","SOT-23-5", 116.0, 25.0, 0, "AP2112K-3.3")
@@ -94,7 +93,7 @@ put("H2","MountingHole","MountingHole_2.7mm_M2.5", 114.0, 43.0, 0, "M2.5")
 TP = {"TP1":("LED_5V",116.0,21.0),"TP2":("+3V3",109.5,47.0),"TP3":("GND",112.5,47.0),
       "TP4":("GND",122.5,44.5),"TP5":("LED_DIN1",80.0,37.0),"TP6":("TOUCH_SENSE",106.5,27.0),
       "TP7":("LD11_DOUT",176.0,18.6),"TP8":("UART_TX",108.5,39.5),"TP9":("UART_RX",108.5,42.0),
-      "TP10":("EN",108.5,44.5),"TP11":("VBUS_F",93.5,21.5)}
+      "TP10":("EN",100.0,18.5),"TP11":("VBUS_F",93.5,21.5)}
 for ref,(net,x,y) in TP.items():
     fp = put(ref,"TestPoint","TestPoint_Pad_D1.0mm", x, y, 0, net)
     for p in fp.Pads(): p.SetNet(N(net))

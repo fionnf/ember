@@ -1,7 +1,7 @@
 # FL-11 rev B pours and routing.
 import sys, pcbnew
 from pcbnew import VECTOR2I, FromMM as MM
-NLED = 20                     # must match build_fl11.py
+NLED = 15                     # must match build_fl11.py
 B = sys.argv[1]
 board = pcbnew.LoadBoard(B)
 nets = board.GetNetsByName()

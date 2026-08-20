@@ -15,7 +15,7 @@ PART = {
  "100R":       ("C25076",    "BASIC. 9.8M stock"),
  "4M7":        ("C474132",   "Extended - no BASIC 4.7M exists in 0402. 389k stock. Replaces C49655641 (9.8k). Do NOT drop to 1M"),
  "470uF/10V":  ("C47023096", "Extended. 7.4k stock, D8 x 10.5mm - thinnest stock on the board after the LED"),
- "PPTC 3A/5A": ("C18198349", "Extended. 1812, 3A hold / 5A trip, 41k stock. 2A would nuisance-trip at 20 LEDs (~2.25A worst case); the 2A/4A part is C883156"),
+ "PPTC 2A/4A": ("C883156",   "Extended. BSMD1812-200-16V, 2A hold / 4A trip, 76k stock - the section 6.2 spec. At 15 LEDs worst case is ~1.69 A"),
  "USBLC6-2SC6":("C2687116",  "Extended. 150k stock"),
  "AP2112K-3.3":("C23380830", "Extended. 31k stock. EN ties to VIN, not VOUT"),
  "BOOT":       ("C18078117", "Extended. 20.5k stock, 3x4mm SMD tact"),
@@ -23,7 +23,7 @@ PART = {
  "SN74AHCT1G125": ("C7484",  "AHCT/HCT ONLY. C7468 is AHC and fixes nothing - two digits apart"),
  "AO3401A":    ("C15127",    "P-FET. Source to INPUT side, drain to load"),
  "USB-C 16P":  ("C165948",   "TOP side, horizontal - plug enters from the rear board edge"),
- "SK6812RGBW": ("C5378724",  "*** STOCK NOT VERIFIED - section 9.1 number one live risk. 4-channel RGBW, GRBW order. An RGB part fits the same footprint and is silently wrong ***"),
+ "SK6812RGBW": ("C5378724",  "SKC6812RGBW-WS = WARM WHITE (the -NW suffix, C5348912, is neutral and would fight BASE_WARM_WHITE). *** STOCK NOT VERIFIED - section 9.1 number one live risk. 4-channel RGBW, GRBW order. An RGB part fits the same footprint and is silently wrong ***"),
 }
 
 CLI = os.path.expanduser("~/Applications/KiCad.app/Contents/MacOS/kicad-cli")
