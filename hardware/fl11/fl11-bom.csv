@@ -1,17 +1,17 @@
 Comment,Designator,Footprint,LCSC Part #,Note
-USB-C 16P,J1,USB_C_Receptacle_HRO_TYPE-C-31-M-12,C165948,BOTTOM side - plug enters from the back
-470uF/10V,C1,CP_Elec_8x10,,
-22uF,"C2,C3,C4,C5",C_0805_2012Metric,,
-100nF,"C6,C7,C8,C9,C10,C11,C12,C13,C14,C15,C16,C17,C18,C19,C20",C_0402_1005Metric,,
-PPTC 2A/4A,F1,R_1812_4532Metric,,
-SK6812RGBW,"LD1,LD2,LD3,LD4,LD5,LD6,LD7,LD8,LD9,LD10,LD11",LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm,C5378724,"4-channel RGBW, GRBW order. Do NOT substitute a 3-channel RGB part"
-AO3401A,Q1,SOT-23,C15127,
-5k1,"R1,R2,R3,R4,R5,R6,R7",R_0402_1005Metric,,
-100k,"R8,R9",R_0402_1005Metric,,
-4M7,R10,R_0402_1005Metric,,Do not value-engineer to 1M - collapses the touch delta
-100R,R11,R_0402_1005Metric,,rev B+: series termination for the ~80 mm buffer-to-LED1 run
-BOOT,SW1,SW_SPST_EVQP7C,,
-ESP32-C3-MINI-1-N4,U1,ESP32-C3-MINI-1,C2838502,
-SN74AHCT1G125,U2,SOT-23-5,C7484,AHCT/HCT ONLY - DO NOT SUBSTITUTE (C7468 is AHC and is wrong)
-AP2112K-3.3,U3,SOT-23-5,,"EN tied to VIN. SOT-23-5 drop-ins: ME6211C33M5G, RT9013-33GB, SGM2212-3.3"
-USBLC6-2SC6,U4,SOT-23-6,,
+470uF/10V,C1,CP_Elec_8x10,C47023096,"7.4k stock, D8 x 10.5mm - confirm it clears the 14mm base cavity"
+22uF,"C2,C3,C4,C5",C_0805_2012Metric,C6119897,"Preferred, 184k stock, 0805 10V X5R. See derating note below"
+100nF,"C6,C7,C8,C9,C10,C11,C12,C13,C14,C15,C16,C17,C18,C19,C20",C_0402_1005Metric,C1525,"Basic, 16.4M stock, 16V X7R"
+PPTC 2A/4A,F1,R_1812_4532Metric,,"*** FILL THIS IN: JLC parts search, 1812 PPTC, hold 2.0A, trip 4.0A, R <= 0.06 ohm. Not verified ***"
+USB-C 16P,J1,USB_C_Receptacle_HRO_TYPE-C-31-M-12,C165948,"TOP side, horizontal - plug enters from the rear board edge"
+SK6812RGBW,"LD1,LD2,LD3,LD4,LD5,LD6,LD7,LD8,LD9,LD10,LD11",LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm,C5378724,"*** VERIFY STOCK - the number one live risk. 4-channel RGBW, GRBW order. An RGB part fits the same footprint and is silently wrong ***"
+AO3401A,Q1,SOT-23,C15127,"P-FET. Source to INPUT side, drain to load"
+5k1,"R1,R2,R3,R4,R5,R6,R7",R_0402_1005Metric,C25905,"Basic, 2.24M stock, 1%"
+100k,"R8,R9",R_0402_1005Metric,C25086,"Preferred, 469k stock, 1%"
+4M7,R10,R_0402_1005Metric,C49655641,"Extended, ONLY ~9.8k stock - buy all you need in one PO. Do NOT drop to 1M"
+100R,R11,R_0402_1005Metric,C22369194,"1.13M stock, 5% - tolerance is irrelevant for series damping"
+BOOT,SW1,SW_SPST_EVQP7C,C18078117,"20.5k stock, 3x4mm SMD tact"
+ESP32-C3-MINI-1-N4,U1,ESP32-C3-MINI-1,C2838502,"26k stock, $3.84 - the doc modelled $2.92, so budget ~$0.9/board more"
+SN74AHCT1G125,U2,SOT-23-5,C7484,AHCT/HCT ONLY. C7468 is AHC and fixes nothing - two digits apart
+AP2112K-3.3,U3,SOT-23-5,C23380830,"31k stock. EN ties to VIN, not VOUT"
+USBLC6-2SC6,U4,SOT-23-6,C2687116,150k stock

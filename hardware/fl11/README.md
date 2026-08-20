@@ -1,6 +1,6 @@
-# FL-11 rev C — KiCad project
+# FL-11 rev D — KiCad project
 
-**Linked Friend Lights · FL-11 rev C · designed by Fionn Ferreira**
+**Linked Friend Lights · FL-11 rev D · designed by Fionn Ferreira**
 <https://github.com/fionnf/linked-friend-lights-public>
 
 Generated from [`../../docs/hardware/README.md`](../../docs/hardware/README.md).
@@ -45,6 +45,54 @@ Deleting the end tab also removed the 31 mm tab, the gap, and the strip's break 
 **Cost.** Still one bottom-side part (J1), so the second-setup charge stands at roughly
 **+$0.63/unit at qty 100**. The outline is a T with a notch, so the 6-up panel still needs
 re-nesting and re-quoting.
+
+## rev D
+
+Three changes, all from real problems:
+
+**Back to single-sided.** J1 is a *horizontal* receptacle, so the plug enters along the board
+plane from the rear edge whichever face it is soldered to. Bottom-mounting it bought
+flushness and cost a whole second assembly setup. It is on the top side now: rear entry
+unchanged, **the ~$0.63/unit second-setup charge is gone**, and the CPL has zero bottom-side
+parts.
+
+**The pad section could not actually snap off.** In rev C it touched the rest of the board on
+*two* edges — the bulge at x=120 and the strip along y=20 — and only the first was cut. It now
+hangs off the bulge alone: the strip is notched away over y 20–22, so the pad is cantilevered
+and can be gripped and bent. Retaining material is two 1.3 mm webs carrying SENSE and GND plus
+two 0.4 mm corner ligaments, **≈3.0 mm against rev C's 4.3 mm on two separate edges.** Webs are
+1.3 mm rather than narrower because a 0.30 mm trace needs 0.5 mm to each routed edge; below
+that the fab flags it.
+
+**The BOM carries real LCSC numbers.** Blank part numbers are what made JLC guess, and its
+guess for the 100 k line was C880433 — an **01005** part, Extended, 6 in stock, MOQ 5597. Every
+line is now filled from a live stock check, favouring Basic/Preferred with deep stock.
+
+| Line | Part | Why |
+|---|---|---|
+| 100 nF ×15 | **C1525** | Basic, 16.4 M stock |
+| 5k1 ×7 | **C25905** | Basic, 2.24 M stock |
+| 100 k ×2 | **C25086** | Preferred, 469 k stock — *not* the 01005 JLC suggested |
+| 100 R | **C22369194** | 1.13 M stock, 5 % — tolerance is irrelevant for series damping |
+| 22 µF ×4 | **C6119897** | Preferred, 184 k, **$0.02 vs $0.12** for the 25 V Basic part |
+| 4M7 | **C49655641** | Extended, **only ~9.8 k stock** — buy in one PO |
+| 470 µF | **C47023096** | 7.4 k stock, D8 × 10.5 mm |
+| USBLC6 | **C2687116** | 150 k stock |
+| AP2112K-3.3 | **C23380830** | 31 k stock |
+| Tact | **C18078117** | 20.5 k stock |
+| Module | **C2838502** | 26 k stock, **$3.84 — the doc modelled $2.92** |
+
+Two still need you: **F1 (PPTC 1812, 2 A hold / 4 A trip, ≤0.06 Ω)** is not filled — I could not
+verify one, so it is blank rather than guessed. And **the LED, C5378724, is unverified for
+stock** and is §9.1's number one live risk.
+
+**Two cost corrections, both upward:** the module is ~$0.9/board dearer than modelled, and with
+more Extended lines than the doc's assumed five, the fixed charge `8.18 + 1.53 + 3.07 × N`
+rises — roughly +$0.30/board at qty 30. Against that, single-sided gives back ~$0.63/unit.
+
+**22 µF derating:** the 10 V part loses roughly half its capacitance at 5 V DC bias, so budget
+~10–12 µF effective. That is fine here — C1's 470 µF carries the bulk and C4 only has to cover a
+2 ms burst — but it is a real difference from the nameplate value.
 
 ## Status — read before ordering
 

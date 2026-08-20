@@ -41,6 +41,9 @@ rect(pcbnew.F_Cu, "GND",    72.4, 20.0, 119.6, 47.6, prio=0)
 # U1's thermal pad wants a solid tie; the rest of the bulge keeps thermal relief so the
 # 0402s do not tombstone (§7.7).
 rect(pcbnew.F_Cu, "GND", 93.0, 29.0, 107.0, 47.0, prio=3, solid=True)
+# J1's shield pads are large PTH; give them a solid tie too, without removing thermal
+# relief from the 0402s elsewhere in the bulge.
+rect(pcbnew.F_Cu, "GND", 73.5, 37.5, 86.5, 47.6, prio=3, solid=True)
 # prio 2 so the overlap with the strip pour resolves instead of reading as an intersect
 rect(pcbnew.F_Cu, "LED_5V", 84.0, 16.5, 97.0, 29.5, prio=2)
 # Touch pad, on the snap-off section. Electrodes 17 x 12 = 204 mm2 each, guard ring
@@ -84,7 +87,7 @@ sx,sy = pad("R7","2"); jx,jy = pad("J2_1","1")
 track(sx,sy, jx,sy, "TOUCH_SENSE", 0.30); track(jx,sy, jx,jy, "TOUCH_SENSE", 0.30)
 tx,ty = pad("TP6","1"); track(tx,ty, tx,sy, "TOUCH_SENSE", 0.30); routed += 3
 track(jx,jy, 130.0,jy, "TOUCH_SENSE", 0.30); routed += 1        # across the web
-gx,gy = pad("J2_2","1"); track(gx,gy, 130.0,gy, "GND", 0.5); routed += 1
+gx,gy = pad("J2_2","1"); track(gx,gy, 130.0,gy, "GND", 0.30); routed += 1
 # Stitch the bulge GND pour to the bottom plane
 for vx,vy in [(76.0,29.5),(76.0,44.0),(88.0,45.5),(117.0,22.0),(117.0,45.5)]:
     via(vx,vy,"GND"); routed += 1

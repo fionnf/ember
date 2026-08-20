@@ -9,7 +9,7 @@ from pcbnew import VECTOR2I, FromMM as MM
 OUT, ESP, PADMAP = sys.argv[1], sys.argv[2], sys.argv[3]
 KI = os.path.expanduser("~/Applications/KiCad.app/Contents/SharedSupport/footprints")
 
-VERSION  = "rev C"
+VERSION  = "rev D"
 DESIGNER = "Fionn Ferreira"
 REPO     = "github.com/fionnf/linked-friend-lights-public"
 
@@ -58,10 +58,12 @@ for i, x in enumerate(LED_X, start=1):
 put("U1","Espressif","ESP32-C3-MINI-1", 100.0, 38.0, 180, "ESP32-C3-MINI-1-N4")
 # U1 courtyard x 93.16-106.84, y 29.45-46.55; antenna keep-out lands at y 40.9-46.3,
 # facing the free y=48 edge. Everything below is placed clear of that box.
-put("J1","Connector_USB","USB_C_Receptacle_HRO_TYPE-C-31-M-12", 80.0, 45.0, 180,
-    "USB-C 16P", bottom=True)                   # bottom side: plug enters from the back
+put("J1","Connector_USB","USB_C_Receptacle_HRO_TYPE-C-31-M-12", 80.0, 43.8, 0,
+    "USB-C 16P")   # TOP side. Horizontal receptacle: the plug still enters along the
+                   # board plane from the rear y=48 edge, so rear entry is unchanged and
+                   # the board goes back to single-sided assembly.
 put("U4","Package_TO_SOT_SMD","SOT-23-6", 89.2, 41.5, 0, "USBLC6-2SC6")
-put("R1",*R0402, 83.0, 38.5, 0, "5k1"); put("R2",*R0402, 85.5, 38.5, 0, "5k1")
+put("R1",*R0402, 87.5, 45.5, 0, "5k1"); put("R2",*R0402, 90.5, 45.5, 0, "5k1")
 put("C1","Capacitor_SMD","CP_Elec_8x10", 80.0, 25.0, 0, "470uF/10V")
 put("SW1","Button_Switch_SMD","SW_SPST_EVQP7C", 90.0, 24.0, 0, "BOOT")
 put("F1","Resistor_SMD","R_1812_4532Metric", 98.0, 23.0, 0, "PPTC 2A/4A")
@@ -147,15 +149,20 @@ def seg(x1,y1,x2,y2):
     s.SetLayer(pcbnew.Edge_Cuts); s.SetWidth(MM(0.1)); board.Add(s)
 
 # Outline: strip with the bulge hanging off the y=20 edge. LED row never interrupted.
-for a in [(0,0,W,0),(W,0,W,H),(W,H,PX2,H),(PX2,H,PX2,BY),(PX2,BY,BX1,BY),
-          (BX1,BY,BX1,H),(BX1,H,0,H),(0,H,0,0)]:
+PY1 = 22.0                                  # pad section starts here; y 20-22 is a notch
+# Boundary, traced once: strip, then down the bulge's right edge, around the notch,
+# round the pad, along the bottom, up the bulge's left edge, back along the strip.
+for a in [(0,0,W,0),(W,0,W,H),(W,H,PX1,H),(PX1,H,PX1,PY1),(PX1,PY1,PX2,PY1),
+          (PX2,PY1,PX2,BY),(PX2,BY,BX1,BY),(BX1,BY,BX1,H),(BX1,H,0,H),(0,H,0,0)]:
     seg(*a)
-# Break line runs vertically between bulge and pad tab. Webs sit exactly where the
-# SENSE and GND terminals cross it, as before.
-BITES=[(28.0,1.8),(41.0,1.8)]
-edges=[20.35]
-for cy,w in BITES: edges += [cy-w/2, cy+w/2]
-edges.append(BY-0.35)
+
+# Break line: one edge only, x=120 between bulge and pad. Retained by two 0.9 mm webs
+# carrying SENSE and GND plus two 0.4 mm corner ligaments - about 2.6 mm against rev C's
+# 4.3 mm, and the notch above leaves the pad cantilevered so it can be gripped and bent.
+WEB = 1.3
+edges=[PY1+0.4]
+for cy in (28.0, 41.0): edges += [cy-WEB/2, cy+WEB/2]
+edges.append(BY-0.4)
 for i in range(0,len(edges),2):
     y1,y2 = edges[i], edges[i+1]
     if y2-y1 > 0.05:
