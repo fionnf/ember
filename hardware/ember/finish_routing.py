@@ -117,7 +117,7 @@ if p10: track(p10[0], p10[1], p10[0], p10[1]-1.2, "EN")
 
 # 5. Pads the pour cannot reach with thermal spokes get a solid tie instead - they are
 # already fed by a via, and a starved spoke is an error rather than a connection.
-for ref,pn in [("C8","2"),("C9","2"),("SW1","2"),("U3","2"),("U2","1"),("U2","3"),("U4","2"),("R10","2"),("TP4","1"),("TP3","1")]:
+for ref,pn in [("C8","2"),("C9","2"),("SW1","2"),("U3","2"),("U2","1"),("U2","3"),("U4","2"),("R10","2"),("R8","2"),("TP4","1"),("TP3","1"),("I4","1"),("R1","2"),("TS5","1"),("R2","2")]:
     fp = board.FindFootprintByReference(ref)
     if fp:
         for pdx in fp.Pads():

@@ -23,7 +23,7 @@ PART = {
  "ESP32-C3-MINI-1-N4": ("C2838502","Extended. 26k stock, $3.84 - doc modelled $2.92, budget ~$0.9/board more"),
  "SN74AHCT1G125": ("C7484",  "AHCT/HCT ONLY. C7468 is AHC and fixes nothing - two digits apart"),
  "AO3401A":    ("C15127",    "P-FET. Source to INPUT side, drain to load"),
- "USB-C 16P":  ("C165948",   "TOP side, horizontal - plug enters from the rear board edge"),
+ "USB-C 16P":  ("C165948",   "HRO TYPE-C-31-M-12, 90k stock, $0.186. The $0.087 GT-USB-7010ASV was rejected: its footprint has 0.175 mm copper-to-hole, under JLC's 0.25 mm minimum. TOP side, plug enters from the rear board edge"),
  "SK6812RGBW": ("C5378724",  "SKC6812RGBW-WS = WARM WHITE (the -NW suffix, C5348912, is neutral and would fight BASE_WARM_WHITE). *** STOCK NOT VERIFIED - section 9.1 number one live risk. 4-channel RGBW, GRBW order. An RGB part fits the same footprint and is silently wrong ***"),
 }
 

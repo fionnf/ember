@@ -33,7 +33,7 @@ def N(name):
     if name not in nets:
         ni = pcbnew.NETINFO_ITEM(board, name); board.Add(ni); nets[name] = ni
     return nets[name]
-for n in ["GND","VBUS_RAW","VBUS_F","+5V","LED_5V","+3V3","GATE","EN","CC1","CC2",
+for n in ["I2C_SDA","I2C_SCL","GND","VBUS_RAW","VBUS_F","+5V","LED_5V","+3V3","GATE","EN","CC1","CC2",
           "USB_DP_CONN","USB_DM_CONN","USB_DP","USB_DM","LED_DATA_3V3","LED_DATA_5V",
           "LED_DIN1","LD11_DOUT","TOUCH_GPIO","TOUCH_SENSE","BOOT_N","STRAP2","STRAP8",
           "UART_TX","UART_RX"]: N(n)
@@ -66,6 +66,9 @@ for i, x in enumerate(LED_X, start=1):
 # U1 moves aside so the USB-C can sit dead centre in the bulge. Its antenna keep-out
 # then lands at y 40.9-46.3 facing the free y=52 edge, 23.9 mm from any LED copper.
 put("U1","Espressif","ESP32-C3-MINI-1", 115.0, 38.0, 180, "ESP32-C3-MINI-1-N4")
+# Stays on the HRO TYPE-C-31-M-12 (C165948) despite costing $0.10 more. The cheaper
+# GT-USB-7010ASV footprint puts its own mounting posts 0.175 mm from its own GND pads,
+# under JLC's 0.25 mm hole-to-copper minimum - not worth a fab flag on the power inlet.
 put("J1","Connector_USB","USB_C_Receptacle_HRO_TYPE-C-31-M-12", 98.0, 49.0, 0, "USB-C 16P")
 
 put("C1","Capacitor_SMD","CP_Elec_8x10", 73.0, 24.5, 0, "470uF/10V")
@@ -112,6 +115,16 @@ fp = put("J4", *JST3, 78.0, 46.0, 0, "IO/VCC/GND")
 for pd in fp.Pads():
     pd.SetNet(N({"1":"TOUCH_SENSE","2":"+3V3","3":"GND"}.get(pd.GetNumber(),"GND")))
 
+# I2C expansion pads on two spare GPIOs. Four solder pads, no connector, no BOM line:
+# whatever sensor turns out to be wanted later plugs in here instead of needing a respin.
+# Sited directly above IO4 and IO10 on the module's top edge, in the gap between the
+# regulator row and the module. A pad row on the far side of the board needed a B.Cu
+# jumper straight through the antenna keep-out; here the runs are a few millimetres.
+for ref,(xx,yy,net) in {"I4":(105.5,27.3,"GND"),    "I3":(108.0,27.3,"+3V3"),
+                        "I1":(110.5,27.3,"I2C_SDA"),"I2":(113.0,27.3,"I2C_SCL")}.items():
+    fp = put(ref,"TestPoint","TestPoint_Pad_D1.0mm", xx, yy, 0, net)
+    for pd in fp.Pads(): pd.SetNet(N(net))
+
 # Same order in solder terminals, for when no JST housing is to hand.
 for ref,(xx,yy,net) in {"TS3":(99.0,35.5,"TOUCH_SENSE"), "TS4":(102.0,35.5,"+3V3"),
                         "TS5":(105.0,35.5,"GND")}.items():
@@ -142,7 +155,7 @@ CONN = {
  ("SW1","1"):"BOOT_N", ("SW1","2"):"GND",
 }
 PAD = json.load(open(PADMAP))
-for sig, net in (("IO5","LED_DATA_3V3"),("IO3","TOUCH_GPIO"),("IO2","STRAP2"),
+for sig, net in (("IO4","I2C_SDA"),("IO10","I2C_SCL"),("IO5","LED_DATA_3V3"),("IO3","TOUCH_GPIO"),("IO2","STRAP2"),
                  ("IO8","STRAP8"),("IO9","BOOT_N"),("IO18","USB_DM"),("IO19","USB_DP"),
                  ("IO20","UART_RX"),("IO21","UART_TX"),("EN","EN"),("3V3","+3V3")):
     CONN[("U1", PAD[sig])] = net
@@ -205,6 +218,7 @@ silk("EMBER", 93.5, 3.2, 2.4, 0.36)
 silk(f"EM-15 {VERSION}   \u00b7   {COPYRIGHT}", 93.5, 6.0, 0.9, 0.16)
 silk("EMBER", 96.0, 51.0, 0.8, 0.15)
 silk("TTP223  IO VCC GND", 102.0, 37.6, 0.8, 0.15)
+silk("I2C GND 3V3 SDA SCL", 109.0, 25.6, 0.8, 0.15)
 
 pcbnew.SaveBoard(OUT, board)
 print("PLACED:", len(placed), " NETS:", len(nets),
