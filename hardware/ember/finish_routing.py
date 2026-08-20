@@ -180,5 +180,19 @@ tp5 = pad("TP5","1")
 if tp5:
     track(tp5[0], tp5[1], tp5[0], 18.6, "LED_DIN1", 0.25)   # onto the DIN lane
 
+# 9. Vias too close to each other. JLC wants >= 0.5 mm hole-to-hole; the stitching grid
+# and the per-pad vias can land almost on top of one another. Drop the later of any pair.
+vias = [t for t in board.GetTracks() if isinstance(t, pcbnew.PCB_VIA)]
+dropped = 0
+for i, v1 in enumerate(vias):
+    if v1.GetParentGroup() is None and v1 not in board.GetTracks(): continue
+    p1 = v1.GetPosition()
+    for v2 in vias[i+1:]:
+        p2 = v2.GetPosition()
+        d = (((p1.x-p2.x)/1e6)**2 + ((p1.y-p2.y)/1e6)**2) ** 0.5
+        if d < 0.75 and v2 in board.GetTracks():
+            board.Remove(v2); dropped += 1
+if dropped: print(f"removed {dropped} vias closer than 0.75 mm to a neighbour")
+
 pcbnew.SaveBoard(B, board)
 print(f"widened {widened} tracks to {MIN_W} mm; placed {placed_vias} ground vias")
