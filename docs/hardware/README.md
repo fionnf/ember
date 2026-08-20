@@ -1058,7 +1058,7 @@ Component subtotal per board: **@10 $5.62, @100 $4.43, @500 $4.34**, before attr
 
 **PCB:** 2 layer, FR-4, standard T_g, **1.6 mm**, **1 oz**, **HASL with lead**, **white mask / black silk**, 2.0 mm routed inter-board slots, internal break slot and NPTH mouse bites, order number "specify a location" on a rail (free; removal costs ~$1.50).
 
-**Assembly:** JLCPCB Economic PCBA, single-sided. Published rates: setup $8.18, stencil $1.53, $0.0016/joint, $3.07 per unique Extended part, $0.00 for Basic. Assuming 5 Extended lines:
+**Assembly:** JLCPCB **Standard** PCBA, single-sided. (This section originally modelled Economic. It is not available: the SK6812s are MSL 3 and need baking, which §7.7 predicted and the first order confirmed. Standard adds ~$25 setup and charges a loading fee on every component, not only Extended ones, so **every figure below is optimistic** and must be re-quoted before a volume order.) Published Economic rates were: Published rates: setup $8.18, stencil $1.53, $0.0016/joint, $3.07 per unique Extended part, $0.00 for Basic. Assuming 5 Extended lines:
 
 ```
 fixed    = 8.18 + 1.53 + 5 x 3.07 = $25.06
@@ -1155,7 +1155,7 @@ At qty 10, fixed cost is 89 % of the assembly bill and ~45 % of the landed total
 
 **PCB tab.** 2 layers, dimensions should auto-read **282 × 140 mm** — check it. Delivery format **Panel by Customer**, break-away rail **yes** (we drew our own), **PCB Qty = number of panels, not boards** — check the summary says "5 panels / 30 single boards" and not 5 boards. 1.6 mm, White mask / Black silk, HASL with lead, 1 oz, no gold fingers / castellated / edge plating, tented vias, order number "specify a location", **Confirm Production File = Yes** (worth the day it costs on a first article).
 
-**Assembly tab.** Economic, Top Side, PCBA Qty in boards, tooling holes "Added by Customer", leaded solder paste if offered, **Confirm Parts Placement = Yes**.
+**Assembly tab.** **Standard** (Economic is not offered for this BOM — see §9.2), Top Side, PCBA Qty in boards, tooling holes "Added by Customer", leaded solder paste if offered, **Confirm Parts Placement = Yes**.
 
 **The parts review screen is where boards get killed.** Resolve every "part not found". Never accept a JLC-suggested alternative silently. On the LED line add: *"D1–D11 must be SKC6812RGBW-WS (C5378724), 4-channel RGBW, GRBW data order. Do NOT substitute an RGB (3-channel) part — it is footprint-compatible and functionally wrong."* Confirm the buffer line shows C7484 / SN74AHCT1G125DBVR.
 

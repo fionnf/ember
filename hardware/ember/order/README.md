@@ -28,7 +28,18 @@ trimmed to the four columns JLC's parser wants.
 
 **Assembly tab**
 
-- **Economic PCBA**, **Top side only** (there is nothing on the bottom)
+- **Standard PCBA**, **Top side only** (there is nothing on the bottom)
+
+  Not a choice: JLC forces Standard here. The SK6812 LEDs are MSL 3 and the ESP32-C3
+  module is moisture-sensitive too, so both need **baking before reflow** — a process
+  step the Economic line does not run. §7.7 of the design doc called this before the
+  first order was ever placed.
+
+  What it costs: roughly **+$25 setup**, and a loading fee on *every* component rather
+  than only the Extended ones. That erases most of the value of the four BASIC lines,
+  though those still guarantee stock and no MOQ, which was the real reason for them.
+  At 5 boards fixed cost dominates anyway. One consolation: double-sided assembly is
+  no longer a premium, so a future revision can use the back for free.
 - Tooling holes: **Added by JLCPCB**
 - **Confirm Parts Placement: YES**
 
