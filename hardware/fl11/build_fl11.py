@@ -12,6 +12,7 @@ KI = os.path.expanduser("~/Applications/KiCad.app/Contents/SharedSupport/footpri
 VERSION  = "rev E"
 DESIGNER = "Fionn Ferreira"
 REPO     = "github.com/fionnf/linked-friend-lights-public"
+COPYRIGHT= "\u00a9 2026 Fionn Ferreira"
 
 W, H = 187.0, 20.0
 BX1, BX2, BY = 72.0, 120.0, 48.0          # electronics bulge
@@ -82,15 +83,23 @@ put("R6",*R0402, 114.5, 36.0, 0, "5k1")
 put("H1","MountingHole","MountingHole_2.7mm_M2.5", 76.5, 34.0, 0, "M2.5")
 put("H2","MountingHole","MountingHole_2.7mm_M2.5", 114.0, 43.0, 0, "M2.5")
 
-TP = {"TP1":("LED_5V",116.0,21.0),"TP2":("+3V3",118.0,30.5),"TP3":("GND",118.0,33.0),
+TP = {"TP1":("LED_5V",116.0,21.0),"TP2":("+3V3",109.5,47.0),"TP3":("GND",112.5,47.0),
       "TP4":("GND",122.5,44.5),"TP5":("LED_DIN1",80.0,37.0),"TP6":("TOUCH_SENSE",106.5,27.0),
       "TP7":("LD11_DOUT",183.0,15.5),"TP8":("UART_TX",108.5,39.5),"TP9":("UART_RX",108.5,42.0),
       "TP10":("EN",108.5,44.5),"TP11":("VBUS_F",93.5,21.5)}
 for ref,(net,x,y) in TP.items():
     fp = put(ref,"TestPoint","TestPoint_Pad_D1.0mm", x, y, 0, net)
     for p in fp.Pads(): p.SetNet(N(net))
+# J4 - fallback header. If the etched sensor ever disappoints, a commercial module
+# (TTP223 class) wires here: it needs a supply, a ground and one digital output, and
+# TOUCH_GPIO doubles as that input because touch.py's pin is plain digital.
+for idx,(yy,net,lbl) in enumerate(((31.0,"+5V","5V"),(33.5,"+3V3","3V3"),
+                                   (36.0,"GND","GND"),(38.5,"TOUCH_GPIO","SIG")), start=1):
+    fp = put(f"J4_{idx}","TestPoint","TestPoint_Pad_D1.0mm", 118.5, yy, 0, lbl)
+    for pd in fp.Pads(): pd.SetNet(N(net))
+
 for ref, x in (("J2",117.5),("J3",128.0)):
-    for idx,(yy,net) in enumerate(((28.0,"TOUCH_SENSE"),(41.0,"GND")), start=1):
+    for idx,(yy,net) in enumerate(((28.0,"TOUCH_SENSE"),(46.0,"GND")), start=1):
         fp = put(f"{ref}_{idx}","TestPoint","TestPoint_Pad_D1.0mm", x, yy, 0, net)
         for p in fp.Pads(): p.SetNet(N(net))
 
@@ -161,13 +170,30 @@ for a in [(0,0,W,0),(W,0,W,H),(W,H,PX1,H),(PX1,H,PX1,PY1),(PX1,PY1,PX2,PY1),
 # 4.3 mm, and the notch above leaves the pad cantilevered so it can be gripped and bent.
 WEB = 1.3
 edges=[PY1+0.4]
-for cy in (28.0, 41.0): edges += [cy-WEB/2, cy+WEB/2]
+for cy in (28.0, 46.0): edges += [cy-WEB/2, cy+WEB/2]
 edges.append(BY-0.4)
 for i in range(0,len(edges),2):
     y1,y2 = edges[i], edges[i+1]
     if y2-y1 > 0.05:
         seg(SLOT_X-0.4,y1,SLOT_X-0.4,y2); seg(SLOT_X+0.4,y1,SLOT_X+0.4,y2)
         seg(SLOT_X-0.4,y1,SLOT_X+0.4,y1); seg(SLOT_X-0.4,y2,SLOT_X+0.4,y2)
+
+# ── Silkscreen: identity, and it must survive the pad being snapped off
+def silk(txt, x, y, size=0.9, thick=0.15, layer=pcbnew.F_SilkS):
+    t = pcbnew.PCB_TEXT(board); t.SetText(txt)
+    t.SetPosition(VECTOR2I(MM(x), MM(y))); t.SetLayer(layer)
+    t.SetTextSize(VECTOR2I(MM(size), MM(size))); t.SetTextThickness(MM(thick))
+    t.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_CENTER)
+    board.Add(t); return t
+
+silk("LINKED FRIEND LIGHTS", 55.0, 18.4, 1.1, 0.18)
+silk(f"FL-11  {VERSION}   \u00b7   {COPYRIGHT}", 55.0, 19.6, 0.8, 0.13)
+silk(f"FL-11 {VERSION}  \u00b7  {COPYRIGHT}", 88.0, 20.6, 0.8, 0.13)
+silk(REPO, 96.0, 47.3, 0.8, 0.13)
+silk("5V 3V3 GND SIG", 115.0, 34.8, 0.6, 0.10)
+silk(f"FL-11 {VERSION} TOUCH", 134.5, 21.4, 0.7, 0.12)
+silk(COPYRIGHT, 134.5, 47.0, 0.6, 0.11)
+silk("CUT TRACES, THEN BEND", 134.5, 20.0, 0.6, 0.11)
 
 pcbnew.SaveBoard(OUT, board)
 print("PLACED:", len(placed), " NETS:", len(nets),

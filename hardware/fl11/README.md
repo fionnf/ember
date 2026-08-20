@@ -1,6 +1,6 @@
-# FL-11 rev D — KiCad project
+# FL-11 rev E — KiCad project
 
-**Linked Friend Lights · FL-11 rev D · designed by Fionn Ferreira**
+**Linked Friend Lights · FL-11 rev E · © 2026 Fionn Ferreira**
 <https://github.com/fionnf/linked-friend-lights-public>
 
 Generated from [`../../docs/hardware/README.md`](../../docs/hardware/README.md).
@@ -45,6 +45,26 @@ Deleting the end tab also removed the 31 mm tab, the gap, and the strip's break 
 **Cost.** Still one bottom-side part (J1), so the second-setup charge stands at roughly
 **+$0.63/unit at qty 100**. The outline is a T with a notch, so the 6-up panel still needs
 re-nesting and re-quoting.
+
+## rev E
+
+**Interdigitated touch electrodes.** Two solid plates couple mostly through the overlay's
+thickness. A comb pushes the field *out* of the surface as fringing, which is what a finger
+behind plastic actually intercepts — so sensitivity through a thin cover goes up sharply and
+degrades gracefully as the cover thickens. Finger pitch is 3.0 mm with 1.1 mm fingers, so a
+~10 mm fingertip always spans several SENSE/GND pairs. Seven fingers per electrode, a SENSE
+spine at the break edge and a GND spine plus return bar, still with no copper on B.Cu beneath.
+
+**J4 — commercial-sensor fallback.** Four pads (`5V`, `3V3`, `GND`, `SIG`) beside the break.
+If the etched sensor ever disappoints, a TTP223-class module wires straight in: it needs a
+supply, a ground and one digital output, and `TOUCH_GPIO` doubles as that input because
+`touch.py`'s pin is plain digital, not ADC. Both supply rails are brought out because those
+modules come in 3.3 V and 5 V variants. Zero placements, zero BOM lines.
+
+**Silkscreen.** Version, `© 2026 Fionn Ferreira` and the repo URL, with the copyright
+repeated on the snap-off pad so it stays identified after the break. This was claimed in the
+rev C and rev D commit messages but the calls had been lost in an earlier edit and were not
+actually on the board — they are now.
 
 ## rev D
 

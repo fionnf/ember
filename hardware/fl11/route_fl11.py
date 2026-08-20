@@ -48,9 +48,22 @@ rect(pcbnew.F_Cu, "GND", 73.5, 37.5, 86.5, 47.6, prio=3, solid=True)
 rect(pcbnew.F_Cu, "LED_5V", 84.0, 16.5, 97.0, 29.5, prio=2)
 # Touch pad, on the snap-off section. Electrodes 17 x 12 = 204 mm2 each, guard ring
 # on the far edge, no copper on B.Cu beneath either.
-rect(pcbnew.F_Cu, "TOUCH_SENSE", 126.0, 22.0, 143.0, 34.0, prio=1, solid=True)
-rect(pcbnew.F_Cu, "GND",         126.0, 35.4, 143.0, 47.4, prio=1)
-rect(pcbnew.F_Cu, "GND",         143.6, 22.0, 144.6, 47.4, prio=2)
+# Interdigitated electrodes. Two solid plates couple mostly through the plastic's
+# thickness; a comb pushes the field OUT of the surface as fringing, which is what a
+# finger behind an overlay actually intercepts. Finger pitch 3.0 mm means a ~10 mm
+# fingertip always spans several SENSE/GND pairs, so the delta stays large through a
+# thin cover and degrades gracefully as the overlay thickens.
+FP, FH = 3.0, 1.1                                   # finger pitch and height
+# Fingers and the return bar sit at a different priority to the spines so their
+# deliberate overlap resolves instead of reading as a same-net zone intersection.
+rect(pcbnew.F_Cu, "TOUCH_SENSE", 126.0, 24.0, 127.2, 44.8, prio=1, solid=True)   # spine
+rect(pcbnew.F_Cu, "GND",         141.8, 24.0, 143.0, 46.6, prio=1)               # spine
+rect(pcbnew.F_Cu, "GND",         126.0, 45.4, 143.0, 46.6, prio=2)               # return bar
+for k in range(7):
+    y = 24.6 + FP*k
+    rect(pcbnew.F_Cu, "TOUCH_SENSE", 127.0, y, 140.6, y+FH, prio=2, solid=True)
+    y = 26.1 + FP*k
+    rect(pcbnew.F_Cu, "GND",         128.4, y, 142.0, y+FH, prio=2)
 
 def pad(ref, num):
     fp = board.FindFootprintByReference(ref)
@@ -86,8 +99,8 @@ for i in range(1,12):
 sx,sy = pad("R7","2"); jx,jy = pad("J2_1","1")
 track(sx,sy, jx,sy, "TOUCH_SENSE", 0.30); track(jx,sy, jx,jy, "TOUCH_SENSE", 0.30)
 tx,ty = pad("TP6","1"); track(tx,ty, tx,sy, "TOUCH_SENSE", 0.30); routed += 3
-track(jx,jy, 130.0,jy, "TOUCH_SENSE", 0.30); routed += 1        # across the web
-gx,gy = pad("J2_2","1"); track(gx,gy, 130.0,gy, "GND", 0.30); routed += 1
+track(jx,jy, 127.0,jy, "TOUCH_SENSE", 0.30); routed += 1        # across the web onto the spine
+gx,gy = pad("J2_2","1"); track(gx,gy, 127.0,gy, "GND", 0.30); routed += 1
 # Stitch the bulge GND pour to the bottom plane
 for vx,vy in [(76.0,29.5),(76.0,44.0),(88.0,45.5),(117.0,22.0),(117.0,45.5)]:
     via(vx,vy,"GND"); routed += 1
