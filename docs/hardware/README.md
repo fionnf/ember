@@ -1,5 +1,16 @@
 # FL-11 — integrated lamp board
 
+**Linked Friend Lights · FL-11 rev B · designed by Fionn Ferreira**
+<https://github.com/fionnf/linked-friend-lights-public>
+
+> **rev B supersedes the geometry below.** The electronics moved off the end of the strip
+> into a rear bulge at the middle so the USB-C plugs in from the back; the LED row stayed
+> continuous. The board is now a 228 × 20 mm strip with a 48 × 28 mm bulge, not 282 × 20.
+> Everything else — the schematic, the BOM, the power budget, the bring-up plan — is
+> unchanged, with two exceptions noted in [`../../hardware/fl11/README.md`](../../hardware/fl11/README.md):
+> `R11` becomes 100 Ω, and SENSE runs in a guarded y=18.6 lane. The built KiCad project
+> is in `hardware/fl11/`.
+
 This is the hardware design for a single PCB that replaces the discrete build (Pico W + separate SK6812 strip + a foil touch pad on a wire). One piece of FR4 carries the MCU, the radio, eleven SK6812 RGBW LEDs at standard 60 LED/m pitch, power input and protection, and a capacitive touch pad on a break-away tab. It is designed to be ordered from JLCPCB as a panel, assembled turnkey with no hand-soldering and no per-unit calibration, and to run the existing MicroPython firmware with a six-line `config.py` change and one rewritten driver file.
 
 The optimisation target is **total landed cost per assembled board at qty 100**, subject to a hard floor: it has to work on the first batch. A board that needs rework, per-unit tuning, or a revision spin is not cheap at any BOM price. Everything below states what a choice cost and what would break if it were deleted.
@@ -510,7 +521,7 @@ J2 doubles as a SENSE + GND probe point at the far end.
 
 ### 7.0 Board drawing
 
-![FL-11 top view, drawn to scale](fl11-board.svg)
+![FL-11 rev B, drawn to scale](fl11-board.svg)
 
 Top view, to scale. LED centres, pitch, pad extents, break slot, mounting holes and the copper
 bands are the specified values from the sections below. Head-section parts are indicative — this
