@@ -15,3 +15,6 @@ networks.json
 # KiCad local state
 *.kicad_prl
 *-backups/
+
+# Editor local history
+.history/
