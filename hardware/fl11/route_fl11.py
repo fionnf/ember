@@ -38,49 +38,22 @@ rect(pcbnew.F_Cu, "LED_5V", 0.4, 12.40, 186.6, 17.00, prio=1)
 zone(pcbnew.B_Cu, "GND", [(0.4,0.4),(186.6,0.4),(186.6,19.6),(129.6,19.6),
                           (129.6,51.6),(66.4,51.6),(66.4,19.6),(0.4,19.6)], prio=0, solid=True)
 # Bulge: GND everywhere, with a 5 V island that reaches up into the strip pour to merge.
-rect(pcbnew.F_Cu, "GND",    66.4, 20.0, 129.6, 51.6, prio=0)
+# The module has three unassigned GPIO pads. Rather than let the general pour crowd
+# them, the solid patch owns the whole module area and the general pour works around it.
+rect(pcbnew.F_Cu, "GND",    66.4, 20.0, 106.0, 51.6, prio=0)
+rect(pcbnew.F_Cu, "GND",   124.0, 20.0, 129.6, 51.6, prio=1)
+rect(pcbnew.F_Cu, "GND",   106.0, 20.0, 124.0,  27.0, prio=2)
 # U1's thermal pad wants a solid tie; the rest of the bulge keeps thermal relief so the
 # 0402s do not tombstone (§7.7).
-rect(pcbnew.F_Cu, "GND", 91.0, 29.0, 105.0, 47.0, prio=3, solid=True)
+rect(pcbnew.F_Cu, "GND", 106.0, 27.0, 124.0, 49.0, prio=3, solid=True)
 # J1's shield pads are large PTH; give them a solid tie too, without removing thermal
 # relief from the 0402s elsewhere in the bulge.
-rect(pcbnew.F_Cu, "GND", 74.0, 42.0, 88.5, 51.6, prio=3, solid=True)
+rect(pcbnew.F_Cu, "GND", 91.0, 42.0, 105.0, 51.6, prio=3, solid=True)
 # prio 2 so the overlap with the strip pour resolves instead of reading as an intersect
 rect(pcbnew.F_Cu, "LED_5V", 84.0, 16.5, 97.0, 29.5, prio=2)
 # Touch pad, on the snap-off section. Electrodes 17 x 12 = 204 mm2 each, guard ring
 # on the far edge, no copper on B.Cu beneath either.
-# Interdigitated electrodes. Two solid plates couple mostly through the plastic's
-# thickness; a comb pushes the field OUT of the surface as fringing, which is what a
-# finger behind an overlay actually intercepts. Finger pitch 3.0 mm means a ~10 mm
-# fingertip always spans several SENSE/GND pairs, so the delta stays large through a
-# thin cover and degrades gracefully as the overlay thickens.
-# Interdigitated electrodes. Two solid plates couple mostly through the overlay's
-# thickness; a comb pushes the field OUT of the surface as fringing, which is what a
-# finger behind plastic actually intercepts. Pitch 3.0 mm with 1.1 mm fingers means a
-# ~10 mm fingertip always spans several SENSE/GND pairs.
-#
-# Each electrode is ONE polygon. Built as overlapping rectangles they filled as separate
-# zones and the priority clipping severed every GND finger from its spine - eight
-# isolated islands and a dead half of the sensor.
-FP, FH, NF = 3.0, 1.1, 7
-SX, SW, SXF = 136.0, 1.2, 150.6      # SENSE spine x, width, finger tip
-GX, GW, GXF = 153.0, 1.2, 138.4      # GND spine x (right), width, finger tip
-TOP, SBOT   = 29.0, 47.0
-BAR_T, BAR_B = 47.6, 48.8            # GND return bar, brings GND back to the break edge
-
-pts = [(SX, TOP), (SX+SW, TOP)]
-for k in range(NF):
-    ft = 29.6 + FP*k
-    pts += [(SX+SW, ft), (SXF, ft), (SXF, ft+FH), (SX+SW, ft+FH)]
-pts += [(SX+SW, SBOT), (SX, SBOT)]
-zone(pcbnew.F_Cu, "TOUCH_SENSE", pts, prio=1, solid=True)
-
-pts = [(GX, TOP), (GX-GW, TOP)]
-for k in range(NF):
-    ft = 31.1 + FP*k
-    pts += [(GX-GW, ft), (GXF, ft), (GXF, ft+FH), (GX-GW, ft+FH)]
-pts += [(GX-GW, BAR_T), (SX, BAR_T), (SX, BAR_B), (GX, BAR_B)]
-zone(pcbnew.F_Cu, "GND", pts, prio=1, solid=True)   # solid: nothing to tombstone on the pad section
+# rev I: no etched electrodes - a TTP223 module on J4 does the sensing.
 
 def pad(ref, num):
     fp = board.FindFootprintByReference(ref)
@@ -100,7 +73,7 @@ for i in range(1, NLED):
 # DIN must NOT share the y=11 data channel - it would cross every hop. It runs
 # below the 5 V pour at y=18.6, then climbs at x=4.0, clear of LD1's body.
 x,y = pad("R11","2"); dx,dy = pad("LD1","4")
-DIN_Y, DIN_X, EXIT = 18.6, 4.0, 89.0
+DIN_Y, DIN_X, EXIT = 18.6, 2.5, 79.0   # x=2.5 clears the new end screw at x=6
 track(x,y, EXIT,y, "LED_DIN1"); track(EXIT,y, EXIT,DIN_Y, "LED_DIN1")
 track(EXIT,DIN_Y, DIN_X,DIN_Y, "LED_DIN1"); track(DIN_X,DIN_Y, DIN_X,dy, "LED_DIN1")
 track(DIN_X,dy, dx,dy, "LED_DIN1"); routed += 5
@@ -113,36 +86,9 @@ for i in range(1, NLED+1):
 # ── SENSE. In rev C this is ~13 mm inside the bulge instead of ~70 mm down the strip:
 # it never crosses the LED data channel and never runs beside the 5 V rail. It sits in
 # the bulge GND pour, which is the guard.
-sx,sy = pad("R7","2"); jx,jy = pad("J2","1"); gx,gy = pad("J2","2")
-# J2 pin 1 (SENSE) sits left of pin 2 (GND), and the mounting tabs block the way down,
-# so both nets exit UPWARD first. The lane order is what keeps them apart: the OUTER
-# lane serves the NEARER web, the inner lane the farther one, so the two paths nest
-# instead of crossing.
-track(gx,gy, gx,20.6, "GND", 0.30); track(gx,20.6, 128.8,20.6, "GND", 0.30)
-track(128.8,20.6, 128.8,32.0, "GND", 0.30); track(128.8,32.0, 133.0,32.0, "GND", 0.30)
-# GND cannot reach its fingers on the top layer - the SENSE spine (x 136-137.2) is in
-# the way for the full height of the comb. It drops to B.Cu, runs down the pad
-# section's bare left margin, and comes up into the GND return bar under the comb.
-via(133.0,32.0,"GND"); via(133.0,48.6,"GND")
-track(133.0,32.0, 133.0,48.6, "GND", 0.30, pcbnew.B_Cu)
-track(133.0,48.6, 140.0,48.6, "GND", 0.30); routed += 6
-# SENSE exits LEFT and drops down its own lane at x=117.5, clear of J2's mounting tab
-# at 119.15. GND goes up and over at y=20.6. That ordering is what stops them meeting.
-track(jx,jy, 117.5,jy, "TOUCH_SENSE", 0.30); track(117.5,jy, 117.5,35.5, "TOUCH_SENSE", 0.30)
-track(117.5,35.5, 137.0,35.5, "TOUCH_SENSE", 0.30); routed += 3   # onto the SENSE spine
-
-# Back-side solder terminals, for wiring the pad from either face. Each is a pad on
-# B.Cu with a via up to its bridge. Note this puts ONE via on SENSE, which §7.1 asks
-# to avoid - it is a deliberate, inspectable feature rather than a routing artifact,
-# and the boot-time baseline calibrates its ~0.5 pF away.
-# SENSE's terminal hangs off the spine well below the bridge corridor, where the GND
-# path cannot reach it; GND's sits on its own bridge.
-via(134.5, 44.0, "TOUCH_SENSE"); via(131.5, 32.0, "GND"); routed += 2
-track(136.4, 44.0, 134.5, 44.0, "TOUCH_SENSE", 0.30)
-track(131.5, 32.0, 133.0, 32.0, "GND", 0.30); routed += 2
-tsx,tsy = pad("TS1","1")
-track(tsx,tsy, tsx,24.5, "TOUCH_SENSE", 0.30); track(tsx,24.5, 117.5,24.5, "TOUCH_SENSE", 0.30)
-routed += 2
+# R7 stays in series between the module's IO pin and the GPIO; the rest of the touch
+# net is now just a short hop to the plug, which the autorouter finishes.
+sx,sy = pad("R7","2"); track(sx,sy, sx,29.0, "TOUCH_SENSE", 0.30); routed += 1
 
 pcbnew.SaveBoard(B, board)
 print("zones:", len([z for z in board.Zones()]), " tracks/vias added:", routed)

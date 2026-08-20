@@ -13,8 +13,9 @@ PART = {
  "5k1":        ("C25905",    "BASIC. 8.4M stock, 1%"),
  "100k":       ("C25741",    "BASIC. 15.4M stock, 1%. Replaces C25086 - JLC now lists that Extended, 0 stock, MOQ 700"),
  "100R":       ("C25076",    "BASIC. 9.8M stock"),
- "4M7":        ("C474132",   "Extended - no BASIC 4.7M exists in 0402. 389k stock. Replaces C49655641 (9.8k). Do NOT drop to 1M"),
+ 
  "470uF/10V":  ("C47023096", "Extended. 7.4k stock, D8 x 10.5mm - thinnest stock on the board after the LED"),
+ "IO/VCC/GND": ("",          "*** FILL IN: JST-PH 3-pin SMD right-angle, S3B-PH-SM4-TB class. Not verified against live stock ***"),
  "PPTC 2A/4A": ("C883156",   "Extended. BSMD1812-200-16V, 2A hold / 4A trip, 76k stock - the section 6.2 spec. At 15 LEDs worst case is ~1.69 A"),
  "USBLC6-2SC6":("C2687116",  "Extended. 150k stock"),
  "AP2112K-3.3":("C23380830", "Extended. 31k stock. EN ties to VIN, not VOUT"),

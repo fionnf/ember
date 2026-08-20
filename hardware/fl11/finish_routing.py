@@ -40,7 +40,7 @@ def pad(ref, num):
 # 2. Stitch every F.Cu ground region to the B.Cu plane. Without these the pours are
 # electrically separate islands even though they share a net name. Candidates are
 # filtered against existing copper and the antenna keep-out rather than trusted.
-ANT = (93.0, 40.5, 107.0, 46.7)      # module antenna keep-out, with margin
+ANT = (107.5, 40.4, 122.5, 46.8)     # module antenna keep-out (rev I position), with margin
 
 def seg_dist(px,py, x1,y1,x2,y2):
     dx,dy = x2-x1, y2-y1
@@ -59,7 +59,7 @@ for fp in board.Footprints():
     for pd in fp.Pads():
         v=pd.GetPosition(); obstacles.append((v.x/1e6,v.y/1e6,v.x/1e6,v.y/1e6, pd.GetNetname()))
 # Mounting holes are NPTH with no net, so they never appear as obstacles otherwise.
-for ref in ("H1","H2"):
+for ref in ("H1","H2","H3","H4"):
     fp = board.FindFootprintByReference(ref)
     if fp:
         v = fp.GetPosition(); x,y = v.x/1e6, v.y/1e6
@@ -69,7 +69,7 @@ EDGES = [(0,0,187,0),(187,0,187,20),(187,20,120,20),(120,20,120,22),(120,22,145,
          (145,22,145,48),(145,48,72,48),(72,48,72,20),(72,20,0,20),(0,20,0,0),
          (119.6,22,119.6,48),(120.4,22,120.4,48)]
 
-def clear_for_gnd(x,y, r=1.15):
+def clear_for_gnd(x,y, r=2.0):
     if ANT[0] <= x <= ANT[2] and ANT[1] <= y <= ANT[3]: return False
     for x1,y1,x2,y2 in EDGES:
         if seg_dist(x,y,x1,y1,x2,y2) < 1.1: return False
@@ -105,7 +105,7 @@ def place_gnd_via_near(x, y):
             return True
     return False
 
-for ref,pn in [("SW1","2"),("U3","2"),("U2","1"),("U2","3"),("U4","2"),
+for ref,pn in [("SW1","2"),("U3","2"),("U2","1"),("U2","3"),("U4","2"),("R10","2"),
                ("C8","2"),("C9","2"),("C2","2"),("C3","2"),("C4","2"),
                ("R1","2"),("R2","2"),("R3","2"),("R8","2"),("R10","2"),("C1","2"),("J4_3","1"),("TP3","1"),("TP4","1")]:
     p = pad(ref,pn)
@@ -117,7 +117,7 @@ if p10: track(p10[0], p10[1], p10[0], p10[1]-1.2, "EN")
 
 # 5. Pads the pour cannot reach with thermal spokes get a solid tie instead - they are
 # already fed by a via, and a starved spoke is an error rather than a connection.
-for ref,pn in [("C8","2"),("C9","2"),("SW1","2"),("U3","2"),("U2","1"),("U2","3"),("U4","2")]:
+for ref,pn in [("C8","2"),("C9","2"),("SW1","2"),("U3","2"),("U2","1"),("U2","3"),("U4","2"),("R10","2"),("TP4","1"),("TP3","1")]:
     fp = board.FindFootprintByReference(ref)
     if fp:
         for pdx in fp.Pads():

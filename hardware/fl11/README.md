@@ -1,6 +1,6 @@
-# FL-11 rev G — KiCad project
+# FL-11 rev I — KiCad project
 
-**Linked Friend Lights · FL-11 rev G · © 2026 Fionn Ferreira**
+**Linked Friend Lights · FL-11 rev I · © 2026 Fionn Ferreira**
 <https://github.com/fionnf/linked-friend-lights-public>
 
 Generated from [`../../docs/hardware/README.md`](../../docs/hardware/README.md).
@@ -45,6 +45,46 @@ Deleting the end tab also removed the 31 mm tab, the gap, and the strip's break 
 **Cost.** Still one bottom-side part (J1), so the second-setup charge stands at roughly
 **+$0.63/unit at qty 100**. The outline is a T with a notch, so the 6-up panel still needs
 re-nesting and re-quoting.
+
+## rev I — TTP223 module, and the etched sensor is gone
+
+The biggest simplification in the whole design. A **TTP223-class module plugs into J4**
+(pin order **IO / VCC / GND**) and does the sensing, which deletes:
+
+- the etched comb electrodes and their whole geometry problem
+- the snap-off pad section, the break line, the webs and both bridges
+- R10's 4.7 MΩ (now 100 k, a value already on the BOM) — **the thinnest-stock line is gone**
+- §7.5's entire uncertainty: the charge-time measurement, the per-unit threshold question,
+  the overlay-thickness dependence, the "least-certain subsystem in this design" note
+
+`touch.py` becomes a digital read instead of a timing loop.
+
+**VCC is 3V3, not 5V, deliberately.** These modules drive their output rail-to-rail and the
+ESP32-C3 is **not 5V tolerant** (3.6 V absolute max). At 3V3 the output is inherently safe,
+and R7's 5.1 kΩ stays in series as belt and braces. `TS3/TS4/TS5` repeat the same three
+signals as solder terminals for when no JST housing is to hand.
+
+**Centred geometry.** The LED row sits square on the strip — **15.567 mm of headroom at each
+end**, identical. The USB-C sits **dead centre of the bulge at x=98.0**; the module moved
+aside to x=115 to make room, which puts its antenna keep-out at y 40.9–46.3 facing the free
+y=52 edge, **23.9 mm** from the nearest LED copper against a rule of 8.
+
+**Four screws**: two in the bulge, and one at **each end of the LED strip**, so the full
+length is held down rather than just the electronics.
+
+### Routing: complete
+
+| | |
+|---|---|
+| **Unconnected component pads** | **0** |
+| DRC errors | **0** |
+| Board | 187 × 20 strip + 64 × 32 bulge, single-sided, 2 layer |
+| BOM | 16 lines, 59 placements, 5 BASIC |
+
+Pipeline: `build_fl11.py` places and netlists, `route_fl11.py` lays the pours and the nets
+§7.9 insists on by hand, freerouting 2.3.0 finishes the rest through KiCad's Specctra
+DSN/SES path, and `finish_routing.py` cleans up after it — width floor, 133 collision-checked
+ground vias, solid ties, island removal, stray-pad joins.
 
 ## rev G — 15 LEDs, fully routed
 
