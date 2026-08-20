@@ -15,11 +15,11 @@ PART = {
  "100R":       ("C25076",    "BASIC. 9.8M stock"),
  
  "470uF/10V":  ("C47023096", "Extended. 7.4k stock, D8 x 10.5mm - thinnest stock on the board after the LED"),
- "IO/VCC/GND": ("",          "*** FILL IN: JST-PH 3-pin SMD right-angle, S3B-PH-SM4-TB class. Not verified against live stock ***"),
+ "IO/VCC/GND": ("C7429690",  "ZX-PH2.0-WT3P, 3-pin 2.0mm right-angle SMD, 17k stock, $0.053. Genuine JST S3B-PH-SM4-TB is C265101 at $0.377 if the clone footprint disappoints - CHECK the chosen part's drawing against the JST land pattern before ordering"),
  "PPTC 2A/4A": ("C883156",   "Extended. BSMD1812-200-16V, 2A hold / 4A trip, 76k stock - the section 6.2 spec. At 15 LEDs worst case is ~1.69 A"),
  "USBLC6-2SC6":("C2687116",  "Extended. 150k stock"),
  "AP2112K-3.3":("C23380830", "Extended. 31k stock. EN ties to VIN, not VOUT"),
- "BOOT":       ("C18078117", "Extended. 20.5k stock, 3x4mm SMD tact"),
+ "BOOT":       ("C49234124", "3x4x2mm SMD tact, 101k stock, $0.019 - half the price of C18078117 with 5x the stock"),
  "ESP32-C3-MINI-1-N4": ("C2838502","Extended. 26k stock, $3.84 - doc modelled $2.92, budget ~$0.9/board more"),
  "SN74AHCT1G125": ("C7484",  "AHCT/HCT ONLY. C7468 is AHC and fixes nothing - two digits apart"),
  "AO3401A":    ("C15127",    "P-FET. Source to INPUT side, drain to load"),

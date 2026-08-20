@@ -198,8 +198,11 @@ for ref, fp in placed.items():
 
 # Identity, in the clear band beside the LED row: below the 5 V pour (ends y=17.0), above
 # the board edge, right of x=120 where the DIN trace never runs. Bare soldermask under it.
-silk("EMBER", 150.0, 17.7, 1.6, 0.26)
-silk(f"EM-15 {VERSION}   \u00b7   {COPYRIGHT}", 150.0, 19.0, 0.8, 0.15)
+# Identity centred above LED8, the middle of the row. The two lines are 2.8 mm apart
+# with 2.4 mm and 0.9 mm glyphs, so they cannot touch each other, and the lower line
+# still clears the LED bodies (which start at y=7.44) by 1 mm.
+silk("EMBER", 93.5, 3.2, 2.4, 0.36)
+silk(f"EM-15 {VERSION}   \u00b7   {COPYRIGHT}", 93.5, 6.0, 0.9, 0.16)
 silk("EMBER", 96.0, 51.0, 0.8, 0.15)
 silk("TTP223  IO VCC GND", 102.0, 37.6, 0.8, 0.15)
 
