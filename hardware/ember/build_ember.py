@@ -11,7 +11,7 @@ KI = os.path.expanduser("~/Applications/KiCad.app/Contents/SharedSupport/footpri
 
 VERSION  = "rev I"
 DESIGNER = "Fionn Ferreira"
-REPO     = "github.com/fionnf/linked-friend-lights-public"
+# The repo URL is deliberately NOT on the silkscreen - it will outlive the URL.
 COPYRIGHT= "\u00a9 2026 Fionn Ferreira"
 
 W, H = 187.0, 20.0
@@ -200,7 +200,6 @@ for ref, fp in placed.items():
 # the board edge, right of x=120 where the DIN trace never runs. Bare soldermask under it.
 silk("EMBER", 150.0, 17.7, 1.6, 0.26)
 silk(f"EM-15 {VERSION}   \u00b7   {COPYRIGHT}", 150.0, 19.0, 0.8, 0.15)
-silk(REPO, 40.0, 19.0, 0.8, 0.15)
 silk("EMBER", 96.0, 51.0, 0.8, 0.15)
 silk("TTP223  IO VCC GND", 102.0, 37.6, 0.8, 0.15)
 
