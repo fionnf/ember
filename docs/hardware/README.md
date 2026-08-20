@@ -1,9 +1,9 @@
 # FL-11 — integrated lamp board
 
-**Linked Friend Lights · FL-11 rev B · designed by Fionn Ferreira**
+**Linked Friend Lights · FL-11 rev C · designed by Fionn Ferreira**
 <https://github.com/fionnf/linked-friend-lights-public>
 
-> **rev B supersedes the geometry below.** The electronics moved off the end of the strip
+> **rev C supersedes the geometry below.** The electronics moved off the end of the strip
 > into a rear bulge at the middle so the USB-C plugs in from the back; the LED row stayed
 > continuous. The board is now a 228 × 20 mm strip with a 48 × 28 mm bulge, not 282 × 20.
 > Everything else — the schematic, the BOM, the power budget, the bring-up plan — is
