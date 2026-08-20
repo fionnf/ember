@@ -1,7 +1,7 @@
 # EM-15 rev I — KiCad project
 
 **Ember · EM-15 rev I · © 2026 Fionn Ferreira**
-<https://github.com/fionnf/linked-friend-lights-public>
+<https://github.com/fionnf/ember>
 
 Generated from [`../../docs/hardware/README.md`](../../docs/hardware/README.md).
 Open `fl11.kicad_pcb` with KiCad 9 or 10.

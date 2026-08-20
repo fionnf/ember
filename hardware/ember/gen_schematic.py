@@ -125,7 +125,7 @@ with open(OUT, "w") as f:
     (title "EM-15 - Linked Friend Lights")
     (date "2026-08-20")
     (rev "G")
-    (company "(c) 2026 Fionn Ferreira - github.com/fionnf/linked-friend-lights-public")
+    (company "(c) 2026 Fionn Ferreira - github.com/fionnf/ember")
   )
   (lib_symbols
 {chr(10).join(lib_syms)}

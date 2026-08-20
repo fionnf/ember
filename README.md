@@ -550,7 +550,7 @@ stores the fields shown, but another client may store whatever it needs.
 ## Project Structure
 
 ```
-linked-friend-lights-public/
+ember/
 ├── index.html              # Web UI — single source, served by GitHub Pages
 ├── sw.js                   # Service worker — caches shell + mqtt.js
 ├── manifest.json           # PWA manifest (Add to Home Screen)

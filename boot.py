@@ -12,7 +12,7 @@ import utime
 # ── Files to sync from GitHub ────────────────────────────────
 # Point this at YOUR fork. Boards pull firmware from here on every daily
 # reboot, so whoever controls this repo controls the lamps.
-REPO_RAW = "https://raw.githubusercontent.com/fionnf/linked-friend-lights-public/master/"
+REPO_RAW = "https://raw.githubusercontent.com/fionnf/ember/master/"
 SYNC_FILES = ["main.py", "colour.py", "sk6812.py", "touch.py"]
 
 # ── Crash-loop rollback ──────────────────────────────────────

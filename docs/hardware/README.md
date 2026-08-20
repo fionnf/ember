@@ -1,7 +1,7 @@
 # EM-15 — integrated lamp board
 
 **Ember · EM-15 rev C · designed by Fionn Ferreira**
-<https://github.com/fionnf/linked-friend-lights-public>
+<https://github.com/fionnf/ember>
 
 > **rev C supersedes the geometry below.** The electronics moved off the end of the strip
 > into a rear bulge at the middle so the USB-C plugs in from the back; the LED row stayed
