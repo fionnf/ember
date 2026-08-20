@@ -11,3 +11,7 @@ state.json
 alarms.json
 animations.json
 networks.json
+
+# KiCad local state
+*.kicad_prl
+*-backups/
