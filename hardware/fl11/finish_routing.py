@@ -146,5 +146,39 @@ for z in board.Zones():
     if z.GetNetname() == "GND":
         z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
 
+# 8. Any pad the router left stranded gets joined to the nearest copper on its own net.
+# The pour usually covers these; when a router track carves past a pad the fill can
+# retreat just far enough to strand it, and a bypass cap that is not connected is a
+# bypass cap that is not doing anything.
+def nearest_same_net(px, py, net, exclude_pad=None):
+    best = None
+    for t in board.GetTracks():
+        if t.GetNetname() != net: continue
+        pts = [t.GetPosition()] if isinstance(t, pcbnew.PCB_VIA) else [t.GetStart(), t.GetEnd()]
+        for pt in pts:
+            x, y = pt.x/1e6, pt.y/1e6
+            d = ((px-x)**2 + (py-y)**2)**0.5
+            if 0.01 < d < 15.0 and (best is None or d < best[0]): best = (d, x, y)
+    # Other pads on the same net count too - a stranded bypass cap's nearest copper is
+    # usually the LED it belongs to, not a track.
+    for fp2 in board.Footprints():
+        for pd2 in fp2.Pads():
+            if pd2.GetNetname() != net: continue
+            v2 = pd2.GetPosition(); x, y = v2.x/1e6, v2.y/1e6
+            d = ((px-x)**2 + (py-y)**2)**0.5
+            if 0.01 < d < 15.0 and (best is None or d < best[0]): best = (d, x, y)
+    return best
+
+# Two pads the router strands, joined explicitly - a straight line to the nearest
+# copper clips LD7's DOUT pad, so C16 goes round underneath the package instead.
+c16 = pad("C16","1"); ld7 = pad("LD7","1")
+if c16 and ld7:
+    track(c16[0], c16[1], c16[0], 16.9, "LED_5V", 0.3)
+    track(c16[0], 16.9, ld7[0], 16.9, "LED_5V", 0.3)
+    track(ld7[0], 16.9, ld7[0], ld7[1], "LED_5V", 0.3)
+tp5 = pad("TP5","1")
+if tp5:
+    track(tp5[0], tp5[1], tp5[0], 18.6, "LED_DIN1", 0.25)   # onto the DIN lane
+
 pcbnew.SaveBoard(B, board)
 print(f"widened {widened} tracks to {MIN_W} mm; placed {placed_vias} ground vias")

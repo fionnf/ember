@@ -9,15 +9,17 @@ from pcbnew import VECTOR2I, FromMM as MM
 OUT, ESP, PADMAP = sys.argv[1], sys.argv[2], sys.argv[3]
 KI = os.path.expanduser("~/Applications/KiCad.app/Contents/SharedSupport/footprints")
 
-VERSION  = "rev G"
+VERSION  = "rev H"
 DESIGNER = "Fionn Ferreira"
 REPO     = "github.com/fionnf/linked-friend-lights-public"
 COPYRIGHT= "\u00a9 2026 Fionn Ferreira"
 
 W, H = 187.0, 20.0
-BX1, BX2, BY = 72.0, 120.0, 48.0          # electronics bulge
-PX1, PX2 = 120.0, 145.0                   # snap-off touch pad, beside the bulge
-SLOT_X = 120.0                            # break line between them
+# Bulge grew from 48x28 to 56x30 to fit three JST-PH plugs, so the touch pad needs
+# no soldering in any configuration.
+BX1, BX2, BY = 66.0, 130.0, 52.0          # electronics bulge, 64 x 32
+PX1, PX2 = 130.0, 155.0                   # snap-off touch pad, beside the bulge
+SLOT_X = 130.0                            # break line between them
 # 15 LEDs at 11.13333 mm pitch. Fifteen at that spacing give a lit zone of exactly
 # 167.00 mm - the lamp length stays put - while worst-case current drops to ~1.69 A,
 # back under the 2 A PPTC hold and inside a 2.4 A supply. 20 LEDs needed neither.
@@ -62,53 +64,82 @@ for i, x in enumerate(LED_X, start=1):
 
 # ── The bulge. Antenna keep-out lands at x 93.4-106.6, y 38.9-44.3, pointing at the
 # free y=46 edge - 21.9 mm clear of the nearest LED copper.
-put("U1","Espressif","ESP32-C3-MINI-1", 100.0, 38.0, 180, "ESP32-C3-MINI-1-N4")
-# U1 courtyard x 93.16-106.84, y 29.45-46.55; antenna keep-out lands at y 40.9-46.3,
-# facing the free y=48 edge. Everything below is placed clear of that box.
-put("J1","Connector_USB","USB_C_Receptacle_HRO_TYPE-C-31-M-12", 80.0, 43.8, 0,
-    "USB-C 16P")   # TOP side. Horizontal receptacle: the plug still enters along the
-                   # board plane from the rear y=48 edge, so rear entry is unchanged and
-                   # the board goes back to single-sided assembly.
-put("U4","Package_TO_SOT_SMD","SOT-23-6", 89.2, 41.5, 0, "USBLC6-2SC6")
-put("R1",*R0402, 87.5, 45.5, 0, "5k1"); put("R2",*R0402, 90.5, 45.5, 0, "5k1")
-put("C1","Capacitor_SMD","CP_Elec_8x10", 80.0, 25.0, 0, "470uF/10V")
-put("SW1","Button_Switch_SMD","SW_SPST_EVQP7C", 90.0, 24.0, 0, "BOOT")
-# Back to 2A/4A: at 15 LEDs worst case is ~1.69 A, comfortably under a 2 A hold.
-put("F1","Resistor_SMD","R_1812_4532Metric", 98.0, 23.0, 0, "PPTC 2A/4A")
-put("Q1","Package_TO_SOT_SMD","SOT-23", 105.0, 23.0, 0, "AO3401A")
-put("R8",*R0402, 110.0, 22.0, 0, "100k"); put("C7",*C0402, 112.5, 22.0, 0, "100nF")
-put("U3","Package_TO_SOT_SMD","SOT-23-5", 116.0, 25.0, 0, "AP2112K-3.3")
-put("C3",*C0805, 110.0, 25.5, 0, "22uF"); put("C2",*C0805, 110.0, 30.5, 0, "22uF")
-put("R9",*R0402, 95.0, 27.0, 0, "100k"); put("C8",*C0402, 97.5, 27.0, 0, "100nF")
-put("U2","Package_TO_SOT_SMD","SOT-23-5", 88.5, 31.5, 0, "SN74AHCT1G125")
-put("C6",*C0402, 84.5, 31.5, 0, "100nF"); put("R11",*R0402, 88.5, 35.0, 0, "100R")
-put("R3",*R0402, 91.5, 31.5, 0, "5k1"); put("C5",*C0805, 84.0, 34.5, 0, "22uF")
-put("C4",*C0805, 114.5, 30.5, 0, "22uF"); put("C9",*C0402, 110.0, 33.0, 0, "100nF")
-put("R10",*R0402, 102.0, 27.0, 0, "4M7"); put("R7",*R0402, 104.5, 27.0, 0, "5k1")
-put("R4",*R0402, 114.5, 33.5, 0, "5k1"); put("R5",*R0402, 110.0, 36.0, 0, "5k1")
-put("R6",*R0402, 114.5, 36.0, 0, "5k1")
-put("H1","MountingHole","MountingHole_2.7mm_M2.5", 76.5, 34.0, 0, "M2.5")
-put("H2","MountingHole","MountingHole_2.7mm_M2.5", 114.0, 43.0, 0, "M2.5")
+put("U1","Espressif","ESP32-C3-MINI-1", 98.0, 38.0, 180, "ESP32-C3-MINI-1-N4")
+# U1 courtyard x 91.16-104.84, y 29.45-46.55; antenna keep-out y 40.9-46.3 facing the
+# free y=52 edge, 22 mm clear of the nearest LED copper.
+put("J1","Connector_USB","USB_C_Receptacle_HRO_TYPE-C-31-M-12", 82.0, 49.0, 0, "USB-C 16P")
 
-TP = {"TP1":("LED_5V",116.0,21.0),"TP2":("+3V3",109.5,47.0),"TP3":("GND",112.5,47.0),
-      "TP4":("GND",122.5,44.5),"TP5":("LED_DIN1",80.0,37.0),"TP6":("TOUCH_SENSE",106.5,27.0),
-      "TP7":("LD11_DOUT",176.0,18.6),"TP8":("UART_TX",108.5,39.5),"TP9":("UART_RX",108.5,42.0),
-      "TP10":("EN",100.0,18.5),"TP11":("VBUS_F",93.5,21.5)}
+# ── Left column
+put("C1","Capacitor_SMD","CP_Elec_8x10", 78.0, 24.5, 0, "470uF/10V")
+put("SW1","Button_Switch_SMD","SW_SPST_EVQP7C", 72.0, 40.0, 0, "BOOT")
+put("U4","Package_TO_SOT_SMD","SOT-23-6", 86.5, 41.0, 0, "USBLC6-2SC6")
+put("R1",*R0402, 84.0, 37.0, 0, "5k1"); put("R2",*R0402, 86.5, 37.0, 0, "5k1")
+put("U2","Package_TO_SOT_SMD","SOT-23-5", 88.0, 31.5, 0, "SN74AHCT1G125")
+put("C6",*C0402, 84.5, 31.5, 0, "100nF"); put("R11",*R0402, 88.5, 28.0, 0, "100R")
+put("R3",*R0402, 88.0, 34.5, 0, "5k1"); put("C5",*C0805, 83.5, 34.5, 0, "22uF")
+
+# ── Top band
+put("F1","Resistor_SMD","R_1812_4532Metric", 93.0, 23.0, 0, "PPTC 2A/4A")
+put("Q1","Package_TO_SOT_SMD","SOT-23", 100.0, 23.0, 0, "AO3401A")
+put("R8",*R0402, 104.0, 22.4, 0, "100k"); put("C7",*C0402, 106.5, 22.4, 0, "100nF")
+put("U3","Package_TO_SOT_SMD","SOT-23-5", 110.5, 23.0, 0, "AP2112K-3.3")
+put("C2",*C0805, 114.5, 23.0, 0, "22uF"); put("C3",*C0805, 114.5, 26.5, 0, "22uF")
+put("R9",*R0402, 93.0, 26.5, 0, "100k"); put("C8",*C0402, 95.5, 26.5, 0, "100nF")
+put("R10",*R0402, 98.5, 26.5, 0, "4M7"); put("R7",*R0402, 101.0, 26.5, 0, "5k1")
+
+# ── Between the module and the connector column
+put("C4",*C0805, 110.0, 30.0, 0, "22uF"); put("C9",*C0402, 113.5, 30.0, 0, "100nF")
+put("R4",*R0402, 108.0, 33.0, 0, "5k1"); put("R5",*R0402, 110.5, 33.0, 0, "5k1")
+put("R6",*R0402, 113.0, 33.0, 0, "5k1")
+
+put("H1","MountingHole","MountingHole_2.7mm_M2.5", 70.0, 46.0, 0, "M2.5")
+put("H2","MountingHole","MountingHole_2.7mm_M2.5", 70.0, 33.5, 0, "M2.5")
+
+TP = {"TP1":("LED_5V",134.0,18.5),"TP2":("+3V3",77.0,33.0),"TP3":("GND",77.0,36.0),
+      "TP4":("GND",77.0,39.0),"TP5":("LED_DIN1",69.5,20.9),"TP6":("TOUCH_SENSE",103.5,26.5),
+      "TP7":("LD11_DOUT",176.0,18.6),"TP8":("UART_TX",108.0,37.0),"TP9":("UART_RX",111.0,37.0),
+      "TP10":("EN",100.0,18.5),"TP11":("VBUS_F",88.0,20.9)}
 for ref,(net,x,y) in TP.items():
     fp = put(ref,"TestPoint","TestPoint_Pad_D1.0mm", x, y, 0, net)
     for p in fp.Pads(): p.SetNet(N(net))
-# J4 - fallback header. If the etched sensor ever disappoints, a commercial module
-# (TTP223 class) wires here: it needs a supply, a ground and one digital output, and
-# TOUCH_GPIO doubles as that input because touch.py's pin is plain digital.
-for idx,(yy,net,lbl) in enumerate(((31.0,"+5V","5V"),(33.5,"+3V3","3V3"),
-                                   (36.0,"GND","GND"),(38.5,"TOUCH_GPIO","SIG")), start=1):
-    fp = put(f"J4_{idx}","TestPoint","TestPoint_Pad_D1.0mm", 118.5, yy, 0, lbl)
+# Three JST-PH plugs so nothing needs soldering:
+#   J2  main board  - SENSE + GND, for a cable to the snapped-off pad
+#   J3  pad section - the other end of that cable
+#   J4  main board  - 3V3 / GND / SIG, for a commercial sensor module instead
+JST2 = ("Connector_JST","JST_PH_S2B-PH-SM4-TB_1x02-1MP_P2.00mm_Horizontal")
+JST3 = ("Connector_JST","JST_PH_S3B-PH-SM4-TB_1x03-1MP_P2.00mm_Horizontal")
+# Rotated 90 deg so the cable leaves along the strip axis, in line with the LEDs,
+# rather than out of the back of the bulge.
+# Plugs live on the bulge only, rotated 90 so cables leave along the strip axis, in
+# line with the LEDs. The pad section gets plain solder pads instead - it is snapped
+# off rarely and soldered by hand when it is.
+fp = put("J2", *JST2, 122.5, 26.5, 0, "SENSE+GND")
+for pd in fp.Pads():
+    pd.SetNet(N("TOUCH_SENSE") if pd.GetNumber()=="1" else N("GND"))
+# Back-side solder terminals on the pad section, clear of the electrode area so the
+# no-copper-under-the-pads rule still holds. Front side stays bare copper to solder to.
+for idx,(xx,yy,net) in enumerate(((134.5,44.0,"TOUCH_SENSE"),(131.5,32.0,"GND")), start=1):
+    fp = put(f"J3_{idx}","TestPoint","TestPoint_Pad_D1.0mm", xx, yy, 0, net, bottom=True)
     for pd in fp.Pads(): pd.SetNet(N(net))
 
-for ref, x in (("J2",117.5),("J3",126.6)):
-    for idx,(yy,net) in enumerate(((28.0,"TOUCH_SENSE"),(46.0,"GND")), start=1):
-        fp = put(f"{ref}_{idx}","TestPoint","TestPoint_Pad_D1.0mm", x, yy, 0, net)
-        for p in fp.Pads(): p.SetNet(N(net))
+# Solder terminals beside each plug, so the board still works with no connectors at
+# all - JST housings are the one part likely to be missing from a hobby bench.
+for ref,(xx,yy,net) in {"TS1":(118.0,20.8,"TOUCH_SENSE"), "TS2":(115.5,20.8,"GND"),
+                        "TS3":(99.0,49.2,"+5V"),        "TS4":(101.5,49.2,"GND"),
+                        "TS5":(104.0,49.2,"TOUCH_SENSE")}.items():
+    fp = put(ref,"TestPoint","TestPoint_Pad_D1.0mm", xx, yy, 0, net)
+    for pd in fp.Pads(): pd.SetNet(N(net))
+# J4 matches a commercial module's 5V / GND / SIG pinout. SIG lands on TOUCH_SENSE,
+# NOT on the GPIO: a 5V-powered TTP223 drives its output to 5 V and the ESP32-C3 is
+# not 5V tolerant (3.6 V absolute max). Going in through R7's 5.1 k means the C3's
+# clamp diode sees ~0.33 mA instead of a direct 5 V drive - the series resistor that
+# was already there for ESD does this job for free.
+# J4 moved out of the break corridor so SENSE and GND can both reach the pad
+# section without crossing each other or J2's mounting tabs.
+fp = put("J4", *JST3, 111.0, 45.0, 0, "5V/GND/SIG")
+for pd in fp.Pads():
+    n = {"1":"+5V","2":"GND","3":"TOUCH_SENSE"}.get(pd.GetNumber(),"GND")
+    pd.SetNet(N(n))
 
 CONN = {
  ("F1","1"):"VBUS_RAW", ("F1","2"):"VBUS_F",
@@ -177,7 +208,7 @@ for a in [(0,0,W,0),(W,0,W,H),(W,H,PX1,H),(PX1,H,PX1,PY1),(PX1,PY1,PX2,PY1),
 # 4.3 mm, and the notch above leaves the pad cantilevered so it can be gripped and bent.
 WEB = 1.3
 edges=[PY1+0.4]
-for cy in (28.0, 46.0): edges += [cy-WEB/2, cy+WEB/2]
+for cy in (32.0, 35.5): edges += [cy-WEB/2, cy+WEB/2]
 edges.append(BY-0.4)
 for i in range(0,len(edges),2):
     y1,y2 = edges[i], edges[i+1]
@@ -208,11 +239,11 @@ for ref, fp in placed.items():
 # the board edge, right of x=120 where the DIN trace never runs. Bare soldermask under it.
 silk("LINKED FRIEND LIGHTS", 150.0, 17.9, 1.0, 0.17)
 silk(f"FL-11 {VERSION}   \u00b7   {COPYRIGHT}", 150.0, 19.0, 0.8, 0.15)
-silk(REPO, 45.0, 19.0, 0.8, 0.15)
-silk("LINKED FRIEND LIGHTS", 96.0, 46.8, 0.8, 0.15)
-silk(f"FL-11 {VERSION} TOUCH", 134.5, 23.0, 0.8, 0.15)
-silk(COPYRIGHT, 134.5, 47.0, 0.8, 0.15)
-silk("CUT TRACES", 113.5, 24.0, 0.8, 0.15)
+silk(REPO, 40.0, 19.0, 0.8, 0.15)
+silk("LINKED FRIEND LIGHTS", 96.0, 51.0, 0.8, 0.15)
+silk(f"FL-11 {VERSION} TOUCH", 142.5, 31.0, 0.8, 0.15)
+silk(COPYRIGHT, 142.5, 51.0, 0.8, 0.15)
+silk("CUT TRACES", 122.5, 20.8, 0.8, 0.15)
 
 pcbnew.SaveBoard(OUT, board)
 print("PLACED:", len(placed), " NETS:", len(nets),

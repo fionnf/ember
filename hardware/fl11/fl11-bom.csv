@@ -4,6 +4,8 @@ Comment,Designator,Footprint,LCSC Part #,Note
 100nF,"C6,C7,C8,C9,C10,C11,C12,C13,C14,C15,C16,C17,C18,C19,C20,C21,C22,C23,C24",C_0402_1005Metric,C1525,"BASIC. 16.4M stock, 16V X7R"
 PPTC 2A/4A,F1,R_1812_4532Metric,C883156,"Extended. BSMD1812-200-16V, 2A hold / 4A trip, 76k stock - the section 6.2 spec. At 15 LEDs worst case is ~1.69 A"
 USB-C 16P,J1,USB_C_Receptacle_HRO_TYPE-C-31-M-12,C165948,"TOP side, horizontal - plug enters from the rear board edge"
+SENSE+GND,J2,JST_PH_S2B-PH-SM4-TB_1x02-1MP_P2.00mm_Horizontal,,
+5V/GND/SIG,J4,JST_PH_S3B-PH-SM4-TB_1x03-1MP_P2.00mm_Horizontal,,
 SK6812RGBW,"LD1,LD2,LD3,LD4,LD5,LD6,LD7,LD8,LD9,LD10,LD11,LD12,LD13,LD14,LD15",LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm,C5378724,"SKC6812RGBW-WS = WARM WHITE (the -NW suffix, C5348912, is neutral and would fight BASE_WARM_WHITE). *** STOCK NOT VERIFIED - section 9.1 number one live risk. 4-channel RGBW, GRBW order. An RGB part fits the same footprint and is silently wrong ***"
 AO3401A,Q1,SOT-23,C15127,"P-FET. Source to INPUT side, drain to load"
 5k1,"R1,R2,R3,R4,R5,R6,R7",R_0402_1005Metric,C25905,"BASIC. 8.4M stock, 1%"
