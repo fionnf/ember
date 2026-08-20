@@ -30,7 +30,7 @@ MQTT_PASSWORD = ""             # Leave empty if not required
 # your lamps. Change this before first boot, and make it unguessable — it is
 # the only thing separating your lights from a stranger's. The web app shows
 # the random prefix it generated for you; paste that same value here.
-MQTT_TOPIC_PREFIX = "picolight_CHANGEME"   # ← REQUIRED: change this
+MQTT_TOPIC_PREFIX = "ember_CHANGEME"   # ← REQUIRED: change this
 
 # ── LED strip ───────────────────────────────────────────────
 LED_PIN        = 5             # GPIO pin connected to DIN of SK6812 strip

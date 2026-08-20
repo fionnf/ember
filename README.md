@@ -1,4 +1,4 @@
-# Linked Friend Lights
+# Ember
 
 Two Raspberry Pi Pico W boards keeping their SK6812 RGBW LED strips in sync over MQTT. Touch one lamp and both shift colour together. Control everything from a web app that works on any phone or browser.
 
@@ -99,7 +99,7 @@ IDLE_DRIFT_INTERVAL_S = 45
 
 MQTT_BROKER        = "broker.hivemq.com"
 MQTT_PORT          = 1883
-MQTT_TOPIC_PREFIX  = "picolight_CHANGEME"   # ← set to your own unique value
+MQTT_TOPIC_PREFIX  = "ember_CHANGEME"   # ← set to your own unique value
 
 WIFI_NETWORKS = [
     ("YourSSID", "YourPassword"),

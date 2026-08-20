@@ -1,6 +1,6 @@
-# FL-11 — integrated lamp board
+# EM-15 — integrated lamp board
 
-**Linked Friend Lights · FL-11 rev C · designed by Fionn Ferreira**
+**Ember · EM-15 rev C · designed by Fionn Ferreira**
 <https://github.com/fionnf/linked-friend-lights-public>
 
 > **rev C supersedes the geometry below.** The electronics moved off the end of the strip
@@ -50,7 +50,7 @@ The optimisation target is **total landed cost per assembled board at qty 100**,
 ## 2. Architecture
 
 ```
-                        FL-11  —  282.0 × 20.0 × 1.6 mm, 2 layer, single-sided SMT
+                        EM-15  —  282.0 × 20.0 × 1.6 mm, 2 layer, single-sided SMT
 
  x=0                       56                                              239           250   282
  |<--------- HEAD --------->|<------------- LIT ZONE 183.33 --------------->|<-- gap -->|<-TAB->|
@@ -521,7 +521,7 @@ J2 doubles as a SENSE + GND probe point at the far end.
 
 ### 7.0 Board drawing
 
-![FL-11 rev B, drawn to scale](fl11-board.svg)
+![EM-15 rev B, drawn to scale](fl11-board.svg)
 
 Top view, to scale. LED centres, pitch, pad extents, break slot, mounting holes and the copper
 bands are the specified values from the sections below. Head-section parts are indicative — this
@@ -856,7 +856,7 @@ The outline is a **plain 282 × 20 mm rectangle** — the tab is an internal slo
 | Rails | 5.0 mm on the two **282 mm** long edges only |
 | Fiducials | 3 × Ø1.00 mm bare copper, Ø2.00 mm mask opening, asymmetric triple in the rails |
 | Tooling holes | 2 × Ø3.00 mm NPTH in the rails |
-| Panel ID | Silkscreen `FL-11 REV A 6UP ^` on a rail |
+| Panel ID | Silkscreen `EM-15 REV A 6UP ^` on a rail |
 | Panels for 100 boards | **17** (102 boards) |
 
 Two things about this arrangement are corrections worth stating:
@@ -909,12 +909,12 @@ Manual checks DRC will not catch: SENSE via count, MLCC long-axis orientation wi
 
 `config.py` is per-board and **never OTA'd** (`boot.py:5`), so this is the golden file flashed to all units, and anything wrong in it is a manual edit on every board forever. That is why `LED_PIN` was deliberately kept at 5.
 
-| Constant | Now | FL-11 | Why |
+| Constant | Now | EM-15 | Why |
 |---|---|---|---|
 | `LED_PIN` | `5` | **`5` — unchanged** | IO5 chosen on the C3 specifically so this and `hardware_test.py:65` never move |
 | `NUM_LEDS` | `10` | **`11`** | |
 | `TOUCH_PINS` | `[12]` | **`[3]`** | GPIO12–17 are internal flash pins on the C3, not bonded out on MINI-1 |
-| `TOUCH_THRESHOLD` | `1` | *(legacy path only)* | Superseded by `TOUCH_FRACTION` on FL-11; kept present for old boards |
+| `TOUCH_THRESHOLD` | `1` | *(legacy path only)* | Superseded by `TOUCH_FRACTION` on EM-15; kept present for old boards |
 | `TOUCH_FRACTION` | — | **new, set at Stage 1** | Proportional threshold. See §8.3 |
 | `TOUCH_METHOD` | — | **`"ticks"`** | Selects the µs-timed measurement. Absent ⇒ legacy loop counting |
 | `TOUCH_SAMPLES` | — | **`5`** | min-of-N. Absent ⇒ single sample, i.e. legacy |
@@ -922,7 +922,7 @@ Manual checks DRC will not catch: SENSE via count, MLCC long-axis orientation wi
 | `GROUP_MAX_LEDS` | `8` | **`8` — keep** | See §8.2 |
 | `REVERSE_LEDS` | `False` | **`False` — MUST REMAIN PRESENT** | `colour.py:15` does a bare `from config import REVERSE_LEDS` with no try/except. Delete the symbol and the board does not boot. It is also a live runtime feature (`main.py:331`, `colour.py:242`), so it is not just a build constant |
 | `MAX_CHANNEL_SUM` | — | **`680`** | Hard power/thermal clamp, §5.4 |
-| `BOARD_REV` | — | `"FL-11"` | Optional, telemetry only, guarded import. Lets you tell an FL-11 from a discrete build in the MQTT status without a serial console |
+| `BOARD_REV` | — | `"EM-15"` | Optional, telemetry only, guarded import. Lets you tell an EM-15 from a discrete build in the MQTT status without a serial console |
 | `LED_BRIGHTNESS`, `NUM_GROUPS`, `GROUP_MIN_LEDS`, `HOLD_TIME_MS`, `WATCHDOG_ENABLED`, palette, MQTT, WiFi, WebREPL | | unchanged | |
 
 **Every new symbol read by an OTA'd file must have an `except ImportError` fallback that restores legacy behaviour.** `boot.py:16` syncs `main.py`, `colour.py`, `sk6812.py` and `touch.py` to *every* board, old and new, and an old board's `config.py` cannot be updated to add a flag. This is not politeness — the discrete boards run `TOUCH_THRESHOLD = 1` against a ±1-count noise floor, and switching them to proportional thresholds or aggressive baseline tracking would cause false taps.
@@ -1011,7 +1011,7 @@ Frame time: 11 × 32 bits × 1.2 µs = **422 µs**, 2.6 % of a 16 ms frame. The 
 
 **`hardware_test.py` needs a rewrite**, not a tweak. It currently hard-codes `TOUCH_PIN = 12` and `NUM_LEDS = 8` — the LED count is already wrong for the existing ten-LED build — and carries its own inline PIO copy of the driver. Structure in §9.2.
 
-**Operational recommendation, zero code change: canary via a staging branch.** `boot.py` is per-board and not OTA'd, so point one discrete Pico W and one FL-11 at a `staging` branch by editing one line of their `boot.py`. Push to `staging`, wait one daily reboot cycle, confirm both canaries came back, then fast-forward `master`. It costs nothing and it is the only mechanism you have that tests both platforms before the fleet sees a change.
+**Operational recommendation, zero code change: canary via a staging branch.** `boot.py` is per-board and not OTA'd, so point one discrete Pico W and one EM-15 at a `staging` branch by editing one line of their `boot.py`. Push to `staging`, wait one daily reboot cycle, confirm both canaries came back, then fast-forward `master`. It costs nothing and it is the only mechanism you have that tests both platforms before the fleet sees a change.
 
 ---
 
@@ -1087,7 +1087,7 @@ At qty 10, fixed cost is 89 % of the assembly bill and ~45 % of the landed total
 
 | Item | $ |
 |---|---|
-| Assembled FL-11 board | 7.59 |
+| Assembled EM-15 board | 7.59 |
 | Opal diffuser tube, 30 mm OD × 220 mm, cut from extrusion | 2.50 |
 | Printed base + spine + top cap, in-house (**filament only**) | 1.90 |
 | 5 V / 2.4 A USB-C supply | 3.50 |

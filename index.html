@@ -7,7 +7,7 @@
        below has nothing to push content clear of, and on a notched iPhone the
        header sits under the clock once the page is added to the home screen. -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-  <title>Linked Lights</title>
+  <title>Ember</title>
   <meta name="theme-color" content="#060608">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -541,7 +541,7 @@
   </div>
   <div class="cfg-field">
     <label>Topic Prefix</label>
-    <input id="cfg-prefix" placeholder="picolight_xxxxxx">
+    <input id="cfg-prefix" placeholder="ember_xxxxxx">
     <div style="font-size:0.7rem;color:var(--muted);margin-top:0.25rem;line-height:1.4">
       Generated for you. Put this exact value in <code>MQTT_TOPIC_PREFIX</code>
       in <code>config.py</code> on every board. Anyone who knows it can control your lamps.
@@ -573,7 +573,7 @@
 function randomPrefix() {
   const a = new Uint8Array(5);
   crypto.getRandomValues(a);
-  return "picolight_" + Array.from(a, b => b.toString(36).padStart(2, "0")).join("");
+  return "ember_" + Array.from(a, b => b.toString(36).padStart(2, "0")).join("");
 }
 if (!localStorage.getItem("ll_prefix")) {
   localStorage.setItem("ll_prefix", randomPrefix());

@@ -1,7 +1,7 @@
 {
-  "name": "Linked Lights",
-  "short_name": "Lights",
-  "description": "Control two linked SK6812 lamps over MQTT",
+  "name": "Ember",
+  "short_name": "Ember",
+  "description": "Two lamps that share their light",
   "display": "standalone",
   "background_color": "#060608",
   "theme_color": "#060608",
