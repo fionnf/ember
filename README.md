@@ -11,7 +11,7 @@ Two Raspberry Pi Pico W boards keeping their SK6812 RGBW LED strips in sync over
                                 SK6812 strip               SK6812 strip
 ```
 
-One board (`board_a`, display name **FF**) is the BOSS; the other (`board_b`, **LS**) is the follower. Both subscribe to the same MQTT topic and keep their strips in sync. The web UI publishes JSON commands to the same topic and reflects live state from both boards.
+One board (`board_a`, display name **A**) is the BOSS; the other (`board_b`, **B**) is the follower. Both subscribe to the same MQTT topic and keep their strips in sync. The web UI publishes JSON commands to the same topic and reflects live state from both boards.
 
 ---
 
@@ -99,7 +99,7 @@ IDLE_DRIFT_INTERVAL_S = 45
 
 MQTT_BROKER        = "broker.hivemq.com"
 MQTT_PORT          = 1883
-MQTT_TOPIC_PREFIX  = "picolight_lf26"
+MQTT_TOPIC_PREFIX  = "picolight_CHANGEME"   # ← set to your own unique value
 
 WIFI_NETWORKS = [
     ("YourSSID", "YourPassword"),
@@ -109,10 +109,10 @@ WIFI_NETWORKS = [
 ### MQTT
 
 - **Broker:** `broker.hivemq.com:1883` (TCP on device) / `:8884` WSS (web)
-- **Events topic:** `picolight_lf26/events`
-- **Alarms topic:** `picolight_lf26/alarms` (retained, subscribed by boards)
-- **Status topic:** `picolight_lf26/status/<board_id>` (retained, Last-Will)
-- **Scenes topic:** `picolight_lf26/scenes` (retained, client-to-client scene library)
+- **Events topic:** `<your-prefix>/events`
+- **Alarms topic:** `<your-prefix>/alarms` (retained, subscribed by boards)
+- **Status topic:** `<your-prefix>/status/<board_id>` (retained, Last-Will)
+- **Scenes topic:** `<your-prefix>/scenes` (retained, client-to-client scene library)
 
 All messages are JSON with a `from` field for echo suppression. The full contract is documented in [MQTT Protocol Specification](#mqtt-protocol-specification) — that section is the reference for writing an additional client.
 
@@ -133,7 +133,7 @@ When the BOSS's physical touch sensor fires, it runs `ColourEngine.impulse()` (r
 
 Every 60 s the BOSS publishes its state with `"sync": true` as a drift-correction heartbeat. The follower applies it with a slow 300-step fade so re-alignment is invisible.
 
-**Independent mode.** That periodic sync would otherwise undo deliberate per-lamp settings — set one lamp with **Send to → LS** and it reverted within a minute. So a **targeted** command (one carrying `target`) unlinks the lamps and suppresses the BOSS sync for 30 minutes; a **broadcast** colour command — which sets both lamps to the same thing — re-links them immediately. Boards notice targeted traffic even when it is addressed to the other lamp, so the BOSS knows to stand down.
+**Independent mode.** That periodic sync would otherwise undo deliberate per-lamp settings — set one lamp with **Send to → B** and it reverted within a minute. So a **targeted** command (one carrying `target`) unlinks the lamps and suppresses the BOSS sync for 30 minutes; a **broadcast** colour command — which sets both lamps to the same thing — re-links them immediately. Boards notice targeted traffic even when it is addressed to the other lamp, so the BOSS knows to stand down.
 
 ### Alarms
 
@@ -201,7 +201,7 @@ A service worker (`sw.js`) caches the app shell and the mqtt.js library, so the 
 | **Warm White** | Resets all groups to `pos=0.0, w=1.0` (pure warm white) |
 | **Brightness** | Global brightness 0–100% |
 | **Fade Speed** | Colour transition duration (~0.3 s–10 s) |
-| **Send to** | Target Both boards / FF only / LS only |
+| **Send to** | Target Both boards / A only / B only |
 
 ### Strip preview
 
@@ -234,7 +234,7 @@ Scenes are stored in `localStorage` **and** mirrored to the retained `P/scenes` 
 | Field | Default | Description |
 |-------|---------|-------------|
 | WebSocket URL | `wss://broker.hivemq.com:8884/mqtt` | MQTT broker |
-| Topic Prefix | `picolight_lf26` | Must match boards |
+| Topic Prefix | randomly generated per install | Must match `MQTT_TOPIC_PREFIX` on the boards |
 | LEDs | `10` | LEDs per strip |
 | Groups | `3` | Initial group count |
 
@@ -242,7 +242,7 @@ Also: **Add WiFi Network** (sends credentials to both boards over MQTT), **↺ R
 
 ### Board presence pills
 
-The two pills (FF / LS) at the top right show each board's status. Presence uses MQTT **Last-Will** on a retained per-board topic (`prefix/status/<board_id>`): each board publishes `{"online": true}` (retained) on connect, and the broker itself flips it to `{"online": false}` if the board dies silently (within ~90 s of its last keepalive). Because the status is retained, the pills are correct the instant the page loads. The web app additionally pings both boards on connect and every 2 minutes to refresh their full state.
+The two pills (A / B) at the top right show each board's status. Presence uses MQTT **Last-Will** on a retained per-board topic (`prefix/status/<board_id>`): each board publishes `{"online": true}` (retained) on connect, and the broker itself flips it to `{"online": false}` if the board dies silently (within ~90 s of its last keepalive). Because the status is retained, the pills are correct the instant the page loads. The web app additionally pings both boards on connect and every 2 minutes to refresh their full state.
 
 - **Green (online)** — retained status online (or message seen within 150 s) and lights on
 - **Amber (standby)** — same, but lights are off
@@ -257,7 +257,7 @@ Home Assistant, a script) only needs these topics — there is no other API.
 
 ### Topics
 
-With `MQTT_TOPIC_PREFIX = "picolight_lf26"` (call it `P`):
+With your `MQTT_TOPIC_PREFIX` (call it `P`):
 
 | Topic | Direction | Retained | Payload |
 |-------|-----------|----------|---------|
@@ -266,7 +266,7 @@ With `MQTT_TOPIC_PREFIX = "picolight_lf26"` (call it `P`):
 | `P/status/<board_id>` | board → client | **yes** | `{"online": bool, "fw": str, "ntp": bool}` |
 | `P/scenes` | client ⇄ client | **yes** | Shared scene library (below). Boards ignore it entirely |
 
-Board IDs are `board_a` (BOSS, display name FF) and `board_b` (follower, LS).
+Board IDs are `board_a` (BOSS, display name A) and `board_b` (follower, B).
 
 A client should subscribe to `P/events`, `P/alarms`, and `P/status/+`.
 
@@ -550,7 +550,7 @@ stores the fields shown, but another client may store whatever it needs.
 ## Project Structure
 
 ```
-linked_friend_lights/
+linked-friend-lights-public/
 ├── index.html              # Web UI — single source, served by GitHub Pages
 ├── sw.js                   # Service worker — caches shell + mqtt.js
 ├── manifest.json           # PWA manifest (Add to Home Screen)

@@ -541,7 +541,11 @@
   </div>
   <div class="cfg-field">
     <label>Topic Prefix</label>
-    <input id="cfg-prefix" value="picolight_lf26">
+    <input id="cfg-prefix" placeholder="picolight_xxxxxx">
+    <div style="font-size:0.7rem;color:var(--muted);margin-top:0.25rem;line-height:1.4">
+      Generated for you. Put this exact value in <code>MQTT_TOPIC_PREFIX</code>
+      in <code>config.py</code> on every board. Anyone who knows it can control your lamps.
+    </div>
   </div>
   <div class="cfg-row">
     <div class="cfg-field"><label>LEDs</label><input id="cfg-leds"   type="number" min="1" max="144" value="10"></div>
@@ -561,15 +565,29 @@
 
 <script>
 // ── Config ────────────────────────────────────────────────
+// Every install gets its own topic namespace. broker.hivemq.com is a public
+// broker with no auth, so the prefix is the only thing keeping your lamps
+// separate from everyone else's — a shared default would mean strangers
+// driving each other's lights. Generated once, then kept in localStorage.
+// Copy the value shown in Settings into config.py on each board.
+function randomPrefix() {
+  const a = new Uint8Array(5);
+  crypto.getRandomValues(a);
+  return "picolight_" + Array.from(a, b => b.toString(36).padStart(2, "0")).join("");
+}
+if (!localStorage.getItem("ll_prefix")) {
+  localStorage.setItem("ll_prefix", randomPrefix());
+}
+
 let cfg = {
   broker:    localStorage.getItem("ll_broker")    || "wss://broker.hivemq.com:8884/mqtt",
-  prefix:    localStorage.getItem("ll_prefix")    || "picolight_lf26",
+  prefix:    localStorage.getItem("ll_prefix"),
   numLeds:   parseInt(localStorage.getItem("ll_leds")   || "10"),
   numGroups: parseInt(localStorage.getItem("ll_groups") || "3"),
   boardIdA:  "board_a",
-  boardNameA:"FF",
+  boardNameA:"A",
   boardIdB:  "board_b",
-  boardNameB:"LS",
+  boardNameB:"B",
 };
 document.getElementById("cfg-broker").value  = cfg.broker;
 document.getElementById("cfg-prefix").value  = cfg.prefix;
@@ -1194,7 +1212,8 @@ document.getElementById("btn-add-network").addEventListener("click", () => {
 
 document.getElementById("btn-reconnect").addEventListener("click", () => {
   cfg.broker     = document.getElementById("cfg-broker").value.trim();
-  cfg.prefix     = document.getElementById("cfg-prefix").value.trim();
+  cfg.prefix     = document.getElementById("cfg-prefix").value.trim() || randomPrefix();
+  document.getElementById("cfg-prefix").value = cfg.prefix;
   cfg.numLeds    = parseInt(document.getElementById("cfg-leds").value);
   cfg.numGroups  = parseInt(document.getElementById("cfg-groups").value);
   localStorage.setItem("ll_broker", cfg.broker);
@@ -1630,16 +1649,6 @@ syncBrightnessSlider();
 syncFadeSlider();
 connect();
 </script>
-
-<a href="https://www.fionnferreira.com/gacha?token=lennart"
-   style="display:block;width:100%;max-width:580px;padding:0.8rem;text-align:center;
-          border-radius:12px;border:1px solid var(--border);
-          color:var(--muted);font-size:0.78rem;letter-spacing:0.06em;text-decoration:none;
-          transition:color 0.2s,border-color 0.2s;"
-   onmouseover="this.style.color='var(--text2)';this.style.borderColor='var(--border2)'"
-   onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">
-  ← Zurück zu Gacha
-</a>
 
 </body>
 </html>
