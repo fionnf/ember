@@ -1,6 +1,6 @@
 Comment,Designator,Footprint,LCSC Part #,Note
 470uF/10V,C1,CP_Elec_8x10,C47023096,"Extended. 7.4k stock, D8 x 10.5mm - thinnest stock on the board after the LED"
-22uF,"C2,C3,C4,C5",C_0805_2012Metric,C45783,"BASIC. 1.73M stock, 0805 25V X5R. Cheaper Extended alt C6119897 (10V, $0.02 vs $0.12) carries a feeder fee and derates to ~10uF at 5V"
+22uF,"C2,C3,C4,C5",C_0805_2012Metric,C6119897,"0805 10V X5R, 184k stock, $0.020 vs $0.119 for the 25V BASIC part C45783 - the single biggest safe saving on the board, $0.39/unit across four places. DC bias at 5V derates it to ~10-12uF effective, which is fine here: the LDO needs >=1uF, and C1's 470uF carries the bulk"
 100nF,"C6,C7,C8,C9,C10,C11,C12,C13,C14,C15,C16,C17,C18,C19,C20,C21,C22,C23,C24",C_0402_1005Metric,C1525,"BASIC. 16.4M stock, 16V X7R"
 PPTC 2A/4A,F1,R_1812_4532Metric,C883156,"Extended. BSMD1812-200-16V, 2A hold / 4A trip, 76k stock - the section 6.2 spec. At 15 LEDs worst case is ~1.69 A"
 USB-C 16P,J1,USB_C_Receptacle_HRO_TYPE-C-31-M-12,C165948,"TOP side, horizontal - plug enters from the rear board edge"

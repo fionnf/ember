@@ -9,7 +9,7 @@ import csv, collections, re, subprocess, sys, os
 
 PART = {
  "100nF":      ("C1525",     "BASIC. 16.4M stock, 16V X7R"),
- "22uF":       ("C45783",    "BASIC. 1.73M stock, 0805 25V X5R. Cheaper Extended alt C6119897 (10V, $0.02 vs $0.12) carries a feeder fee and derates to ~10uF at 5V"),
+ "22uF":       ("C6119897",  "0805 10V X5R, 184k stock, $0.020 vs $0.119 for the 25V BASIC part C45783 - the single biggest safe saving on the board, $0.39/unit across four places. DC bias at 5V derates it to ~10-12uF effective, which is fine here: the LDO needs >=1uF, and C1's 470uF carries the bulk"),
  "5k1":        ("C25905",    "BASIC. 8.4M stock, 1%"),
  "100k":       ("C25741",    "BASIC. 15.4M stock, 1%. Replaces C25086 - JLC now lists that Extended, 0 stock, MOQ 700"),
  "100R":       ("C25076",    "BASIC. 9.8M stock"),
