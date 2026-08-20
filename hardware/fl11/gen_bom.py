@@ -15,7 +15,7 @@ PART = {
  "100R":       ("C25076",    "BASIC. 9.8M stock"),
  "4M7":        ("C474132",   "Extended - no BASIC 4.7M exists in 0402. 389k stock. Replaces C49655641 (9.8k). Do NOT drop to 1M"),
  "470uF/10V":  ("C47023096", "Extended. 7.4k stock, D8 x 10.5mm - thinnest stock on the board after the LED"),
- "PPTC 2A/4A": ("C883156",   "Extended. BSMD1812-200-16V, 2A hold / 4A trip, 76k stock - exactly the section 6.2 spec"),
+ "PPTC 3A/5A": ("C18198349", "Extended. 1812, 3A hold / 5A trip, 41k stock. 2A would nuisance-trip at 20 LEDs (~2.25A worst case); the 2A/4A part is C883156"),
  "USBLC6-2SC6":("C2687116",  "Extended. 150k stock"),
  "AP2112K-3.3":("C23380830", "Extended. 31k stock. EN ties to VIN, not VOUT"),
  "BOOT":       ("C18078117", "Extended. 20.5k stock, 3x4mm SMD tact"),

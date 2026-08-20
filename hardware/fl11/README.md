@@ -1,6 +1,6 @@
-# FL-11 rev E — KiCad project
+# FL-11 rev F — KiCad project
 
-**Linked Friend Lights · FL-11 rev E · © 2026 Fionn Ferreira**
+**Linked Friend Lights · FL-11 rev F · © 2026 Fionn Ferreira**
 <https://github.com/fionnf/linked-friend-lights-public>
 
 Generated from [`../../docs/hardware/README.md`](../../docs/hardware/README.md).
@@ -45,6 +45,41 @@ Deleting the end tab also removed the 31 mm tab, the gap, and the strip's break 
 **Cost.** Still one bottom-side part (J1), so the second-setup charge stands at roughly
 **+$0.63/unit at qty 100**. The outline is a T with a notch, so the 6-up panel still needs
 re-nesting and re-quoting.
+
+## rev F — 20 LEDs
+
+**20 LEDs at 8.33333 mm pitch = 120 LEDs/m**, a standard strip density. Twenty at that pitch
+give a lit zone of **exactly 166.67 mm** — the same lamp length as eleven at 60/m, at double
+the density, so the dots blend instead of reading individually. The board outline does not
+change: LED20 lands at x=168.33 on a 187 mm strip.
+
+**F1 is now 3 A hold / 5 A trip (C18198349).** Twenty LEDs put worst case at **~2.25 A** and a
+2 A hold would nuisance-trip. Same 1812 footprint, no layout change.
+
+**Two consequences you must not skip:**
+
+- **The supply must be 3 A**, not the 2.4 A the §9.2 budget assumed. Or cap `MAX_CHANNEL_SUM`
+  in firmware — at 20 LEDs the old 680 value no longer keeps you under 2 A.
+- **The copper was sized for 1.6 A** (§5.5). The 4.6 mm 5 V pour probably carries 2.5 A at an
+  acceptable rise, but that calculation has not been redone and must be before ordering.
+
+`NUM_LEDS` becomes 20 in `config.py`. The bypass caps moved to y=15.10 rotated 0: at 8.33 mm
+pitch a vertical 0402 could not sit inside the 4.6 mm pour with room for thermal spokes.
+
+### Routing status — checked, not assumed
+
+| | |
+|---|---|
+| DRC | **0 errors** |
+| LED chain | **all 19 DOUT→DIN hops routed** |
+| LED power/ground | all 20 LEDs and all 20 bypass caps connected |
+| SENSE, touch pad, tab terminals | routed |
+| **Unrouted** | **54 endpoints, all in the bulge** — power path, USB pair, module I/O, J4 |
+
+Two routing bugs were found and fixed getting here, both silent: the hop loop was still bounded
+at 11 so **LEDs 11–20 had no data connection**, and the bypass caps' 5 V pads sat too close to
+the pour edge for thermal spokes, leaving 23 of them floating. Neither showed up as a DRC error
+— they only appear in the unconnected count, which is why that number is quoted here.
 
 ## rev E
 

@@ -1,6 +1,7 @@
 # FL-11 rev B pours and routing.
 import sys, pcbnew
 from pcbnew import VECTOR2I, FromMM as MM
+NLED = 20                     # must match build_fl11.py
 B = sys.argv[1]
 board = pcbnew.LoadBoard(B)
 nets = board.GetNetsByName()
@@ -53,17 +54,33 @@ rect(pcbnew.F_Cu, "LED_5V", 84.0, 16.5, 97.0, 29.5, prio=2)
 # finger behind an overlay actually intercepts. Finger pitch 3.0 mm means a ~10 mm
 # fingertip always spans several SENSE/GND pairs, so the delta stays large through a
 # thin cover and degrades gracefully as the overlay thickens.
-FP, FH = 3.0, 1.1                                   # finger pitch and height
-# Fingers and the return bar sit at a different priority to the spines so their
-# deliberate overlap resolves instead of reading as a same-net zone intersection.
-rect(pcbnew.F_Cu, "TOUCH_SENSE", 126.0, 24.0, 127.2, 44.8, prio=1, solid=True)   # spine
-rect(pcbnew.F_Cu, "GND",         141.8, 24.0, 143.0, 46.6, prio=1)               # spine
-rect(pcbnew.F_Cu, "GND",         126.0, 45.4, 143.0, 46.6, prio=2)               # return bar
-for k in range(7):
-    y = 24.6 + FP*k
-    rect(pcbnew.F_Cu, "TOUCH_SENSE", 127.0, y, 140.6, y+FH, prio=2, solid=True)
-    y = 26.1 + FP*k
-    rect(pcbnew.F_Cu, "GND",         128.4, y, 142.0, y+FH, prio=2)
+# Interdigitated electrodes. Two solid plates couple mostly through the overlay's
+# thickness; a comb pushes the field OUT of the surface as fringing, which is what a
+# finger behind plastic actually intercepts. Pitch 3.0 mm with 1.1 mm fingers means a
+# ~10 mm fingertip always spans several SENSE/GND pairs.
+#
+# Each electrode is ONE polygon. Built as overlapping rectangles they filled as separate
+# zones and the priority clipping severed every GND finger from its spine - eight
+# isolated islands and a dead half of the sensor.
+FP, FH, NF = 3.0, 1.1, 7
+SX, SW, SXF = 126.0, 1.2, 140.6      # SENSE spine x, width, finger tip
+GX, GW, GXF = 143.0, 1.2, 128.4      # GND spine x (right), width, finger tip
+TOP, SBOT   = 24.0, 44.8
+BAR_T, BAR_B = 45.4, 46.6            # GND return bar, brings GND back to the break edge
+
+pts = [(SX, TOP), (SX+SW, TOP)]
+for k in range(NF):
+    ft = 24.6 + FP*k
+    pts += [(SX+SW, ft), (SXF, ft), (SXF, ft+FH), (SX+SW, ft+FH)]
+pts += [(SX+SW, SBOT), (SX, SBOT)]
+zone(pcbnew.F_Cu, "TOUCH_SENSE", pts, prio=1, solid=True)
+
+pts = [(GX, TOP), (GX-GW, TOP)]
+for k in range(NF):
+    ft = 26.1 + FP*k
+    pts += [(GX-GW, ft), (GXF, ft), (GXF, ft+FH), (GX-GW, ft+FH)]
+pts += [(GX-GW, BAR_T), (SX, BAR_T), (SX, BAR_B), (GX, BAR_B)]
+zone(pcbnew.F_Cu, "GND", pts, prio=1, solid=True)   # solid: nothing to tombstone on the pad section
 
 def pad(ref, num):
     fp = board.FindFootprintByReference(ref)
@@ -74,7 +91,7 @@ def pad(ref, num):
 
 routed = 0
 CH = 11.0
-for i in range(1, 11):
+for i in range(1, NLED):
     x1,y1 = pad(f"LD{i}","2"); x2,y2 = pad(f"LD{i+1}","4"); net=f"D_{i}_{i+1}"
     track(x1,y1,x1,CH,net); track(x1,CH,x2,CH,net); track(x2,CH,x2,y2,net); routed += 3
 # Buffer output leaves the bulge and runs ~80 mm to LD1. Past the ~75 mm critical
@@ -87,10 +104,10 @@ DIN_Y, DIN_X, EXIT = 18.6, 4.0, 73.5
 track(x,y, x,37.5, "LED_DIN1"); track(x,37.5, EXIT,37.5, "LED_DIN1")
 track(EXIT,37.5, EXIT,DIN_Y, "LED_DIN1"); track(EXIT,DIN_Y, DIN_X,DIN_Y, "LED_DIN1")
 track(DIN_X,DIN_Y, DIN_X,dy, "LED_DIN1"); track(DIN_X,dy, dx,dy, "LED_DIN1"); routed += 6
-x,y = pad("LD11","2"); tx,ty = pad("TP7","1")
+x,y = pad(f"LD{NLED}","2"); tx,ty = pad("TP7","1")
 track(x,y,x,CH,"LD11_DOUT"); track(x,CH,tx,CH,"LD11_DOUT"); track(tx,CH,tx,ty,"LD11_DOUT")
 routed += 3
-for i in range(1,12):
+for i in range(1, NLED+1):
     gx,gy = pad(f"C{9+i}","2"); via(gx,gy,"GND"); routed += 1
 
 # ── SENSE. In rev C this is ~13 mm inside the bulge instead of ~70 mm down the strip:
